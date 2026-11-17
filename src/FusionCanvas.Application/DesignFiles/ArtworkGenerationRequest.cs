@@ -10,4 +10,8 @@ public sealed record ArtworkGenerationRequest(
     IReadOnlyList<AiModelDescriptor> Models,
     IReadOnlyList<AiImageEndpointCapabilities> Endpoints,
     bool TransparentBackground,
-    bool RequireZeroDataRetention = true);
+    bool RequireZeroDataRetention = true,
+    string? Prompt = null,
+    ArtworkContrast Contrast = ArtworkContrast.DarkOnLight,
+    bool EditExistingArtwork = false,
+    string? AdjustmentPrompt = null);

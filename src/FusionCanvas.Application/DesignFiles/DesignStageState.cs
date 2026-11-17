@@ -1,6 +1,7 @@
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Application.Catalog;
+using FusionCanvas.Application.AI;
 
 namespace FusionCanvas.Application.DesignFiles;
 
@@ -35,4 +36,8 @@ public sealed record DesignStageState(
     public string? StaleConfigurationDisplayName { get; init; }
     public string RecoveryGuidance { get; init; } = string.Empty;
     public IReadOnlyList<FulfillmentOffering> RecoveryOfferings { get; init; } = [];
+    public string? DefaultArtworkPrompt { get; init; }
+    public string? ArtworkPromptOverride { get; init; }
+    public string? ArtworkAdjustmentPrompt { get; init; }
+    public ArtworkContrast ArtworkContrast { get; init; } = ArtworkContrast.DarkOnLight;
 }

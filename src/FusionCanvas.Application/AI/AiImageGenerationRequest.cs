@@ -8,4 +8,5 @@ public sealed record AiImageGenerationRequest(
     string ApiKey = "",
     bool RequireZeroDataRetention = true,
     string? ProviderTag = null,
-    AiImageGenerationOptions? Options = null);
+    AiImageGenerationOptions? Options = null,
+    IReadOnlyList<AiImageInputReference>? InputReferences = null);

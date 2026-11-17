@@ -99,7 +99,8 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         var selection = resolution.Availability == AiConfigurationAvailability.Ready
             && request.ArtworkProfile.ModelId is { Length: > 0 } modelId
             && area is not null
-            ? AiImageEndpointPolicy.SelectEndpoint(request.Endpoints, modelId, request.RequireZeroDataRetention, request.TransparentBackground, area.Size)
+            ? AiImageEndpointPolicy.SelectEndpoint(request.Endpoints, modelId, request.RequireZeroDataRetention,
+                request.TransparentBackground, area.Size, request.EditExistingArtwork)
             : null;
         var readiness = ArtworkGenerationReadinessPolicy.Evaluate(
             ItemWorkflowPolicy.CanPerformOperation(item, ItemOperationKind.DesignStage).IsAllowed,
@@ -115,22 +116,45 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         var readyArea = area!;
         var readySelection = selection!;
         var readyRow = row!;
-        var nicheContext = BuildNicheContext(snapshot, item.NicheId);
-        var sll = metadata.GetValueOrDefault(ItemMetadataCodec.SllKey);
-        var fingerprint = metadata.GetValueOrDefault(ItemMetadataCodec.SllSourceFingerprintKey);
-        var currentFingerprint = ItemMetadataCodec.ComputeSllSourceFingerprint(
-            metadata.GetValueOrDefault(ItemMetadataCodec.IdeaKey), metadata.GetValueOrDefault(ItemMetadataCodec.ConceptIdeaKey),
-            metadata.GetValueOrDefault(ItemMetadataCodec.PhraseKey), metadata.GetValueOrDefault(ItemMetadataCodec.GraphicDirectionKey));
-        var prompt = ArtworkPromptBuilder.Build(new ArtworkPromptContext(
-            metadata.GetValueOrDefault(ItemMetadataCodec.IdeaKey) ?? "", metadata.GetValueOrDefault(ItemMetadataCodec.ConceptIdeaKey) ?? "",
-            metadata.GetValueOrDefault(ItemMetadataCodec.PhraseKey) ?? "", metadata.GetValueOrDefault(ItemMetadataCodec.GraphicDirectionKey) ?? "",
-            readyArea.Name, readyArea.Position, readyArea.Size, readyArea.DecorationMethod, readyArea.Guidance is null ? null : $"Recommended format: {readyArea.Guidance.FileFormat ?? "PNG"}; background: {readyArea.Guidance.Background ?? "transparent when requested"}.",
-            metadata.GetValueOrDefault(ItemMetadataCodec.NotesKey), sll, !string.IsNullOrWhiteSpace(sll) && !string.Equals(fingerprint, currentFingerprint, StringComparison.Ordinal), nicheContext));
+        Asset? sourceArtwork = null;
+        IReadOnlyList<AiImageInputReference>? inputReferences = null;
+        if (request.EditExistingArtwork)
+        {
+            var sourceAssignment = snapshot.DesignSlotAssignments.SingleOrDefault(value =>
+                value.RowId == readyRow.Id && value.DesignAreaId == request.DesignAreaId);
+            sourceArtwork = sourceAssignment?.AssetId is Guid sourceAssetId
+                ? snapshot.Assets.SingleOrDefault(value => value.Id == sourceAssetId)
+                : null;
+            if (sourceArtwork is null
+                || sourceArtwork.Kind != AssetKind.ExportedImage
+                || sourceArtwork.IsMissing
+                || !Path.GetExtension(sourceArtwork.Name).Equals(".png", StringComparison.OrdinalIgnoreCase)
+                || !snapshot.AssetLinks.Any(value => value.AssetId == sourceArtwork.Id
+                    && value.EntityKind == WorkspaceEntityKind.Item && value.EntityId == item.Id))
+            {
+                return DesignStageResult.Failure("The selected Design slot has no available final PNG artwork to adjust.");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.AdjustmentPrompt))
+            {
+                return DesignStageResult.Failure("Enter adjustment instructions before adjusting existing artwork.");
+            }
+
+            inputReferences = [await ReadInputReferenceAsync(sourceArtwork, cancellationToken).ConfigureAwait(false)];
+        }
+
+        var prompt = request.EditExistingArtwork
+            ? request.AdjustmentPrompt
+            : request.Prompt ?? ArtworkPromptCompiler.BuildDefault(snapshot, item, request.DesignAreaId, request.Contrast);
+        if (string.IsNullOrWhiteSpace(prompt))
+        {
+            return DesignStageResult.Failure("The artwork prompt could not be built from the current Design context.");
+        }
 
         setStage("provider_dispatch");
         var dispatch = await _provider.GenerateAsync(new AiImageGenerationRequest(
             request.ArtworkProfile.ModelId!, prompt, readySelection.ProviderSize, request.TransparentBackground, request.ApiKey,
-            request.RequireZeroDataRetention, readySelection.Endpoint.EndpointId, readySelection.Options), cancellationToken).ConfigureAwait(false);
+            request.RequireZeroDataRetention, readySelection.Endpoint.EndpointId, readySelection.Options, inputReferences), cancellationToken).ConfigureAwait(false);
         if (dispatch.Failure is not null || dispatch.Result is null)
             return DesignStageResult.Failure(dispatch.Failure?.Message ?? "The image provider returned no artwork.");
         cancellationToken.ThrowIfCancellationRequested();
@@ -168,9 +192,23 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
             result.ProviderRequestId, result.Usage, normalized.Warnings, request.DesignAreaId);
         setStage("file_storage");
         ManagedWorkspaceFile managed;
-        await using (var content = new MemoryStream(normalized.PngBytes, writable: false))
+        ManagedWorkspaceFile? relatedManaged = null;
+        try
         {
+            if (sourceArtwork is not null)
+            {
+                await using var originalContent = new MemoryStream(inputReferences![0].ImageBytes, writable: false);
+                relatedManaged = await _fileStore.SaveAsync($"before-ai-edit-{_newId():N}.png", AssetKind.ReferenceImage, originalContent, cancellationToken).ConfigureAwait(false);
+            }
+
+            await using var content = new MemoryStream(normalized.PngBytes, writable: false);
             managed = await _fileStore.SaveAsync($"generated-artwork-{_newId():N}.png", AssetKind.ExportedImage, content, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            if (relatedManaged is not null)
+                await CleanupGeneratedFileAfterFailureAsync(relatedManaged.WorkspaceRelativePath, exception).ConfigureAwait(false);
+            throw;
         }
         await RecordStageAsync("file_storage", "Succeeded", "The normalized artwork file was stored.").ConfigureAwait(false);
         WorkspaceSnapshot currentSnapshot;
@@ -182,12 +220,16 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
             {
                 var invalidated = new InvalidOperationException("The Design context changed while artwork was generating.");
                 await CleanupGeneratedFileAfterFailureAsync(managed.WorkspaceRelativePath, invalidated).ConfigureAwait(false);
+                if (relatedManaged is not null)
+                    await CleanupGeneratedFileAfterFailureAsync(relatedManaged.WorkspaceRelativePath, invalidated).ConfigureAwait(false);
                 return DesignStageResult.Failure($"{invalidated.Message} The result was discarded; try again.");
             }
         }
         catch (Exception exception) when (exception is OperationCanceledException)
         {
             await CleanupGeneratedFileAfterFailureAsync(managed.WorkspaceRelativePath, exception).ConfigureAwait(false);
+            if (relatedManaged is not null)
+                await CleanupGeneratedFileAfterFailureAsync(relatedManaged.WorkspaceRelativePath, exception).ConfigureAwait(false);
             throw;
         }
 
@@ -196,15 +238,27 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         var currentRow = currentSnapshot.DesignVariantRows.Single(value => value.Id == readyRow.Id);
         var asset = new Asset(assetId, currentItem.StoreId, $"{GeneratedArtworkName} - {readyArea.Name}", null, AssetKind.ExportedImage,
             managed.WorkspaceRelativePath, null, false, false, now, now, _provenanceCodec.Serialize(provenance));
+        var relatedAssetId = relatedManaged is null ? (Guid?)null : _newId();
+        var relatedAsset = relatedManaged is null || sourceArtwork is null
+            ? null
+            : new Asset(relatedAssetId!.Value, currentItem.StoreId, $"Before AI edit - {readyArea.Name}", null,
+                AssetKind.ReferenceImage, relatedManaged.WorkspaceRelativePath, null, false, false, now, now, sourceArtwork.MetadataJson);
         var assignment = new DesignSlotAssignment(currentRow.Id, request.DesignAreaId, assetId);
         var reviewTarget = new ContentRiskReviewTarget(assetId, ContentRiskOwnerKind.Asset, ContentRiskContentKind.Image, "design.asset");
         var review = ContentRiskReview.Unreviewed(reviewTarget, ContentRiskFingerprint.ForImage(reviewTarget, normalized.PngBytes));
         var updated = currentSnapshot with
         {
-            Assets = [.. currentSnapshot.Assets, asset],
-            AssetLinks = [.. currentSnapshot.AssetLinks, new AssetLink(assetId, WorkspaceEntityKind.Item, currentItem.Id)],
+            Assets = relatedAsset is null ? [.. currentSnapshot.Assets, asset] : [.. currentSnapshot.Assets, asset, relatedAsset],
+            AssetLinks = relatedAsset is null
+                ? [.. currentSnapshot.AssetLinks, new AssetLink(assetId, WorkspaceEntityKind.Item, currentItem.Id)]
+                : [.. currentSnapshot.AssetLinks, new AssetLink(assetId, WorkspaceEntityKind.Item, currentItem.Id), new AssetLink(relatedAsset.Id, WorkspaceEntityKind.Item, currentItem.Id)],
             DesignSlotAssignments = [.. currentSnapshot.DesignSlotAssignments.Where(value => value.RowId != currentRow.Id || value.DesignAreaId != request.DesignAreaId), assignment],
-            ContentRiskReviews = [.. currentSnapshot.ContentRiskReviews.Where(existing => existing.Target != reviewTarget), review]
+            ContentRiskReviews = relatedAsset is null
+                ? [.. currentSnapshot.ContentRiskReviews.Where(existing => existing.Target != reviewTarget), review]
+                : [.. currentSnapshot.ContentRiskReviews.Where(existing => existing.Target.OwnerId != relatedAsset.Id && existing.Target != reviewTarget), review,
+                    ContentRiskReview.Unreviewed(
+                        new ContentRiskReviewTarget(relatedAsset.Id, ContentRiskOwnerKind.Asset, ContentRiskContentKind.Image, "design.asset"),
+                        ContentRiskFingerprint.ForImage(new ContentRiskReviewTarget(relatedAsset.Id, ContentRiskOwnerKind.Asset, ContentRiskContentKind.Image, "design.asset"), inputReferences![0].ImageBytes))]
         };
         try
         {
@@ -214,12 +268,16 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         catch (Exception exception)
         {
             var cleanup = await CleanupGeneratedFileAfterFailureAsync(managed.WorkspaceRelativePath, exception).ConfigureAwait(false);
+            var relatedCleanup = relatedManaged is null
+                ? null
+                : await CleanupGeneratedFileAfterFailureAsync(relatedManaged.WorkspaceRelativePath, exception).ConfigureAwait(false);
             if (exception is OperationCanceledException)
             {
                 throw;
             }
 
-            var cleanupMessage = ManagedWorkspaceFileCleanup.FailureMessage(cleanup);
+            var cleanupMessage = ManagedWorkspaceFileCleanup.FailureMessage(cleanup)
+                + (relatedCleanup is null ? string.Empty : ManagedWorkspaceFileCleanup.FailureMessage(relatedCleanup));
             return DesignStageResult.Failure($"The generated artwork could not be saved. {exception.Message}{cleanupMessage}");
         }
 
@@ -267,6 +325,21 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
             return false;
         }
 
+        // The compiled prompt includes live Store and Niche guidance. Discard an
+        // in-flight result when that source context changes during generation.
+        var expectedStore = expected.Stores.SingleOrDefault(value => value.Id == expectedItem.StoreId);
+        var currentStore = current.Stores.SingleOrDefault(value => value.Id == currentItem.StoreId);
+        var expectedNiche = expectedItem.NicheId is Guid expectedNicheId
+            ? expected.Niches.SingleOrDefault(value => value.Id == expectedNicheId)
+            : null;
+        var currentNiche = currentItem.NicheId is Guid currentNicheId
+            ? current.Niches.SingleOrDefault(value => value.Id == currentNicheId)
+            : null;
+        if (!Equals(expectedStore, currentStore) || !Equals(expectedNiche, currentNiche))
+        {
+            return false;
+        }
+
         var expectedRow = expected.DesignVariantRows.SingleOrDefault(value => value.ItemId == request.ItemId && value.IsDefault);
         var currentRow = current.DesignVariantRows.SingleOrDefault(value => value.ItemId == request.ItemId && value.IsDefault);
         if (!Equals(expectedRow, currentRow) || expectedRow is null || currentRow is null)
@@ -286,6 +359,24 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         if (!Equals(expectedAssignment, currentAssignment))
         {
             return false;
+        }
+
+        if (request.EditExistingArtwork)
+        {
+            var expectedAsset = expectedAssignment?.AssetId is Guid expectedAssetId
+                ? expected.Assets.SingleOrDefault(value => value.Id == expectedAssetId)
+                : null;
+            var currentAsset = currentAssignment?.AssetId is Guid currentAssetId
+                ? current.Assets.SingleOrDefault(value => value.Id == currentAssetId)
+                : null;
+            var expectedLink = expectedAsset is null ? null : expected.AssetLinks.SingleOrDefault(value =>
+                value.AssetId == expectedAsset.Id && value.EntityKind == WorkspaceEntityKind.Item && value.EntityId == request.ItemId);
+            var currentLink = currentAsset is null ? null : current.AssetLinks.SingleOrDefault(value =>
+                value.AssetId == currentAsset.Id && value.EntityKind == WorkspaceEntityKind.Item && value.EntityId == request.ItemId);
+            if (!Equals(expectedAsset, currentAsset) || !Equals(expectedLink, currentLink))
+            {
+                return false;
+            }
         }
 
         var expectedArea = expectedConfiguration is null ? null : ResolveArea(expected, expectedConfiguration.OfferingId, request.DesignAreaId);
@@ -330,45 +421,17 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         return legacy is null ? null : new(areaId, legacy.Name, legacy.Position, legacy.DecorationMethod, new AiImageSize(legacy.Width, legacy.Height), null);
     }
 
-    private static string? BuildNicheContext(WorkspaceSnapshot snapshot, Guid? nicheId)
+    private async Task<AiImageInputReference> ReadInputReferenceAsync(Asset asset, CancellationToken cancellationToken)
     {
-        if (nicheId is not Guid id || snapshot.Niches.SingleOrDefault(value => value.Id == id) is not { } niche)
-            return null;
-
-        var fields = new List<(string Label, string? Value)>
+        await using var source = await _fileStore.OpenReadAsync(asset.WorkspaceRelativePath, cancellationToken).ConfigureAwait(false);
+        using var buffer = new MemoryStream();
+        await source.CopyToAsync(buffer, cancellationToken).ConfigureAwait(false);
+        if (buffer.Length == 0)
         {
-            ("Name", niche.Name),
-            ("Description", niche.Description)
-        };
-        try
-        {
-            using var document = JsonDocument.Parse(niche.MetadataJson);
-            if (document.RootElement.ValueKind == JsonValueKind.Object)
-            {
-                AddMetadataField("Audience", "audience");
-                AddMetadataField("Humor style", "humorStyle");
-                AddMetadataField("Visual style guidance", "visualStyleGuidance");
-                AddMetadataField("Constraints", "constraints");
-                AddMetadataField("Risks", "risks");
-                AddMetadataField("Research notes", "researchNotes");
-                AddMetadataField("Notes", "notes");
-
-                void AddMetadataField(string label, string key)
-                {
-                    if (document.RootElement.TryGetProperty(key, out var property) && property.ValueKind == JsonValueKind.String)
-                        fields.Add((label, property.GetString()));
-                }
-            }
-        }
-        catch (JsonException)
-        {
-            // Keep usable name/description context if legacy or damaged metadata is malformed.
+            throw new InvalidDataException("The selected artwork is empty and cannot be used as an image reference.");
         }
 
-        var included = fields.Where(field => !string.IsNullOrWhiteSpace(field.Value))
-            .Select(field => $"{field.Label}: {field.Value!.Trim()}")
-            .ToArray();
-        return included.Length == 0 ? null : string.Join(Environment.NewLine, included);
+        return new AiImageInputReference("image/png", buffer.ToArray());
     }
 
     private static DesignStageState BuildStateAfterSave(WorkspaceSnapshot snapshot, Guid itemId)

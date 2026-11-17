@@ -1,3 +1,5 @@
+using FusionCanvas.Application.AI;
+
 namespace FusionCanvas.Application.DesignFiles;
 
 /// <summary>
@@ -21,6 +23,14 @@ public interface IDesignStageService
 
     /// <summary>Persists the Design-stage artwork target and transparency preference for an item.</summary>
     Task<DesignStageResult> SaveArtworkPreferencesAsync(Guid itemId, Guid? designAreaId, bool transparentBackground, CancellationToken cancellationToken = default);
+
+    Task<DesignStageResult> SaveArtworkPromptPreferencesAsync(
+        Guid itemId,
+        string? promptOverride,
+        string? adjustmentPrompt,
+        ArtworkContrast contrast,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(DesignStageResult.Failure("Artwork prompt preferences are unavailable."));
 
     /// <summary>Adds a color to the working set.</summary>
     Task<DesignStageResult> AddSelectedColorAsync(Guid itemId, string colorValue, CancellationToken cancellationToken = default);

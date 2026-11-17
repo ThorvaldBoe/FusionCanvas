@@ -216,6 +216,57 @@ public sealed class DesignStageService : IDesignStageService
         return await SaveDesignMutationAsync(updated, itemId, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<DesignStageResult> SaveArtworkPromptPreferencesAsync(
+        Guid itemId,
+        string? promptOverride,
+        string? adjustmentPrompt,
+        ArtworkContrast contrast,
+        CancellationToken cancellationToken = default)
+    {
+        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var item = snapshot.Items.SingleOrDefault(value => value.Id == itemId);
+        if (item is null)
+        {
+            return DesignStageResult.Failure("Item was not found.");
+        }
+
+        var editDecision = ItemWorkflowPolicy.CanPerformOperation(item, ItemOperationKind.DesignStage);
+        if (!editDecision.IsAllowed)
+        {
+            return DesignStageResult.Failure(editDecision.Reason, BuildState(snapshot, itemId));
+        }
+
+        var metadata = ItemMetadataCodec.ParseMetadata(item.MetadataJson);
+        metadata[ItemMetadataCodec.ArtworkContrastKey] = contrast.ToString();
+        if (string.IsNullOrWhiteSpace(promptOverride))
+        {
+            metadata.Remove(ItemMetadataCodec.ArtworkPromptOverrideKey);
+        }
+        else
+        {
+            metadata[ItemMetadataCodec.ArtworkPromptOverrideKey] = promptOverride;
+        }
+        if (string.IsNullOrWhiteSpace(adjustmentPrompt))
+        {
+            metadata.Remove(ItemMetadataCodec.ArtworkAdjustmentPromptKey);
+        }
+        else
+        {
+            metadata[ItemMetadataCodec.ArtworkAdjustmentPromptKey] = adjustmentPrompt;
+        }
+
+        var updatedItem = item with
+        {
+            MetadataJson = ItemMetadataCodec.SerializeMetadata(metadata),
+            UpdatedAt = _clock()
+        };
+        var updated = snapshot with
+        {
+            Items = [.. snapshot.Items.Where(value => value.Id != itemId), updatedItem]
+        };
+        return await SaveDesignMutationAsync(updated, itemId, cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task<DesignStageResult> AddSelectedColorAsync(Guid itemId, string colorValue, CancellationToken cancellationToken = default)
     {
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
@@ -1383,6 +1434,14 @@ public sealed class DesignStageService : IDesignStageService
             && bool.TryParse(itemMetadata.GetValueOrDefault(ItemMetadataCodec.ArtworkTransparentBackgroundKey), out var savedTransparentBackground)
                 ? savedTransparentBackground
                 : (bool?)null;
+        var artworkContrast = Enum.TryParse<ArtworkContrast>(itemMetadata.GetValueOrDefault(ItemMetadataCodec.ArtworkContrastKey), out var savedArtworkContrast)
+            ? savedArtworkContrast
+            : ArtworkContrast.DarkOnLight;
+        var defaultArtworkAreaId = persistedArtworkTargetId
+            ?? (normalizedConfiguredOffering?.PrimaryArtworkDesignAreaId is Guid primaryAreaId && activeArtworkAreaIds.Contains(primaryAreaId)
+                ? primaryAreaId
+                : (Guid?)null);
+        var defaultArtworkPrompt = ArtworkPromptCompiler.BuildDefault(snapshot, item, defaultArtworkAreaId, artworkContrast);
         var selectedNetworkCode = configOfferingId is Guid selectedId
             ? normalizedOfferings.SingleOrDefault(offering => offering.Id == selectedId)?.ProviderNetworkCode
             : null;
@@ -1404,6 +1463,10 @@ public sealed class DesignStageService : IDesignStageService
             PersistedArtworkTargetId = persistedArtworkTargetId,
             HasPersistedArtworkTargetPreference = hasPersistedArtworkTargetPreference,
             PersistedTransparentBackground = persistedTransparentBackground,
+            DefaultArtworkPrompt = defaultArtworkPrompt,
+            ArtworkPromptOverride = itemMetadata.GetValueOrDefault(ItemMetadataCodec.ArtworkPromptOverrideKey),
+            ArtworkAdjustmentPrompt = itemMetadata.GetValueOrDefault(ItemMetadataCodec.ArtworkAdjustmentPromptKey),
+            ArtworkContrast = artworkContrast,
             IsDesignTriangleComplete = isDesignTriangleComplete,
             HasDefaultRowWithSelectedColor = hasDefaultRowWithSelectedColor,
             HasStaleConfiguration = configuredOfferingIsStale,

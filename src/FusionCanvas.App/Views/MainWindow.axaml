@@ -1936,6 +1936,46 @@
                         <TextBlock Text="{Binding DesignTool.ArtworkGenerationGuidance}"
                                    TextWrapping="Wrap" FontSize="11"
                                    Foreground="{DynamicResource SecondaryTextBrush}" />
+                        <Expander Header="Image prompt and contrast" IsExpanded="False">
+                          <StackPanel Spacing="6" Margin="0,6,0,0">
+                            <TextBlock Text="Contrast" FontSize="11"
+                                       Foreground="{DynamicResource SecondaryTextBrush}" />
+                            <ComboBox ItemsSource="{Binding DesignTool.ArtworkContrastOptions}"
+                                      SelectedValue="{Binding DesignTool.ArtworkContrast, Mode=TwoWay}"
+                                      SelectedValueBinding="{Binding Value}"
+                                      DisplayMemberBinding="{Binding Label}"
+                                      IsEnabled="{Binding !DesignTool.IsReadOnly}"
+                                      AutomationProperties.Name="Artwork contrast" />
+                            <TextBox Text="{Binding DesignTool.ArtworkPrompt, Mode=TwoWay}"
+                                     AcceptsReturn="True"
+                                     TextWrapping="Wrap"
+                                     MinHeight="150"
+                                     VerticalContentAlignment="Top"
+                                     LostFocus="OnArtworkPromptLostFocus"
+                                     IsEnabled="{Binding !DesignTool.IsReadOnly}"
+                                     AutomationProperties.Name="Image generation prompt"
+                                     AutomationProperties.AutomationId="Design.ArtworkPrompt" />
+                            <TextBlock Text="Adjustment instructions"
+                                       IsVisible="{Binding DesignTool.HasCurrentArtwork}"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource SecondaryTextBrush}" />
+                            <TextBox Text="{Binding DesignTool.ArtworkAdjustmentPrompt, Mode=TwoWay}"
+                                     IsVisible="{Binding DesignTool.HasCurrentArtwork}"
+                                     AcceptsReturn="True"
+                                     TextWrapping="Wrap"
+                                     MinHeight="70"
+                                     VerticalContentAlignment="Top"
+                                     PlaceholderText="For example: Use capital letters and a more vintage font. Preserve the bike and layout."
+                                     LostFocus="OnArtworkPromptLostFocus"
+                                     IsEnabled="{Binding !DesignTool.IsReadOnly}"
+                                     AutomationProperties.Name="Instructions for adjusting existing artwork"
+                                     AutomationProperties.AutomationId="Design.ArtworkAdjustmentPrompt" />
+                            <Button Content="Reset to default prompt"
+                                    Command="{Binding DesignTool.ResetArtworkPromptCommand}"
+                                    IsEnabled="{Binding DesignTool.CanResetArtworkPrompt}"
+                                    AutomationProperties.Name="Reset image prompt to current Concept and Store settings" />
+                          </StackPanel>
+                        </Expander>
                         <ComboBox ItemsSource="{Binding DesignTool.ArtworkTargets}"
                                   SelectedValue="{Binding DesignTool.SelectedArtworkTargetId, Mode=TwoWay}"
                                   SelectedValueBinding="{Binding Id}"
@@ -1954,6 +1994,13 @@
                                   IsEnabled="{Binding DesignTool.CanGenerateArtwork}"
                                   AutomationProperties.Name="Generate Artwork"
                                   AutomationProperties.AutomationId="Design.GenerateArtwork" />
+                          <Button Content="Adjust existing artwork"
+                                  Command="{Binding DesignTool.AdjustExistingArtworkCommand}"
+                                  IsEnabled="{Binding DesignTool.CanAdjustExistingArtwork}"
+                                  ToolTip.Tip="{Binding DesignTool.ArtworkAdjustmentAvailabilityMessage}"
+                                  ToolTip.ShowOnDisabled="True"
+                                  AutomationProperties.Name="Adjust existing artwork using the adjustment instructions"
+                                  AutomationProperties.AutomationId="Design.AdjustArtwork" />
                           <Button Content="Cancel"
                                   Command="{Binding DesignTool.CancelArtworkCommand}"
                                   IsVisible="{Binding DesignTool.IsArtworkBusy}"

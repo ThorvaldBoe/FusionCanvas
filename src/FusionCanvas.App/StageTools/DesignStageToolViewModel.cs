@@ -61,6 +61,11 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
     private bool _isArtworkBusy;
     private Guid? _selectedArtworkTargetId;
     private bool _transparentBackground;
+    private ArtworkContrast _artworkContrast = ArtworkContrast.DarkOnLight;
+    private string? _defaultArtworkPrompt;
+    private string? _artworkPromptOverride;
+    private string _artworkPrompt = string.Empty;
+    private string _artworkAdjustmentPrompt = string.Empty;
     private IReadOnlyList<AiImageEndpointCapabilities> _artworkEndpoints = [];
     private bool _artworkCapabilitiesLoaded;
     private string? _artworkCapabilityMessage;
@@ -91,6 +96,8 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         _aiConfiguration = aiConfiguration;
         _globalColorRemovalService = globalColorRemovalService;
         GenerateArtworkCommand = new RelayCommand(_ => _ = GenerateArtworkAsync(), () => CanGenerateArtwork);
+        AdjustExistingArtworkCommand = new RelayCommand(_ => _ = GenerateArtworkAsync(editExistingArtwork: true), () => CanAdjustExistingArtwork);
+        ResetArtworkPromptCommand = new RelayCommand(_ => _ = ResetArtworkPromptAsync(), () => CanResetArtworkPrompt);
         CancelArtworkCommand = new RelayCommand(_ => _artworkCts?.Cancel(), () => IsArtworkBusy);
         ConfirmListingMigrationCommand = new RelayCommand(_ => _ = ConfirmListingMigrationAsync(), () => IsListingMigrationReviewVisible && !IsBusy);
         CancelListingMigrationCommand = new RelayCommand(_ => _ = CancelListingMigrationAsync(), () => IsListingMigrationReviewVisible && !IsBusy);
@@ -290,8 +297,12 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
             _isReadOnly = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(CanGenerateArtwork));
+            OnPropertyChanged(nameof(CanAdjustExistingArtwork));
+            OnPropertyChanged(nameof(CanResetArtworkPrompt));
             NotifyArtworkPreviewState();
             GenerateArtworkCommand.NotifyCanExecuteChanged();
+            AdjustExistingArtworkCommand.NotifyCanExecuteChanged();
+            ResetArtworkPromptCommand.NotifyCanExecuteChanged();
         }
     }
 
@@ -537,8 +548,12 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
             }
             OnPropertyChanged(nameof(ArtworkGenerationGuidance));
             OnPropertyChanged(nameof(CanGenerateArtwork));
+            OnPropertyChanged(nameof(CanAdjustExistingArtwork));
+            OnPropertyChanged(nameof(ArtworkAdjustmentAvailabilityMessage));
+            OnPropertyChanged(nameof(HasCurrentArtwork));
             OnPropertyChanged(nameof(CanUseTransparentBackground));
             GenerateArtworkCommand.NotifyCanExecuteChanged();
+            AdjustExistingArtworkCommand.NotifyCanExecuteChanged();
         }
     }
 
@@ -625,13 +640,71 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
     public bool IsArtworkBusy
     {
         get => _isArtworkBusy;
-        private set { if (_isArtworkBusy == value) return; _isArtworkBusy = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanGenerateArtwork)); GenerateArtworkCommand.NotifyCanExecuteChanged(); CancelArtworkCommand.NotifyCanExecuteChanged(); }
+        private set { if (_isArtworkBusy == value) return; _isArtworkBusy = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanGenerateArtwork)); OnPropertyChanged(nameof(CanAdjustExistingArtwork)); GenerateArtworkCommand.NotifyCanExecuteChanged(); AdjustExistingArtworkCommand.NotifyCanExecuteChanged(); CancelArtworkCommand.NotifyCanExecuteChanged(); }
     }
 
     public bool CanGenerateArtwork => _artworkGenerationService is not null && !IsArtworkBusy && EvaluateArtworkReadiness().IsReady;
+    public bool HasCurrentArtwork => CurrentDefaultArtworkSlot()?.AssetId is Guid;
+    public bool CanAdjustExistingArtwork => _artworkGenerationService is not null
+        && !IsReadOnly && !IsArtworkBusy && SelectedArtworkTargetId is Guid targetId
+        && HasCurrentArtwork
+        && !string.IsNullOrWhiteSpace(ArtworkAdjustmentPrompt)
+        && HasCompatibleArtworkEndpoint(transparentBackground: false, requireInputReference: true)
+        && EvaluateArtworkReadiness().IsReady;
+    public string ArtworkAdjustmentAvailabilityMessage
+    {
+        get
+        {
+            if (IsReadOnly) return ReadOnlyReason;
+            if (SelectedArtworkTargetId is null) return "Choose a Design Area before adjusting artwork.";
+            if (!HasCurrentArtwork) return "Assign final artwork to the selected Design Area before adjusting it.";
+            if (string.IsNullOrWhiteSpace(ArtworkAdjustmentPrompt)) return "Enter adjustment instructions to edit the selected artwork.";
+            if (!_artworkCapabilitiesLoaded) return "Checking whether the selected image model supports image editing…";
+            if (!HasCompatibleArtworkEndpoint(transparentBackground: false, requireInputReference: true))
+                return "The selected image model endpoint does not advertise image-reference support for editing.";
+            return ArtworkGenerationGuidance;
+        }
+    }
     public bool CanUseTransparentBackground => !IsReadOnly && HasCompatibleArtworkEndpoint(transparentBackground: true);
-    public string ArtworkProgress => IsArtworkBusy ? "Generating artwork…" : string.Empty;
+    public string ArtworkProgress => IsArtworkBusy ? "Generating or adjusting artwork…" : string.Empty;
+    public string ArtworkPrompt { get => _artworkPrompt; set { if (_artworkPrompt == value) return; _artworkPrompt = value ?? string.Empty; OnPropertyChanged(); OnPropertyChanged(nameof(CanResetArtworkPrompt)); OnPropertyChanged(nameof(HasCustomArtworkPrompt)); ResetArtworkPromptCommand.NotifyCanExecuteChanged(); } }
+    public string ArtworkAdjustmentPrompt
+    {
+        get => _artworkAdjustmentPrompt;
+        set
+        {
+            if (_artworkAdjustmentPrompt == value) return;
+            _artworkAdjustmentPrompt = value ?? string.Empty;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(CanAdjustExistingArtwork));
+            OnPropertyChanged(nameof(ArtworkAdjustmentAvailabilityMessage));
+            OnPropertyChanged(nameof(HasCurrentArtwork));
+            AdjustExistingArtworkCommand.NotifyCanExecuteChanged();
+        }
+    }
+    public ArtworkContrast ArtworkContrast
+    {
+        get => _artworkContrast;
+        set
+        {
+            if (_artworkContrast == value) return;
+            _artworkContrast = value;
+            OnPropertyChanged();
+            if (!_isApplyingState)
+                _ = PersistArtworkPromptPreferencesAsync(preserveCustomPrompt: true);
+        }
+    }
+    public static IReadOnlyList<ArtworkContrastChoice> ArtworkContrastOptions { get; } =
+    [
+        new(ArtworkContrast.LightOnDark, "Light on dark"),
+        new(ArtworkContrast.DarkOnLight, "Dark on light")
+    ];
+    public bool CanResetArtworkPrompt => !IsReadOnly && !IsArtworkBusy && HasCustomArtworkPrompt;
+    public bool HasCustomArtworkPrompt => !string.IsNullOrWhiteSpace(_artworkPromptOverride)
+        || !string.IsNullOrWhiteSpace(_artworkPrompt) && !string.Equals(_artworkPrompt, _defaultArtworkPrompt, StringComparison.Ordinal);
     public RelayCommand GenerateArtworkCommand { get; }
+    public RelayCommand AdjustExistingArtworkCommand { get; }
+    public RelayCommand ResetArtworkPromptCommand { get; }
     public RelayCommand CancelArtworkCommand { get; }
     public RelayCommand ConfirmListingMigrationCommand { get; }
     public RelayCommand CancelListingMigrationCommand { get; }
@@ -778,6 +851,11 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
                 {
                     ErrorMessage = result.Error;
                 }
+                else if (result.State is { } state && _artworkPromptOverride is null)
+                {
+                    _defaultArtworkPrompt = state.DefaultArtworkPrompt;
+                    ArtworkPrompt = _defaultArtworkPrompt ?? string.Empty;
+                }
             }
             finally
             {
@@ -789,6 +867,95 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
             ErrorMessage = $"The artwork preferences could not be persisted. {exception.Message}";
         }
     }
+
+    public async Task SaveArtworkPromptAsync(CancellationToken cancellationToken = default)
+    {
+        await PersistArtworkPromptPreferencesAsync(preserveCustomPrompt: true, cancellationToken).ConfigureAwait(true);
+    }
+
+    public async Task ResetArtworkPromptAsync(CancellationToken cancellationToken = default)
+    {
+        if (_isDisposed || IsReadOnly || IsArtworkBusy || _itemId == Guid.Empty)
+        {
+            return;
+        }
+
+        await SavePromptPreferencesCoreAsync(null, ArtworkContrast, cancellationToken).ConfigureAwait(true);
+    }
+
+    private async Task<bool> PersistArtworkPromptPreferencesAsync(
+        bool preserveCustomPrompt,
+        CancellationToken cancellationToken = default)
+    {
+        if (_isApplyingState || _itemId == Guid.Empty || IsReadOnly)
+        {
+            return false;
+        }
+
+        var promptOverride = preserveCustomPrompt
+            && !string.IsNullOrWhiteSpace(_artworkPrompt)
+            && !string.Equals(_artworkPrompt, _defaultArtworkPrompt, StringComparison.Ordinal)
+                ? _artworkPrompt
+                : null;
+        return await SavePromptPreferencesCoreAsync(promptOverride, ArtworkContrast, cancellationToken).ConfigureAwait(true);
+    }
+
+    private async Task<bool> SavePromptPreferencesCoreAsync(
+        string? promptOverride,
+        ArtworkContrast contrast,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _artworkPreferenceSaveGate.WaitAsync(cancellationToken).ConfigureAwait(true);
+            try
+            {
+                var result = await _designStageService.SaveArtworkPromptPreferencesAsync(
+                    _itemId, promptOverride, ArtworkAdjustmentPrompt, contrast, cancellationToken).ConfigureAwait(true);
+                if (!result.Succeeded)
+                {
+                    ErrorMessage = result.Error;
+                    return false;
+                }
+
+                if (result.State is { } state)
+                {
+                    _isApplyingState = true;
+                    try
+                    {
+                        _defaultArtworkPrompt = state.DefaultArtworkPrompt;
+                        _artworkPromptOverride = state.ArtworkPromptOverride;
+                        _artworkPrompt = state.ArtworkPromptOverride ?? state.DefaultArtworkPrompt ?? string.Empty;
+                        _artworkAdjustmentPrompt = state.ArtworkAdjustmentPrompt ?? string.Empty;
+                        _artworkContrast = state.ArtworkContrast;
+                        OnPropertyChanged(nameof(ArtworkPrompt));
+                        OnPropertyChanged(nameof(ArtworkAdjustmentPrompt));
+                        OnPropertyChanged(nameof(ArtworkContrast));
+                        OnPropertyChanged(nameof(CanResetArtworkPrompt));
+                    }
+                    finally
+                    {
+                        _isApplyingState = false;
+                    }
+                }
+
+                ResetArtworkPromptCommand.NotifyCanExecuteChanged();
+                return true;
+            }
+            finally
+            {
+                _artworkPreferenceSaveGate.Release();
+            }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            ErrorMessage = $"The artwork prompt could not be persisted. {exception.Message}";
+            return false;
+        }
+    }
+
+    private DesignSlotViewModel? CurrentDefaultArtworkSlot() =>
+        Rows.SingleOrDefault(row => row.IsDefault)?.Slots.SingleOrDefault(slot => slot.DesignAreaId == _selectedArtworkTargetId);
 
     public async Task ToggleColorAsync(string colorValue, bool add, CancellationToken ct = default)
     {
@@ -1199,9 +1366,10 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         }
     }
 
-    public async Task GenerateArtworkAsync(CancellationToken cancellationToken = default)
+    public async Task GenerateArtworkAsync(CancellationToken cancellationToken = default, bool editExistingArtwork = false)
     {
-        if (_isDisposed || !CanGenerateArtwork || _aiConfiguration is null || _selectedArtworkTargetId is not Guid targetId)
+        if (_isDisposed || (editExistingArtwork ? !CanAdjustExistingArtwork : !CanGenerateArtwork)
+            || _aiConfiguration is null || _selectedArtworkTargetId is not Guid targetId)
             return;
 
         var operationGeneration = Volatile.Read(ref _artworkOperationGeneration);
@@ -1214,6 +1382,10 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         ErrorMessage = null;
         try
         {
+            if (!await PersistArtworkPromptPreferencesAsync(preserveCustomPrompt: true).ConfigureAwait(true))
+            {
+                return;
+            }
             var key = await _aiConfiguration.ReadApiKeyAsync(operationCts.Token).ConfigureAwait(true);
             var profile = _aiConfiguration.Current.Artwork;
             var endpoints = await _aiConfiguration.GetArtworkEndpointsAsync(operationCts.Token).ConfigureAwait(true);
@@ -1231,7 +1403,8 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
 
             var result = await _artworkGenerationService!.GenerateAsync(new ArtworkGenerationRequest(
                 _itemId, targetId, key, profile, _aiConfiguration.AvailableModels, endpoints,
-                TransparentBackground, _aiConfiguration.Current.RequireZeroDataRetention), operationCts.Token).ConfigureAwait(true);
+                TransparentBackground, _aiConfiguration.Current.RequireZeroDataRetention,
+                ArtworkPrompt, ArtworkContrast, editExistingArtwork, ArtworkAdjustmentPrompt), operationCts.Token).ConfigureAwait(true);
             if (!IsCurrentArtworkOperation(operationGeneration, operationItemId, targetId, operationCts.Token))
             {
                 return;
@@ -1354,6 +1527,17 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
             SelectedArtworkTargetId = state.HasPersistedArtworkTargetPreference
                 ? state.PersistedArtworkTargetId
                 : defaultTargetId;
+            _defaultArtworkPrompt = state.DefaultArtworkPrompt;
+            _artworkPromptOverride = state.ArtworkPromptOverride;
+            _artworkPrompt = state.ArtworkPromptOverride ?? state.DefaultArtworkPrompt ?? string.Empty;
+            _artworkAdjustmentPrompt = state.ArtworkAdjustmentPrompt ?? string.Empty;
+            _artworkContrast = state.ArtworkContrast;
+            OnPropertyChanged(nameof(ArtworkPrompt));
+            OnPropertyChanged(nameof(ArtworkAdjustmentPrompt));
+            OnPropertyChanged(nameof(ArtworkContrast));
+            OnPropertyChanged(nameof(CanResetArtworkPrompt));
+            OnPropertyChanged(nameof(CanAdjustExistingArtwork));
+            OnPropertyChanged(nameof(HasCurrentArtwork));
             TransparentBackground = state.PersistedTransparentBackground
                 ?? ArtworkTargets.SingleOrDefault(value => value.Id == SelectedArtworkTargetId)?.RecommendsTransparency
                 ?? false;
@@ -1438,6 +1622,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
                     PrepareColorRemovalAvailability(slot);
                 }
             }
+            OnPropertyChanged(nameof(CanAdjustExistingArtwork));
         }
         finally
         {
@@ -1581,7 +1766,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         NotifyArtworkCapabilityState();
     }
 
-    private bool HasCompatibleArtworkEndpoint(bool transparentBackground)
+    private bool HasCompatibleArtworkEndpoint(bool transparentBackground, bool requireInputReference = false)
     {
         if (!_artworkCapabilitiesLoaded || _aiConfiguration?.Current.Artwork.ModelId is not { Length: > 0 } modelId)
             return false;
@@ -1591,7 +1776,8 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
             modelId,
             _aiConfiguration.Current.RequireZeroDataRetention,
             transparentBackground,
-            new AiImageSize(target.Width, target.Height)) is not null;
+            new AiImageSize(target.Width, target.Height),
+            requireInputReference) is not null;
     }
 
     private ArtworkGenerationReadiness EvaluateArtworkReadiness()
@@ -1614,8 +1800,11 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
     {
         OnPropertyChanged(nameof(ArtworkGenerationGuidance));
         OnPropertyChanged(nameof(CanGenerateArtwork));
+        OnPropertyChanged(nameof(CanAdjustExistingArtwork));
+        OnPropertyChanged(nameof(ArtworkAdjustmentAvailabilityMessage));
         OnPropertyChanged(nameof(CanUseTransparentBackground));
         GenerateArtworkCommand.NotifyCanExecuteChanged();
+        AdjustExistingArtworkCommand.NotifyCanExecuteChanged();
     }
 
     private void SetPreviewImage(byte[] png)
@@ -1667,6 +1856,8 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
     private void OnPropertyChanged([CallerMemberName] string? name = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
+
+public sealed record ArtworkContrastChoice(ArtworkContrast Value, string Label);
 
 /// <summary>Kind of removal pending user confirmation.</summary>
 

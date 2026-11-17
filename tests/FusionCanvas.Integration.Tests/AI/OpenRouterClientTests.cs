@@ -239,6 +239,7 @@ public class OpenRouterClientTests : IDisposable
         Assert.False(endpoint.Parameters.SupportsExplicitSize);
         Assert.False(endpoint.Parameters.SupportsOutputFormat);
         Assert.True(endpoint.Parameters.SupportsImageCount);
+        Assert.Equal(16, endpoint.Parameters.MaxInputReferences);
         var opaque = AiImageEndpointPolicy.SelectEndpoint(endpoints, endpoint.ModelId, false, false, new(3000, 4500));
         Assert.NotNull(opaque);
         Assert.Equal("2:3", opaque.Options.AspectRatio);
@@ -288,6 +289,27 @@ public class OpenRouterClientTests : IDisposable
         Assert.False(provider.TryGetProperty("require_parameters", out _));
         Assert.False(provider.TryGetProperty("zdr", out _));
         Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async Task ImageGenerateAsync_SerializesOptionalReferenceImageAsDataUrl()
+    {
+        var encoded = Convert.ToBase64String([7, 8, 9]);
+        var handler = new RecordingHandler(Json(HttpStatusCode.OK,
+            "{\"data\":[{\"b64_json\":\"" + encoded + "\",\"media_type\":\"image/png\"}]}"));
+        var client = CreateClient(handler);
+
+        var (result, failure) = await client.GenerateAsync(new AiImageGenerationRequest(
+            "selected/model", "Use a vintage font and preserve the bike.", new AiImageSize(512, 512), false,
+            "secret", false, "provider-tag", InputReferences: [new AiImageInputReference("image/png", [1, 2, 3])]),
+            TestContext.Current.CancellationToken);
+
+        Assert.Null(failure);
+        Assert.NotNull(result);
+        using var body = JsonDocument.Parse(handler.Requests[0].Body!);
+        var reference = Assert.Single(body.RootElement.GetProperty("input_references").EnumerateArray());
+        Assert.Equal("image_url", reference.GetProperty("type").GetString());
+        Assert.Equal("data:image/png;base64,AQID", reference.GetProperty("image_url").GetProperty("url").GetString());
     }
 
     [Fact]
