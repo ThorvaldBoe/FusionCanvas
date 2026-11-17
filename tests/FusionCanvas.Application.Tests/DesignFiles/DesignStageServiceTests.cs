@@ -9,6 +9,7 @@ using FusionCanvas.Domain.Mockups;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.DesignFiles;
 using FusionCanvas.Application.Catalog;
+using FusionCanvas.Application.Items;
 using System.Text.Json;
 using FusionCanvas.Integration.Files;
 using SixLabors.ImageSharp;
@@ -51,6 +52,49 @@ public class DesignStageServiceTests
         Assert.Equal(OfferingReadinessIssueKind.IncompleteMockupTemplate, issue.Kind);
         Assert.Equal("Front mockup", issue.TemplateName);
         Assert.Contains(MockupTemplateReadinessBlocker.MissingMapping, issue.TemplateBlockers!);
+    }
+
+    [Fact]
+    public async Task ArtworkPromptPreferences_PersistOverrideContrastAndAdjustmentThenResetFromCurrentContext()
+    {
+        var repository = new InMemoryWorkspaceRepository(SeedWithProduct());
+        var service = New(repository);
+        var (itemId, offeringId) = await AddItemAndConfig(service, repository);
+        var areaId = repository.Snapshot.DesignAreas.Single().Id;
+        var item = repository.Snapshot.Items.Single(value => value.Id == itemId);
+        repository.Snapshot = repository.Snapshot with
+        {
+            Items = [item with { MetadataJson = "{\"idea\":\"old idea\",\"concept.idea\":\"old concept\",\"phrase\":\"Exact words\",\"graphicDirection\":\"old graphic\"}" }]
+        };
+        await service.SelectConfigurationAsync(itemId, offeringId, TestContext.Current.CancellationToken);
+        await service.SaveArtworkPreferencesAsync(itemId, areaId, false, TestContext.Current.CancellationToken);
+
+        var saved = await service.SaveArtworkPromptPreferencesAsync(itemId, "Edited generation prompt", "Make the type vintage.",
+            FusionCanvas.Application.AI.ArtworkContrast.LightOnDark, TestContext.Current.CancellationToken);
+
+        Assert.True(saved.Succeeded);
+        Assert.Equal("Edited generation prompt", saved.State!.ArtworkPromptOverride);
+        Assert.Equal("Make the type vintage.", saved.State.ArtworkAdjustmentPrompt);
+        Assert.Equal(FusionCanvas.Application.AI.ArtworkContrast.LightOnDark, saved.State.ArtworkContrast);
+
+        var currentItem = repository.Snapshot.Items.Single(value => value.Id == itemId);
+        var metadata = ItemMetadataCodec.ParseMetadata(currentItem.MetadataJson);
+        metadata[ItemMetadataCodec.IdeaKey] = "updated idea";
+        repository.Snapshot = repository.Snapshot with
+        {
+            Items = [currentItem with { MetadataJson = ItemMetadataCodec.SerializeMetadata(metadata) }]
+        };
+
+        var reset = await service.SaveArtworkPromptPreferencesAsync(itemId, null, "Make the type vintage.",
+            FusionCanvas.Application.AI.ArtworkContrast.LightOnDark, TestContext.Current.CancellationToken);
+        var reloaded = await service.LoadDesignStageStateAsync(itemId, TestContext.Current.CancellationToken);
+
+        Assert.True(reset.Succeeded);
+        Assert.Null(reset.State!.ArtworkPromptOverride);
+        Assert.Contains("updated idea", reset.State.DefaultArtworkPrompt!, StringComparison.Ordinal);
+        Assert.Contains("ARTWORK CONTRAST: Use light foreground artwork", reloaded.DefaultArtworkPrompt!, StringComparison.Ordinal);
+        Assert.Equal("Make the type vintage.", reloaded.ArtworkAdjustmentPrompt);
+        Assert.Equal(FusionCanvas.Application.AI.ArtworkContrast.LightOnDark, reloaded.ArtworkContrast);
     }
 
     [Fact]

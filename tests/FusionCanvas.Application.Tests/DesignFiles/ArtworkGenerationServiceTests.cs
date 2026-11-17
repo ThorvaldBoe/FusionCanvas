@@ -103,6 +103,153 @@ public sealed class ArtworkGenerationServiceTests
     }
 
     [Fact]
+    public async Task GenerateAsync_EditSendsCurrentPngAndSeparateInstructionsThenPreservesBeforeImage()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
+        var product = new StoreProduct(Guid.NewGuid(), store.Id, "Shirt", null, null, now, now, "{}");
+        var offering = new FulfillmentOffering(Guid.NewGuid(), product.Id, "Provider", null, FulfillmentKind.FixedProvider, "Provider", null, now, now, "{}");
+        var area = new DesignArea(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 1200, 1400, null, now, now, "{}");
+        var item = new Item(Guid.NewGuid(), store.Id, null, null, "Bike", null, ItemStatus.Draft, WorkflowStage.Design, false, now, now,
+            "{\"idea\":\"bike pun\",\"concept.idea\":\"commuter joke\",\"phrase\":\"Two-tired for work\",\"graphicDirection\":\"side profile bike\"}");
+        var row = new DesignVariantRow(Guid.NewGuid(), item.Id, true, 0);
+        var sourceAsset = new Asset(Guid.NewGuid(), store.Id, "existing.png", null, AssetKind.ExportedImage,
+            "assets/existing.png", null, false, false, now, now, "{}");
+        var repository = new Repo(new WorkspaceSnapshot([store], [], [], [item], [sourceAsset], [], [], [], [])
+        {
+            StoreProducts = [product],
+            FulfillmentOfferings = [offering],
+            DesignAreas = [area],
+            ItemListingConfigurations = [new(item.Id, offering.Id)],
+            DesignVariantRows = [row],
+            DesignVariantRowColors = [new(row.Id, "Black")],
+            DesignSlotAssignments = [new(row.Id, area.Id, sourceAsset.Id)],
+            AssetLinks = [new(sourceAsset.Id, WorkspaceEntityKind.Item, item.Id)]
+        });
+        var provider = new Provider();
+        var files = new Files { ReadBytes = [9, 8, 7, 6] };
+        var service = new ArtworkGenerationService(repository, files, new TestAiImageProvenanceCodec(), provider, new Normalizer(), () => now, Guid.NewGuid);
+        var model = new AiModelDescriptor("image/model", "Image", null, null, ["text"], ["image"], [], null, null, null, null, true, null);
+        var endpoints = new[]
+        {
+            new AiImageEndpointCapabilities("endpoint", model.Id, true, true, ["png"], [new(1200, 1400)], false,
+                Parameters: new AiImageEndpointParameterCapabilities([], [], true, true, ["opaque"], true, MaxInputReferences: 1))
+        };
+        var request = new ArtworkGenerationRequest(item.Id, area.Id, "secret", AiProfileSettings.Empty with { ModelId = model.Id },
+            [model], endpoints, false, false, "unchanged generation prompt", ArtworkContrast.LightOnDark,
+            EditExistingArtwork: true, AdjustmentPrompt: "Use capital letters and a vintage font; preserve the bicycle.");
+
+        var result = await service.GenerateAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded, result.Error);
+        Assert.Equal("Use capital letters and a vintage font; preserve the bicycle.", provider.LastRequest!.Prompt);
+        Assert.Equal([9, 8, 7, 6], Assert.Single(provider.LastRequest.InputReferences!).ImageBytes);
+        Assert.Equal("image/png", provider.LastRequest.InputReferences!.Single().MediaType);
+        Assert.Equal(2, repository.Snapshot.Assets.Count(asset => asset.Kind == AssetKind.ExportedImage));
+        var relatedImage = Assert.Single(repository.Snapshot.Assets.Where(asset => asset.Kind == AssetKind.ReferenceImage));
+        Assert.Contains(repository.Snapshot.AssetLinks, link => link.AssetId == relatedImage.Id && link.EntityId == item.Id);
+        Assert.NotEqual(sourceAsset.Id, repository.Snapshot.DesignSlotAssignments.Single().AssetId);
+        Assert.Equal(3, repository.Snapshot.Assets.Count);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_EditDiscardsProviderResultWhenAssignedSourceChanges()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
+        var product = new StoreProduct(Guid.NewGuid(), store.Id, "Shirt", null, null, now, now, "{}");
+        var offering = new FulfillmentOffering(Guid.NewGuid(), product.Id, "Provider", null, FulfillmentKind.FixedProvider, "Provider", null, now, now, "{}");
+        var area = new DesignArea(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 1200, 1400, null, now, now, "{}");
+        var item = new Item(Guid.NewGuid(), store.Id, null, null, "Bike", null, ItemStatus.Draft, WorkflowStage.Design, false, now, now,
+            "{\"idea\":\"bike pun\",\"concept.idea\":\"commuter joke\",\"phrase\":\"Two-tired for work\",\"graphicDirection\":\"side profile bike\"}");
+        var row = new DesignVariantRow(Guid.NewGuid(), item.Id, true, 0);
+        var sourceAsset = new Asset(Guid.NewGuid(), store.Id, "existing.png", null, AssetKind.ExportedImage,
+            "assets/existing.png", null, false, false, now, now, "{}");
+        var repository = new Repo(new WorkspaceSnapshot([store], [], [], [item], [sourceAsset], [], [], [], [])
+        {
+            StoreProducts = [product],
+            FulfillmentOfferings = [offering],
+            DesignAreas = [area],
+            ItemListingConfigurations = [new(item.Id, offering.Id)],
+            DesignVariantRows = [row],
+            DesignVariantRowColors = [new(row.Id, "Black")],
+            DesignSlotAssignments = [new(row.Id, area.Id, sourceAsset.Id)],
+            AssetLinks = [new(sourceAsset.Id, WorkspaceEntityKind.Item, item.Id)]
+        });
+        var provider = new Provider
+        {
+            BeforeReturn = () => repository.Snapshot = repository.Snapshot with
+            {
+                DesignSlotAssignments = [new(row.Id, area.Id, null)]
+            }
+        };
+        var files = new Files { ReadBytes = [9, 8, 7, 6] };
+        var service = new ArtworkGenerationService(repository, files, new TestAiImageProvenanceCodec(), provider, new Normalizer(), () => now, Guid.NewGuid);
+        var model = new AiModelDescriptor("image/model", "Image", null, null, ["text"], ["image"], [], null, null, null, null, true, null);
+        var endpoints = new[]
+        {
+            new AiImageEndpointCapabilities("endpoint", model.Id, true, true, ["png"], [new(1200, 1400)], false,
+                Parameters: new AiImageEndpointParameterCapabilities([], [], true, true, ["opaque"], true, MaxInputReferences: 1))
+        };
+        var request = new ArtworkGenerationRequest(item.Id, area.Id, "secret", AiProfileSettings.Empty with { ModelId = model.Id },
+            [model], endpoints, false, false, "generation prompt", ArtworkContrast.DarkOnLight,
+            EditExistingArtwork: true, AdjustmentPrompt: "Make the lettering vintage.");
+
+        var result = await service.GenerateAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("context changed", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, provider.Calls);
+        Assert.Null(files.SavedContent);
+        Assert.Single(repository.Snapshot.Assets);
+        Assert.Null(Assert.Single(repository.Snapshot.DesignSlotAssignments).AssetId);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_EditRejectsSlotWithoutAssignedArtworkBeforeProviderDispatch()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
+        var product = new StoreProduct(Guid.NewGuid(), store.Id, "Shirt", null, null, now, now, "{}");
+        var offering = new FulfillmentOffering(Guid.NewGuid(), product.Id, "Provider", null, FulfillmentKind.FixedProvider, "Provider", null, now, now, "{}");
+        var area = new DesignArea(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 1200, 1400, null, now, now, "{}");
+        var item = new Item(Guid.NewGuid(), store.Id, null, null, "Bike", null, ItemStatus.Draft, WorkflowStage.Design, false, now, now,
+            "{\"idea\":\"bike pun\",\"concept.idea\":\"commuter joke\",\"phrase\":\"Two-tired for work\",\"graphicDirection\":\"side profile bike\"}");
+        var row = new DesignVariantRow(Guid.NewGuid(), item.Id, true, 0);
+        var snapshot = new WorkspaceSnapshot([store], [], [], [item], [], [], [], [], [])
+        {
+            StoreProducts = [product],
+            FulfillmentOfferings = [offering],
+            DesignAreas = [area],
+            ItemListingConfigurations = [new(item.Id, offering.Id)],
+            DesignVariantRows = [row],
+            DesignVariantRowColors = [new(row.Id, "Black")],
+            DesignSlotAssignments = [new(row.Id, area.Id, null)]
+        };
+        var repository = new Repo(snapshot);
+        var provider = new Provider();
+        var files = new Files();
+        var service = new ArtworkGenerationService(repository, files, new TestAiImageProvenanceCodec(), provider, new Normalizer(), () => now, Guid.NewGuid);
+        var model = new AiModelDescriptor("image/model", "Image", null, null, ["text"], ["image"], [], null, null, null, null, true, null);
+        var endpoints = new[]
+        {
+            new AiImageEndpointCapabilities("endpoint", model.Id, true, true, ["png"], [new(1200, 1400)], false,
+                Parameters: new AiImageEndpointParameterCapabilities([], [], true, true, ["opaque"], true, MaxInputReferences: 1))
+        };
+        var request = new ArtworkGenerationRequest(item.Id, area.Id, "secret", AiProfileSettings.Empty with { ModelId = model.Id },
+            [model], endpoints, false, false, "generation prompt", ArtworkContrast.DarkOnLight,
+            EditExistingArtwork: true, AdjustmentPrompt: "Make the lettering vintage.");
+
+        var result = await service.GenerateAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("no available final PNG", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, provider.Calls);
+        Assert.Same(snapshot, repository.Snapshot);
+        Assert.Null(files.SavedContent);
+    }
+
+    [Fact]
     public async Task GenerateAsync_CleansGeneratedFileAndPropagatesWorkspaceSaveCancellation()
     {
         var now = DateTimeOffset.UtcNow;
@@ -352,6 +499,7 @@ public sealed class ArtworkGenerationServiceTests
     private sealed class Files : IWorkspaceFileOutputStore
     {
         public Stream? SavedContent { get; private set; }
+        public byte[] ReadBytes { get; init; } = [];
         public List<string> DeletedPaths { get; } = [];
         public Exception? SaveFailure { get; init; }
         public bool DeleteResult { get; init; } = true;
@@ -375,7 +523,7 @@ public sealed class ArtworkGenerationServiceTests
         }
         public Task<Stream> OpenReadAsync(string workspaceRelativePath, CancellationToken cancellationToken = default) =>
             OpenReadFailure is null
-                ? Task.FromResult<Stream>(new MemoryStream())
+                ? Task.FromResult<Stream>(new MemoryStream(ReadBytes, writable: false))
                 : Task.FromException<Stream>(OpenReadFailure);
         public Task ExportCopyAsync(string workspaceRelativePath, string destinationPath, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }

@@ -494,6 +494,24 @@ public class DesignStageToolViewModelTests
             return DesignStageResult.Success(State);
         }
 
+        public Task<DesignStageResult> SaveArtworkPromptPreferencesAsync(
+            Guid itemId,
+            string? promptOverride,
+            string? adjustmentPrompt,
+            ArtworkContrast contrast,
+            CancellationToken cancellationToken = default)
+        {
+            Assert.Equal(_itemId, itemId);
+            cancellationToken.ThrowIfCancellationRequested();
+            State = State with
+            {
+                ArtworkPromptOverride = promptOverride,
+                ArtworkAdjustmentPrompt = adjustmentPrompt,
+                ArtworkContrast = contrast
+            };
+            return Task.FromResult(DesignStageResult.Success(State));
+        }
+
         public void CompleteSave() => _saveCompletion.TrySetResult();
 
         public void CompletePreview(Stream stream) => _previewCompletion.TrySetResult(stream);

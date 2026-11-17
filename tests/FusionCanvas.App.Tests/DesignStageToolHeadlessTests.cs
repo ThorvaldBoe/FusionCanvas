@@ -11,6 +11,7 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using FusionCanvas.App.Assets;
 using FusionCanvas.App.StageTools;
+using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Assets;
 using FusionCanvas.Application.DesignFiles;
 using FusionCanvas.App.Tests.TestSupport;
@@ -997,6 +998,34 @@ public class DesignStageToolHeadlessTests
         Assert.Equal(2, target!.ItemCount);
         Assert.False(transparency!.IsEnabled);
         Assert.False(generate!.IsEnabled);
+
+        var promptSection = window.GetVisualDescendants().OfType<Expander>()
+            .Single(expander => expander.Header is string header && header == "Image prompt and contrast");
+        promptSection.IsExpanded = true;
+        window.UpdateLayout();
+
+        var contrast = window.GetVisualDescendants().OfType<ComboBox>()
+            .SingleOrDefault(combo => AutomationProperties.GetName(combo) == "Artwork contrast");
+        var prompt = window.GetVisualDescendants().OfType<TextBox>()
+            .SingleOrDefault(textBox => AutomationProperties.GetName(textBox) == "Image generation prompt");
+        var adjustmentPrompt = window.GetVisualDescendants().OfType<TextBox>()
+            .SingleOrDefault(textBox => AutomationProperties.GetName(textBox) == "Instructions for adjusting existing artwork");
+        var resetPrompt = window.GetVisualDescendants().OfType<Button>()
+            .SingleOrDefault(button => AutomationProperties.GetName(button) == "Reset image prompt to current Concept and Store settings");
+        var adjustArtwork = window.GetVisualDescendants().OfType<Button>()
+            .SingleOrDefault(button => AutomationProperties.GetAutomationId(button) == "Design.AdjustArtwork");
+
+        Assert.NotNull(contrast);
+        Assert.Equal(2, contrast!.ItemCount);
+        Assert.NotNull(prompt);
+        Assert.NotNull(adjustmentPrompt);
+        Assert.NotNull(resetPrompt);
+        Assert.NotNull(adjustArtwork);
+        Assert.False(adjustArtwork!.IsEnabled);
+
+        contrast.SelectedValue = ArtworkContrast.LightOnDark;
+        window.UpdateLayout();
+        Assert.Equal(ArtworkContrast.LightOnDark, vm.DesignTool.ArtworkContrast);
     }
 
     [AvaloniaFact]

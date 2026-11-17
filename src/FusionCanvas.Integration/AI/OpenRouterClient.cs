@@ -561,6 +561,20 @@ public sealed class OpenRouterClient :
             ["model"] = request.ModelId,
             ["prompt"] = request.Prompt
         };
+        if (request.InputReferences is { Count: > 0 })
+        {
+            root["input_references"] = new JsonArray(request.InputReferences.Select(reference =>
+            {
+                ArgumentException.ThrowIfNullOrWhiteSpace(reference.MediaType);
+                ArgumentNullException.ThrowIfNull(reference.ImageBytes);
+                var dataUrl = $"data:{reference.MediaType};base64,{Convert.ToBase64String(reference.ImageBytes)}";
+                return (JsonNode)new JsonObject
+                {
+                    ["type"] = "image_url",
+                    ["image_url"] = new JsonObject { ["url"] = dataUrl }
+                };
+            }).ToArray());
+        }
         if (request.Options is null)
         {
             root["size"] = $"{request.ProviderSize.Width}x{request.ProviderSize.Height}";
@@ -1065,6 +1079,7 @@ public sealed class OpenRouterClient :
         var supportsTransparency = backgrounds.Contains("transparent", StringComparer.OrdinalIgnoreCase);
         var aspectRatios = ReadParameterValues(supportedElement, "aspect_ratio");
         var resolutions = ReadParameterValues(supportedElement, "resolution");
+        var maxInputReferences = ReadParameterMaximum(supportedElement, "input_references");
         var isZdrCompatible = zdrEndpoints.Any(endpoint =>
             string.Equals(endpoint.ModelId, endpointModel, StringComparison.OrdinalIgnoreCase) &&
             ((!string.IsNullOrWhiteSpace(providerTag) && string.Equals(endpoint.ProviderTag, providerTag, StringComparison.OrdinalIgnoreCase)) ||
@@ -1084,7 +1099,8 @@ public sealed class OpenRouterClient :
                 supportsExplicitSize,
                 supportsOutputFormat,
                 backgrounds,
-                supported.Contains("n", StringComparer.OrdinalIgnoreCase)),
+                supported.Contains("n", StringComparer.OrdinalIgnoreCase),
+                maxInputReferences),
             ParseImagePricing(item));
     }
 
@@ -1148,6 +1164,21 @@ public sealed class OpenRouterClient :
             .OfType<string>()
             .Take(128)
             .ToArray();
+    }
+
+    private static int? ReadParameterMaximum(JsonElement supportedParameters, string parameterName)
+    {
+        if (supportedParameters.ValueKind != JsonValueKind.Object
+            || !supportedParameters.TryGetProperty(parameterName, out var descriptor)
+            || descriptor.ValueKind != JsonValueKind.Object
+            || !descriptor.TryGetProperty("max", out var maximum)
+            || !maximum.TryGetInt32(out var value)
+            || value <= 0)
+        {
+            return null;
+        }
+
+        return value;
     }
 
     private static AiReasoningCapabilities? ParseReasoning(

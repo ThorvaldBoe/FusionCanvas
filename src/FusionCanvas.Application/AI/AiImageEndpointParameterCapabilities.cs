@@ -6,4 +6,5 @@ public sealed record AiImageEndpointParameterCapabilities(
     bool SupportsExplicitSize,
     bool SupportsOutputFormat,
     IReadOnlyList<string> Backgrounds,
-    bool SupportsImageCount);
+    bool SupportsImageCount,
+    int? MaxInputReferences = null);

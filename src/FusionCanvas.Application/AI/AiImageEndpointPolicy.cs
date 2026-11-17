@@ -13,7 +13,8 @@ public static class AiImageEndpointPolicy
         IReadOnlyList<AiImageEndpointCapabilities> endpoints,
         string modelId,
         bool requireZeroDataRetention,
-        bool transparentBackground)
+        bool transparentBackground,
+        bool requireInputReference = false)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
         return endpoints.Where(endpoint =>
@@ -22,6 +23,7 @@ public static class AiImageEndpointPolicy
                 HasDimensionCapability(endpoint) &&
                 endpoint.RasterFormats.Any(format => transparentBackground ? IsAlphaRasterFormat(format) : IsApprovedRasterFormat(format)) &&
                 (!requireZeroDataRetention || endpoint.ZeroDataRetentionCompatible) &&
+                (!requireInputReference || endpoint.Parameters?.MaxInputReferences > 0) &&
                 (!transparentBackground || endpoint.SupportsTransparency))
             .ToArray();
     }
@@ -51,9 +53,10 @@ public static class AiImageEndpointPolicy
         string modelId,
         bool requireZeroDataRetention,
         bool transparentBackground,
-        AiImageSize target)
+        AiImageSize target,
+        bool requireInputReference = false)
     {
-        var eligible = CompatibleEndpoints(endpoints, modelId, requireZeroDataRetention, transparentBackground);
+        var eligible = CompatibleEndpoints(endpoints, modelId, requireZeroDataRetention, transparentBackground, requireInputReference);
         var candidates = eligible
             .Select((endpoint, index) => CreateCandidate(endpoint, target, transparentBackground, index))
             .OrderBy(candidate => candidate.UsesExactSize ? 0 : 1)

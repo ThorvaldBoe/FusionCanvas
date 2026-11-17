@@ -59,6 +59,22 @@ public class AiConfigurationTests
     }
 
     [Fact]
+    public void ImageEndpointPolicy_RequiresAdvertisedReferenceSupportOnlyForEdits()
+    {
+        var generationOnly = new AiImageEndpointCapabilities("generate", "image/model", true, true, ["png"], [new(1024, 1024)], false);
+        var editable = generationOnly with
+        {
+            EndpointId = "edit",
+            Parameters = new AiImageEndpointParameterCapabilities([], [], false, false, [], false, MaxInputReferences: 1)
+        };
+
+        Assert.NotNull(AiImageEndpointPolicy.SelectEndpoint([generationOnly], "image/model", true, false, new(1024, 1024)));
+        Assert.Null(AiImageEndpointPolicy.SelectEndpoint([generationOnly], "image/model", true, false, new(1024, 1024), requireInputReference: true));
+        Assert.Equal("edit", AiImageEndpointPolicy.SelectEndpoint([generationOnly, editable], "image/model", true, false,
+            new(1024, 1024), requireInputReference: true)!.Endpoint.EndpointId);
+    }
+
+    [Fact]
     public void ImageEndpointPolicy_SelectsClosestRatioThenLargestUsefulSize()
     {
         var target = new AiImageSize(3692, 4800);

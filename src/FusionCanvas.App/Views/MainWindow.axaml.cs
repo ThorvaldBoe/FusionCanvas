@@ -612,6 +612,14 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnArtworkPromptLostFocus(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            await viewModel.DesignTool.SaveArtworkPromptAsync();
+        }
+    }
+
     // === Design Stage Tool event handlers ===
 
     private async void OnConfirmConfigurationRecovery(object? sender, RoutedEventArgs e)
