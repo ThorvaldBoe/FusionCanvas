@@ -20,4 +20,4 @@
 - [x] 4.1 Run focused tests and the solution baseline.
 - [x] 4.2 Build the solution and validate the OpenSpec change strictly.
 - [x] 4.3 Record acceptance-scenario evidence and any limitations in `verification.md`.
-- [ ] 4.4 Review implementation lessons and archive the completed change.
+- [x] 4.4 Review implementation lessons and archive the completed change.
