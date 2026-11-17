@@ -8,6 +8,12 @@ Blueprint archival is specified and implemented as reversible, but an archived B
 
 Creators can explicitly reactivate an archived Blueprint from its detail view. Reactivation restores the Blueprint and its owned catalog descendants together, preserving their stable identities and relationships.
 
+## What Changes
+
+- Add a confirmed Reactivate Blueprint action to the archived Blueprint detail.
+- Restore the Blueprint and its owned catalog descendants atomically.
+- Keep archived Store catalogs read-only and retain permanent deletion for archived Blueprints.
+
 ## Scope
 
 - Add an archived-only **Reactivate Blueprint** action and confirmation.
