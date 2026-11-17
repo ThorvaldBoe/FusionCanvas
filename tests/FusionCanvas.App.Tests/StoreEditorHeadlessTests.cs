@@ -1597,6 +1597,54 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public async Task ArchivedBlueprintCanBeReactivatedAfterConfirmation()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        var originalBlueprint = Assert.Single(viewModel.Products);
+        viewModel.OpenProductDetailCommand.Execute(originalBlueprint);
+        viewModel.IsBlueprintBasicsExpanded = true;
+        window.UpdateLayout();
+
+        Assert.Null(FindButton(window, "Reactivate Blueprint"));
+        FindButton(window, "Archive Blueprint")!.Command!.Execute(null);
+        viewModel.ConfirmArchiveSelectedProductCommand.Execute(null);
+        await WaitForAsync(() => viewModel.ArchivedProducts.Any(product => product.Id == originalBlueprint.Id));
+
+        viewModel.ShowArchivedProducts = true;
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.ArchivedProducts));
+        viewModel.IsBlueprintBasicsExpanded = true;
+        window.UpdateLayout();
+
+        var reactivate = FindButton(window, "Reactivate Blueprint");
+        Assert.NotNull(reactivate);
+        Assert.True(reactivate!.IsEffectivelyEnabled);
+        Assert.Null(FindButton(window, "Archive Blueprint"));
+        reactivate.Command!.Execute(null);
+        window.UpdateLayout();
+        Assert.True(viewModel.ProductReactivateWarningVisible);
+        Assert.Contains(window.GetVisualDescendants().OfType<Border>(),
+            border => AutomationProperties.GetAutomationId(border) == "Catalog.BlueprintReactivateWarning");
+
+        viewModel.CancelReactivateSelectedProductCommand.Execute(null);
+        Assert.False(viewModel.ProductReactivateWarningVisible);
+        Assert.True(viewModel.SelectedProduct!.IsArchived);
+
+        FindButton(window, "Reactivate Blueprint")!.Command!.Execute(null);
+        viewModel.ConfirmReactivateSelectedProductCommand.Execute(null);
+        await WaitForAsync(() => viewModel.Products.Any(product => product.Id == originalBlueprint.Id)
+            && viewModel.SelectedProduct?.Id == originalBlueprint.Id
+            && viewModel.SelectedProduct.IsArchived == false);
+
+        Assert.Empty(viewModel.ArchivedProducts);
+        Assert.Null(FindButton(window, "Reactivate Blueprint"));
+        Assert.NotNull(FindButton(window, "Archive Blueprint"));
+        Assert.Null(FindButton(window, "Delete permanently"));
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void CatalogEditorsUseCompactBasicsOnDemandDraftsAndSummaryFirstRegions()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);

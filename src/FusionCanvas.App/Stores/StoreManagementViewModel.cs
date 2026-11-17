@@ -340,6 +340,9 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
         RequestArchiveSelectedProductCommand = new RelayCommand(_ => RequestArchiveSelectedProduct());
         ConfirmArchiveSelectedProductCommand = new RelayCommand(_ => Run(ConfirmArchiveSelectedProductAsync));
         CancelArchiveSelectedProductCommand = new RelayCommand(_ => ClearProductArchiveWarning());
+        RequestReactivateSelectedProductCommand = new RelayCommand(_ => RequestReactivateSelectedProduct());
+        ConfirmReactivateSelectedProductCommand = new RelayCommand(_ => Run(ConfirmReactivateSelectedProductAsync));
+        CancelReactivateSelectedProductCommand = new RelayCommand(_ => ClearProductReactivateWarning());
         StartCreateOfferingCommand = new RelayCommand(_ => StartCreateOffering());
         CancelNewOfferingCommand = new RelayCommand(_ => CancelNewOffering());
         BackToProductsCommand = new RelayCommand(_ => Run(BackToProductsAsync));
@@ -1020,8 +1023,11 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
     public bool CanSaveSelectedOffering => _productCatalogEditor.CanSaveSelectedOffering;
     public bool CanDeleteSelectedProduct => _productCatalogEditor.CanDeleteSelectedProduct;
     public bool CanArchiveSelectedProduct => _productCatalogEditor.CanArchiveSelectedProduct;
+    public bool CanReactivateSelectedProduct => _productCatalogEditor.CanReactivateSelectedProduct;
     public bool ProductArchiveWarningVisible => _productCatalogEditor.ProductArchiveWarningVisible;
     public string ProductArchiveWarningMessage => _productCatalogEditor.ProductArchiveWarningMessage;
+    public bool ProductReactivateWarningVisible => _productCatalogEditor.ProductReactivateWarningVisible;
+    public string ProductReactivateWarningMessage => _productCatalogEditor.ProductReactivateWarningMessage;
     public bool CanDeleteSelectedOffering => _productCatalogEditor.CanDeleteSelectedOffering;
     public bool CanCreateCatalogItem => _productCatalogEditor.CanCreateCatalogItem;
     public bool ProductDeleteWarningVisible => _productCatalogEditor.ProductDeleteWarningVisible;
@@ -1162,6 +1168,12 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand ConfirmArchiveSelectedProductCommand { get; }
 
     public ICommand CancelArchiveSelectedProductCommand { get; }
+
+    public ICommand RequestReactivateSelectedProductCommand { get; }
+
+    public ICommand ConfirmReactivateSelectedProductCommand { get; }
+
+    public ICommand CancelReactivateSelectedProductCommand { get; }
 
     public ICommand StartCreateOfferingCommand { get; }
     public ICommand CancelNewOfferingCommand { get; }
@@ -1773,6 +1785,9 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
     public void RequestArchiveSelectedProduct() => _productCatalogEditor.RequestArchiveSelectedProduct();
     public Task ConfirmArchiveSelectedProductAsync(CancellationToken cancellationToken = default) => _productCatalogEditor.ConfirmArchiveSelectedProductAsync(cancellationToken);
     private void ClearProductArchiveWarning() => _productCatalogEditor.ClearProductArchiveWarning();
+    public void RequestReactivateSelectedProduct() => _productCatalogEditor.RequestReactivateSelectedProduct();
+    public Task ConfirmReactivateSelectedProductAsync(CancellationToken cancellationToken = default) => _productCatalogEditor.ConfirmReactivateSelectedProductAsync(cancellationToken);
+    private void ClearProductReactivateWarning() => _productCatalogEditor.ClearProductReactivateWarning();
     public Task ConfirmDeleteProductAsync(CancellationToken cancellationToken = default) => _productCatalogEditor.ConfirmDeleteProductAsync(cancellationToken);
     private void ClearProductDeleteWarning() => _productCatalogEditor.ClearProductDeleteWarning();
     public void StartCreateOffering() => _productCatalogEditor.StartCreateOffering();

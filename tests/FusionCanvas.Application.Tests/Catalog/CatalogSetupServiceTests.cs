@@ -2,6 +2,7 @@ using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Items;
+using FusionCanvas.Domain.Mockups;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Workspace;
@@ -195,6 +196,101 @@ public sealed class CatalogSetupServiceTests
         Assert.True(result.State.Placeholders.Single(value => value.Id == placeholderId).IsArchived);
         Assert.Contains((await repository.LoadAsync(TestContext.Current.CancellationToken)).ItemListingConfigurations,
             configuration => configuration.ItemId == itemId && configuration.OfferingId == offeringId);
+    }
+
+    [Fact]
+    public async Task RestoresArchivedBlueprintAndItsOwnedCatalogGraphWithoutChangingReferences()
+    {
+        var storeId = Guid.NewGuid();
+        var blueprintId = Guid.NewGuid();
+        var offeringId = Guid.NewGuid();
+        var optionId = Guid.NewGuid();
+        var valueId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+        var placeholderId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+        var templateColorId = Guid.NewGuid();
+        var sourceImageId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var blueprint = new Blueprint(blueprintId, storeId, "T-shirt", null, true, Now, Now);
+        var offering = new BlueprintOffering(offeringId, blueprintId, storeId, "Tee", null, BlueprintOfferingKind.ProviderNetwork, null, "choice", null, null, true, Now, Now);
+        var option = new OfferingOption(optionId, offeringId, OptionKind.Color, "Color", 0, true);
+        var value = new OfferingOptionValue(valueId, optionId, offeringId, "Black", 0, true);
+        var variant = new OfferingVariant(variantId, offeringId, "Black", [valueId], true, Now, Now);
+        var placeholder = new OfferingPlaceholder(placeholderId, offeringId, "Front", null, "front", "DTG", 100, 100, [variantId], true, Now, Now);
+        var template = new MockupTemplate(templateId, offeringId, placeholderId, "Front mockup", null, 1, true, Now, Now);
+        var templateColor = new MockupTemplateColorVariant(templateColorId, templateId, valueId, true, Now, Now);
+        var sourceImage = new MockupTemplateSourceImage(sourceImageId, templateId, Guid.NewGuid(), null, true, Now, Now, 100, 100);
+        var item = new Item(itemId, storeId, null, null, "Listing", null, ItemStatus.Draft, WorkflowStage.Design, false, Now, Now, "{}");
+        var itemConfiguration = new ItemListingConfiguration(itemId, offeringId);
+        var repository = new MemoryRepository(new WorkspaceSnapshot(
+            [WorkspaceSnapshot.DefaultWorkspace(Now)], [NewStore(storeId, "Store")], [], [], [item], [], [], [], [], [])
+        {
+            Blueprints = [blueprint],
+            BlueprintOfferings = [offering],
+            OfferingOptions = [option],
+            OfferingOptionValues = [value],
+            OfferingVariants = [variant],
+            OfferingPlaceholders = [placeholder],
+            MockupTemplates = [template],
+            MockupTemplateColorVariants = [templateColor],
+            MockupTemplateSourceImages = [sourceImage],
+            ItemListingConfigurations = [itemConfiguration]
+        });
+        var service = new CatalogSetupService(repository, () => Now, Guid.NewGuid);
+
+        var result = await service.RestoreBlueprintCascadeAsync(
+            new RestoreBlueprintCascadeRequest(storeId, blueprintId, Confirm: true), TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        Assert.False(repository.Current.Blueprints.Single().IsArchived);
+        Assert.False(repository.Current.BlueprintOfferings.Single().IsArchived);
+        Assert.False(repository.Current.OfferingOptions.Single().IsArchived);
+        Assert.False(repository.Current.OfferingOptionValues.Single().IsArchived);
+        Assert.False(repository.Current.OfferingVariants.Single().IsArchived);
+        Assert.False(repository.Current.OfferingPlaceholders.Single().IsArchived);
+        Assert.False(repository.Current.MockupTemplates.Single().IsArchived);
+        Assert.False(repository.Current.MockupTemplateColorVariants.Single().IsArchived);
+        Assert.False(repository.Current.MockupTemplateSourceImages.Single().IsArchived);
+        Assert.Equal(blueprintId, repository.Current.Blueprints.Single().Id);
+        Assert.Equal(offeringId, repository.Current.BlueprintOfferings.Single().Id);
+        Assert.Equal([valueId], repository.Current.OfferingVariants.Single().OptionValueIds);
+        Assert.Equal([variantId], repository.Current.OfferingPlaceholders.Single().VariantIds);
+        Assert.Equal(placeholderId, repository.Current.MockupTemplates.Single().TargetPlaceholderId);
+        Assert.Equal(templateId, repository.Current.MockupTemplateSourceImages.Single().MockupTemplateId);
+        Assert.Equal(itemConfiguration, Assert.Single(repository.Current.ItemListingConfigurations));
+        Assert.Equal(1, repository.SaveCount);
+    }
+
+    [Fact]
+    public async Task BlueprintRestoreRequiresConfirmationArchivedBlueprintAndWritableStore()
+    {
+        var storeId = Guid.NewGuid();
+        var archivedBlueprint = new Blueprint(Guid.NewGuid(), storeId, "Archived", null, true, Now, Now);
+        var activeBlueprint = new Blueprint(Guid.NewGuid(), storeId, "Active", null, false, Now, Now);
+        var archivedStore = NewStore(Guid.NewGuid(), "Archived Store") with { IsArchived = true };
+        var repository = new MemoryRepository(new WorkspaceSnapshot(
+            [WorkspaceSnapshot.DefaultWorkspace(Now)], [NewStore(storeId, "Store"), archivedStore], [], [], [], [], [], [], [], [])
+        {
+            Blueprints = [archivedBlueprint, activeBlueprint, new Blueprint(Guid.NewGuid(), archivedStore.Id, "Unavailable", null, true, Now, Now)]
+        });
+        var service = new CatalogSetupService(repository, () => Now, Guid.NewGuid);
+
+        var unconfirmed = await service.RestoreBlueprintCascadeAsync(
+            new RestoreBlueprintCascadeRequest(storeId, archivedBlueprint.Id, Confirm: false), TestContext.Current.CancellationToken);
+        var active = await service.RestoreBlueprintCascadeAsync(
+            new RestoreBlueprintCascadeRequest(storeId, activeBlueprint.Id, Confirm: true), TestContext.Current.CancellationToken);
+        var readOnly = await service.RestoreBlueprintCascadeAsync(
+            new RestoreBlueprintCascadeRequest(archivedStore.Id, repository.Current.Blueprints.Single(value => value.StoreId == archivedStore.Id).Id, Confirm: true), TestContext.Current.CancellationToken);
+
+        Assert.False(unconfirmed.Succeeded);
+        Assert.False(active.Succeeded);
+        Assert.False(readOnly.Succeeded);
+        Assert.Contains("confirmation", unconfirmed.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("already active", active.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("read-only", readOnly.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, repository.SaveCount);
+        Assert.All(repository.Current.Blueprints, value => Assert.Equal(value.Id != activeBlueprint.Id, value.IsArchived));
     }
 
     [Fact]
