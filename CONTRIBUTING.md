@@ -116,6 +116,8 @@ Attestation:         FusionCanvas-0.4.127-win-x64-Setup.exe.sigstore.json
 
 Preview releases use `vMajor.Minor.Build-preview.N`, such as `v0.5.0-preview.1`. Set the NBGV `version` in `version.json` to the exact matching version before creating the tag. The workflow rejects any tag/package version mismatch before publishing. Preview releases are experimental and may contain unfinished features; stable bug fixes go to Stable releases.
 
+Before publishing a Preview release, compare its generated version with the versions used by the intended recipients. The updater offers only strictly newer releases. A local build from the same commit as a Preview release has the same version and will correctly report that it is up to date. If those installations need to receive the release through the updater, merge a follow-on commit and tag its newer generated version.
+
 Both tracks retain every versioned GitHub Release asset. The updater defaults to Stable. Preview includes Preview builds and later Stable releases, while Stable excludes prereleases. Neither track offers a downgrade. To verify a downloaded setup independently, download its adjacent `.sigstore.json` bundle and run:
 
 ```powershell
