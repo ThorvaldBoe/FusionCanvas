@@ -685,6 +685,12 @@
                               IsVisible="{Binding !SelectedProduct.IsArchived}"
                               IsEnabled="{Binding CanArchiveSelectedProduct}"
                               Classes="danger fixedAction blueprintAction" />
+                      <Button Content="Reactivate Blueprint"
+                              AutomationProperties.AutomationId="Catalog.ReactivateBlueprint"
+                              Command="{Binding RequestReactivateSelectedProductCommand}"
+                              IsVisible="{Binding SelectedProduct.IsArchived}"
+                              IsEnabled="{Binding CanReactivateSelectedProduct}"
+                              Classes="primary fixedAction blueprintAction" />
                       <Button Content="Delete permanently"
                               AutomationProperties.AutomationId="Catalog.DeleteArchivedBlueprint"
                               Command="{Binding RequestDeleteSelectedProductCommand}"
@@ -713,6 +719,32 @@
                           <Button Content="Cancel"
                                   Command="{Binding CancelArchiveSelectedProductCommand}"
                                   AutomationProperties.Name="Cancel Blueprint archive"
+                                  Classes="secondary fixedAction" />
+                        </StackPanel>
+                      </StackPanel>
+                    </Border>
+                    <Border IsVisible="{Binding ProductReactivateWarningVisible}"
+                            AutomationProperties.AutomationId="Catalog.BlueprintReactivateWarning"
+                            Background="{DynamicResource WarningBackgroundBrush}"
+                            BorderBrush="{DynamicResource WarningBorderBrush}"
+                            BorderThickness="2"
+                            Padding="12">
+                      <StackPanel Spacing="8">
+                        <TextBlock Text="REACTIVATE BLUEPRINT AND CATALOG"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource WarningTextBrush}" />
+                        <TextBlock Text="{Binding ProductReactivateWarningMessage}"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource WarningTextBrush}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <Button Content="Reactivate Blueprint"
+                                  Command="{Binding ConfirmReactivateSelectedProductCommand}"
+                                  IsEnabled="{Binding CanReactivateSelectedProduct}"
+                                  AutomationProperties.Name="Confirm reactivate Blueprint"
+                                  Classes="primary fixedAction" />
+                          <Button Content="Cancel"
+                                  Command="{Binding CancelReactivateSelectedProductCommand}"
+                                  AutomationProperties.Name="Cancel Blueprint reactivation"
                                   Classes="secondary fixedAction" />
                         </StackPanel>
                       </StackPanel>

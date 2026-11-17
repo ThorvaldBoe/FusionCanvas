@@ -230,6 +230,45 @@ public sealed class CatalogSetupService : ICatalogSetupService
             return Success(updated, request.StoreId);
         }, cancellationToken);
 
+    public Task<CatalogSetupResult> RestoreBlueprintCascadeAsync(RestoreBlueprintCascadeRequest request, CancellationToken cancellationToken = default) =>
+        MutateAsync(request.StoreId, snapshot =>
+        {
+            var storeCheck = EnsureWritableStore(snapshot, request.StoreId);
+            if (storeCheck is not null) return Failure(snapshot, request.StoreId, storeCheck);
+            if (!request.Confirm) return Failure(snapshot, request.StoreId, "Blueprint restore confirmation is required.");
+
+            var blueprint = snapshot.Blueprints.SingleOrDefault(value => value.Id == request.BlueprintId && value.StoreId == request.StoreId);
+            if (blueprint is null) return Failure(snapshot, request.StoreId, "Blueprint was not found in this Store.");
+            if (!blueprint.IsArchived) return Failure(snapshot, request.StoreId, "Blueprint is already active.");
+
+            var offeringIds = snapshot.BlueprintOfferings
+                .Where(value => value.BlueprintId == blueprint.Id && value.StoreId == request.StoreId)
+                .Select(value => value.Id)
+                .ToHashSet();
+            var optionIds = snapshot.OfferingOptions
+                .Where(value => offeringIds.Contains(value.OfferingId))
+                .Select(value => value.Id)
+                .ToHashSet();
+            var templateIds = snapshot.MockupTemplates
+                .Where(value => offeringIds.Contains(value.BlueprintOfferingId))
+                .Select(value => value.Id)
+                .ToHashSet();
+
+            var updated = snapshot with
+            {
+                Blueprints = snapshot.Blueprints.Select(value => value.Id == blueprint.Id ? value with { IsArchived = false } : value).ToArray(),
+                BlueprintOfferings = snapshot.BlueprintOfferings.Select(value => offeringIds.Contains(value.Id) ? value with { IsArchived = false } : value).ToArray(),
+                OfferingOptions = snapshot.OfferingOptions.Select(value => optionIds.Contains(value.Id) ? value with { IsArchived = false } : value).ToArray(),
+                OfferingOptionValues = snapshot.OfferingOptionValues.Select(value => offeringIds.Contains(value.OfferingId) ? value with { IsArchived = false } : value).ToArray(),
+                OfferingVariants = snapshot.OfferingVariants.Select(value => offeringIds.Contains(value.OfferingId) ? value with { IsArchived = false } : value).ToArray(),
+                OfferingPlaceholders = snapshot.OfferingPlaceholders.Select(value => offeringIds.Contains(value.OfferingId) ? value with { IsArchived = false } : value).ToArray(),
+                MockupTemplates = snapshot.MockupTemplates.Select(value => templateIds.Contains(value.Id) ? value with { IsArchived = false } : value).ToArray(),
+                MockupTemplateColorVariants = snapshot.MockupTemplateColorVariants.Select(value => templateIds.Contains(value.MockupTemplateId) ? value with { IsArchived = false } : value).ToArray(),
+                MockupTemplateSourceImages = snapshot.MockupTemplateSourceImages.Select(value => templateIds.Contains(value.MockupTemplateId) ? value with { IsArchived = false } : value).ToArray()
+            };
+            return Success(updated, request.StoreId);
+        }, cancellationToken);
+
     public Task<CatalogSetupResult> DeleteBlueprintPermanentlyAsync(DeleteBlueprintPermanentlyRequest request, CancellationToken cancellationToken = default) =>
         MutateAsync(request.StoreId, snapshot =>
         {

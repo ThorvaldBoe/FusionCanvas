@@ -38,9 +38,11 @@ public sealed class ProductCatalogEditorViewModel : INotifyPropertyChanged
     private Guid? _draftOfferingId;
     private StoreProductSummary? _pendingDeleteProduct;
     private StoreProductSummary? _pendingArchiveProduct;
+    private StoreProductSummary? _pendingReactivateProduct;
     private FulfillmentOfferingSummary? _pendingDeleteOffering;
     private bool _productDeleteWarningVisible;
     private bool _productArchiveWarningVisible;
+    private bool _productReactivateWarningVisible;
     private bool _offeringDeleteWarningVisible;
     private bool _isAddingVariant;
     private bool _isAddingDesignArea;
@@ -110,7 +112,7 @@ public sealed class ProductCatalogEditorViewModel : INotifyPropertyChanged
     public bool ShowArchivedProducts { get => _showArchivedProducts; set { if (Set(ref _showArchivedProducts, value)) Raise(nameof(EditorProducts), nameof(HasProducts)); } }
     public bool ShowArchivedOfferings { get => _showArchivedOfferings; set { if (Set(ref _showArchivedOfferings, value)) _runOperation(RefreshBlueprintOfferingCardsAsync); } }
     public IReadOnlyList<StoreProductSummary> EditorProducts => (_showArchivedProducts ? _products.Concat(_archivedProducts) : _products).Concat(_isCreatingNewProduct && DraftProduct() is { } draft ? [draft] : []).ToArray();
-    public StoreProductSummary? SelectedProduct { get => _selectedProduct; private set { if (Set(ref _selectedProduct, value)) Raise(nameof(HasSelectedProduct), nameof(CanDeleteSelectedProduct), nameof(CanArchiveSelectedProduct), nameof(SelectedProductOfferingCount), nameof(SelectedProductSummary)); } }
+    public StoreProductSummary? SelectedProduct { get => _selectedProduct; private set { if (Set(ref _selectedProduct, value)) Raise(nameof(HasSelectedProduct), nameof(CanDeleteSelectedProduct), nameof(CanArchiveSelectedProduct), nameof(CanReactivateSelectedProduct), nameof(SelectedProductOfferingCount), nameof(SelectedProductSummary)); } }
     public FulfillmentOfferingSummary? SelectedOffering { get => _selectedOffering; private set { if (Set(ref _selectedOffering, value)) { Raise(nameof(HasSelectedOffering), nameof(CanDeleteSelectedOffering), nameof(OfferingVariants), nameof(OfferingDesignAreas), nameof(HasOfferingVariants), nameof(HasOfferingDesignAreas), nameof(HasSelectedProductOfferings), nameof(SelectedOfferingVariantCount), nameof(SelectedOfferingDesignAreaCount), nameof(SelectedOfferingSummary)); RefreshApplicableVariants(); } } }
     public IReadOnlyList<ProductVariantSummary> OfferingVariants => SelectedOffering?.Variants ?? [];
     public IReadOnlyList<DesignAreaSummary> OfferingDesignAreas => SelectedOffering?.DesignAreas ?? [];
@@ -139,6 +141,7 @@ public sealed class ProductCatalogEditorViewModel : INotifyPropertyChanged
     public bool CanSaveSelectedOffering => _legacyCatalogCompatibility is not null && CanManageScope && SelectedProduct is not null && HasUnsavedOfferingChanges;
     public bool CanDeleteSelectedProduct => _catalogService is not null && SelectedProduct is { IsArchived: true } && !_isCreatingNewProduct && CanManageScope;
     public bool CanArchiveSelectedProduct => _catalogService is not null && SelectedProduct is { IsArchived: false } && !_isCreatingNewProduct && !HasUnsavedProductChanges && CanManageScope;
+    public bool CanReactivateSelectedProduct => _catalogService is not null && SelectedProduct is { IsArchived: true } && !_isCreatingNewProduct && !HasAnyCatalogUnsavedChanges && CanManageScope;
     public bool CanDeleteSelectedOffering => _legacyCatalogCompatibility is not null && SelectedOffering is not null && !_isCreatingNewOffering && CanManageScope;
     public bool CanCreateCatalogItem => _legacyCatalogCompatibility is not null && CanManageScope;
     public bool IsAddingVariant { get => _isAddingVariant; set => Set(ref _isAddingVariant, value); }
@@ -146,9 +149,11 @@ public sealed class ProductCatalogEditorViewModel : INotifyPropertyChanged
     public bool IsBlueprintBasicsExpanded { get => _isBlueprintBasicsExpanded; set => Set(ref _isBlueprintBasicsExpanded, value); }
     public bool ProductDeleteWarningVisible { get => _productDeleteWarningVisible; private set => Set(ref _productDeleteWarningVisible, value); }
     public bool ProductArchiveWarningVisible { get => _productArchiveWarningVisible; private set => Set(ref _productArchiveWarningVisible, value); }
+    public bool ProductReactivateWarningVisible { get => _productReactivateWarningVisible; private set => Set(ref _productReactivateWarningVisible, value); }
     public bool OfferingDeleteWarningVisible { get => _offeringDeleteWarningVisible; private set => Set(ref _offeringDeleteWarningVisible, value); }
     public string ProductDeleteWarningMessage => _pendingDeleteProduct is null ? "Permanent deletion cannot be undone." : $"Delete archived Blueprint '{_pendingDeleteProduct.Name}' and its catalog records permanently? This cannot be undone.";
     public string ProductArchiveWarningMessage => _pendingArchiveProduct is null ? "Archiving this Blueprint will affect its connected catalog configuration." : $"This is a high-impact action. Archiving Blueprint '{_pendingArchiveProduct.Name}' will also archive its fulfillment offerings, variants, design areas, and mockup configuration. Existing listing and design relationships will be preserved, but this Blueprint will leave active use.";
+    public string ProductReactivateWarningMessage => _pendingReactivateProduct is null ? "Reactivating this Blueprint will restore its connected catalog configuration." : $"Reactivate Blueprint '{_pendingReactivateProduct.Name}' and restore its archived fulfillment offerings, options, variants, design areas, and mockup configuration? Existing listing and design relationships will be preserved.";
     public string OfferingDeleteWarningMessage => _pendingDeleteOffering is null ? "Permanent deletion cannot be undone." : $"Delete offering '{_pendingDeleteOffering.Name}' permanently? This cannot be undone.";
     public string ProductName { get => _productName; set { if (Set(ref _productName, value)) RaiseDraft(); } }
     public string ProductDescription { get => _productDescription; set { if (Set(ref _productDescription, value)) RaiseDraft(); } }
@@ -183,7 +188,7 @@ public sealed class ProductCatalogEditorViewModel : INotifyPropertyChanged
         _isCreatingNewProduct = false; _isCreatingNewOffering = false;
         _draftProductId = null; _draftOfferingId = null;
         _products = []; _archivedProducts = []; SelectedProduct = null; SelectedOffering = null;
-        ClearProductFields(); ClearOfferingFields(); ClearProductDeleteWarning(); ClearProductArchiveWarning(); ClearOfferingDeleteWarning();
+        ClearProductFields(); ClearOfferingFields(); ClearProductDeleteWarning(); ClearProductArchiveWarning(); ClearProductReactivateWarning(); ClearOfferingDeleteWarning();
         BlueprintOfferingCards.Clear();
         CatalogSetup?.CancelActiveDrafts();
         CatalogSetup?.SelectOffering(null);
@@ -289,6 +294,41 @@ public sealed class ProductCatalogEditorViewModel : INotifyPropertyChanged
         if (SelectedProduct is null) { _reportError("Select a product before deleting."); return; }
         if (!SelectedProduct.IsArchived) { _reportError("Archive the Blueprint before permanently deleting it."); return; }
         _pendingDeleteProduct = SelectedProduct; ProductDeleteWarningVisible = true; Raise(nameof(ProductDeleteWarningMessage));
+    }
+
+    public void RequestReactivateSelectedProduct()
+    {
+        if (!CanReactivateSelectedProduct) { _reportError("Select an archived Blueprint in an editable Store with no unsaved catalog changes before reactivating it."); return; }
+        _pendingReactivateProduct = SelectedProduct;
+        ProductReactivateWarningVisible = true;
+        Raise(nameof(ProductReactivateWarningMessage));
+    }
+
+    public async Task ConfirmReactivateSelectedProductAsync(CancellationToken cancellationToken = default)
+    {
+        if (_catalogService is null || _pendingReactivateProduct is null || !CanManageScope || _scope.StoreId is not { } storeId)
+        {
+            _reportError("Blueprint reactivation is not available in the current Store.");
+            return;
+        }
+
+        var scope = _scope;
+        var version = _scopeVersion;
+        var productId = _pendingReactivateProduct.Id;
+        try
+        {
+            var result = await _catalogService.RestoreBlueprintCascadeAsync(new RestoreBlueprintCascadeRequest(storeId, productId, Confirm: true), cancellationToken).ConfigureAwait(true);
+            if (!IsCurrent(scope, version)) return;
+            _reportError(result.Error);
+            if (result.Succeeded)
+            {
+                ClearProductReactivateWarning();
+                await LoadAsync(cancellationToken).ConfigureAwait(true);
+                if (SelectedProduct?.Id == productId) NavigationLevel = CatalogEditorLevel.ProductDetail;
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception exception) { if (IsCurrent(scope, version)) _reportError($"The Blueprint could not be reactivated. {exception.Message}"); }
     }
 
     public async Task ConfirmDeleteProductAsync(CancellationToken cancellationToken = default)
@@ -460,6 +500,7 @@ public sealed class ProductCatalogEditorViewModel : INotifyPropertyChanged
 
     public void ClearProductDeleteWarning() { _pendingDeleteProduct = null; ProductDeleteWarningVisible = false; Raise(nameof(ProductDeleteWarningMessage)); }
     public void ClearProductArchiveWarning() { _pendingArchiveProduct = null; ProductArchiveWarningVisible = false; Raise(nameof(ProductArchiveWarningMessage)); }
+    public void ClearProductReactivateWarning() { _pendingReactivateProduct = null; ProductReactivateWarningVisible = false; Raise(nameof(ProductReactivateWarningMessage)); }
     public void ClearOfferingDeleteWarning() { _pendingDeleteOffering = null; OfferingDeleteWarningVisible = false; Raise(nameof(OfferingDeleteWarningMessage)); }
 
     public async Task RefreshBlueprintOfferingCardsAsync(CancellationToken cancellationToken = default)
@@ -523,7 +564,7 @@ public sealed class ProductCatalogEditorViewModel : INotifyPropertyChanged
     {
         _draftGeneration++;
         if (SelectedProduct?.Id != product.Id) ResetOfferingSecondaryDrafts();
-        _isCreatingNewProduct = false; _draftProductId = null; SelectedProduct = product; ApplyProductFields(product); ApplySelectedOfferingAfterProductChange(); ClearProductDeleteWarning(); NavigationLevel = CatalogEditorLevel.ProductDetail; RaiseEverything();
+        _isCreatingNewProduct = false; _draftProductId = null; SelectedProduct = product; ApplyProductFields(product); ApplySelectedOfferingAfterProductChange(); ClearProductDeleteWarning(); ClearProductReactivateWarning(); NavigationLevel = CatalogEditorLevel.ProductDetail; RaiseEverything();
     }
 
     private void PerformSelectOffering(FulfillmentOfferingSummary? offering)
@@ -582,12 +623,12 @@ public sealed class ProductCatalogEditorViewModel : INotifyPropertyChanged
     private void OnCatalogSetupPropertyChanged(object? sender, PropertyChangedEventArgs args)
     {
         if (args.PropertyName == nameof(CatalogSetupViewModel.HasActiveDraft))
-            Raise(nameof(HasAnyCatalogUnsavedChanges));
+            Raise(nameof(HasAnyCatalogUnsavedChanges), nameof(CanReactivateSelectedProduct));
     }
 
-    private void RaiseDraft() { Raise(nameof(HasUnsavedProductChanges), nameof(HasAnyCatalogUnsavedChanges), nameof(CanSaveSelectedProduct), nameof(EditorProducts)); }
+    private void RaiseDraft() { Raise(nameof(HasUnsavedProductChanges), nameof(HasAnyCatalogUnsavedChanges), nameof(CanSaveSelectedProduct), nameof(CanReactivateSelectedProduct), nameof(EditorProducts)); }
     private void RaiseOfferingDraft() { Raise(nameof(HasUnsavedOfferingChanges), nameof(HasAnyCatalogUnsavedChanges), nameof(CanSaveSelectedOffering)); }
-    private void RaiseEverything() { Raise(nameof(Products), nameof(ArchivedProducts), nameof(EditorProducts), nameof(HasProducts), nameof(IsCreatingNewProduct), nameof(IsCreatingNewOffering), nameof(HasSelectedProduct), nameof(HasSelectedOffering), nameof(CanSaveSelectedProduct), nameof(CanSaveSelectedOffering), nameof(CanDeleteSelectedProduct), nameof(CanArchiveSelectedProduct), nameof(CanDeleteSelectedOffering), nameof(HasAnyCatalogUnsavedChanges), nameof(HasUnsavedProductChanges), nameof(HasUnsavedOfferingChanges), nameof(SelectedProduct), nameof(SelectedOffering), nameof(HasBlueprintOfferingCards)); }
+    private void RaiseEverything() { Raise(nameof(Products), nameof(ArchivedProducts), nameof(EditorProducts), nameof(HasProducts), nameof(IsCreatingNewProduct), nameof(IsCreatingNewOffering), nameof(HasSelectedProduct), nameof(HasSelectedOffering), nameof(CanSaveSelectedProduct), nameof(CanSaveSelectedOffering), nameof(CanDeleteSelectedProduct), nameof(CanArchiveSelectedProduct), nameof(CanReactivateSelectedProduct), nameof(CanDeleteSelectedOffering), nameof(HasAnyCatalogUnsavedChanges), nameof(HasUnsavedProductChanges), nameof(HasUnsavedOfferingChanges), nameof(SelectedProduct), nameof(SelectedOffering), nameof(HasBlueprintOfferingCards)); }
     private void Raise(params string[] names) { foreach (var name in names) PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name)); }
     private bool Set<T>(ref T field, T value, [CallerMemberName] string? property = null) { if (EqualityComparer<T>.Default.Equals(field, value)) return false; field = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(property)); return true; }
     private static string? EmptyToNull(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
