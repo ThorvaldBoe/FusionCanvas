@@ -7,12 +7,12 @@
         Title="Import from Printify"
         Width="900" Height="680" MinWidth="680" MinHeight="480"
         Background="{DynamicResource ApplicationBackgroundBrush}">
-  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="20" RowSpacing="12">
-    <StackPanel Spacing="4">
+  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="{DynamicResource Token.Layout.Margin.Uniform.Wide}" RowSpacing="{DynamicResource Token.Spacing.Gap.Panel}">
+    <StackPanel Spacing="{DynamicResource Token.Spacing.CompactGap}">
       <TextBlock Text="Import from Printify" FontSize="22" FontWeight="SemiBold" Foreground="{DynamicResource StrongTextBrush}" />
       <TextBlock Text="Choose existing shop listings to add to this Niche. Imported Printify products are read only." Foreground="{DynamicResource SecondaryTextBrush}" />
     </StackPanel>
-    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
+    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
       <Button Content="Refresh" Command="{Binding LoadCommand}" Classes="secondary" />
       <Button Content="{Binding LinkedProductsToggleLabel}" AutomationProperties.Name="{Binding LinkedProductsToggleLabel}" Command="{Binding ToggleLinkedCommand}" Classes="secondary" />
       <Button Content="Check selected for duplicates" Command="{Binding CheckDuplicatesCommand}" IsEnabled="{Binding CanImport}" Classes="secondary" />
@@ -24,16 +24,16 @@
         <ItemsControl ItemsSource="{Binding VisibleProducts}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="stores:PrintifyListingImportRowViewModel">
-              <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="10">
-                <Grid ColumnDefinitions="Auto,*,Auto,250" ColumnSpacing="12">
+              <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="{DynamicResource Token.Layout.Padding.Uniform.Group}">
+                <Grid ColumnDefinitions="Auto,*,Auto,250" ColumnSpacing="{DynamicResource Token.Spacing.Gap.Panel}">
                   <CheckBox IsChecked="{Binding IsSelected}" IsEnabled="{Binding !IsLinked}" VerticalAlignment="Center" AutomationProperties.AutomationId="Printify.ProductSelection" />
-                  <StackPanel Grid.Column="1" Spacing="3">
+                  <StackPanel Grid.Column="1" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
                     <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
                     <TextBlock Text="{Binding ProductId}" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBlock Text="{Binding ImportOutcome}" IsVisible="{Binding HasImportOutcome}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
                   </StackPanel>
                   <TextBlock Grid.Column="2" Text="{Binding Visibility}" VerticalAlignment="Center" />
-                  <StackPanel Grid.Column="3" Spacing="4">
+                  <StackPanel Grid.Column="3" Spacing="{DynamicResource Token.Spacing.CompactGap}">
                     <TextBlock Text="{Binding CandidateSummary}" IsVisible="{Binding HasCandidates}" FontSize="11" TextWrapping="Wrap" />
                     <ComboBox ItemsSource="{Binding ConnectableCandidates}" SelectedItem="{Binding SelectedCandidate}" PlaceholderText="Import as new">
                       <ComboBox.ItemTemplate>
@@ -51,7 +51,7 @@
         </ItemsControl>
       </ScrollViewer>
     </Border>
-    <Grid Grid.Row="3" ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="8">
+    <Grid Grid.Row="3" ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
       <TextBlock Grid.Column="0" Text="{Binding Error}" IsVisible="{Binding HasError}" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap" VerticalAlignment="Center" />
       <Button Grid.Column="1" Content="Open Store setup" Click="OnOpenStoreSetup" Classes="secondary" />
       <Button Grid.Column="2" Content="Cancel operation" Command="{Binding CancelCommand}" IsEnabled="{Binding IsBusy}" IsVisible="{Binding IsBusy}" Classes="secondary" />

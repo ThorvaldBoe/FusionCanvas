@@ -26,11 +26,11 @@
             Background="{DynamicResource ElevatedSurfaceBrush}"
             BorderBrush="{DynamicResource ControlBorderBrush}"
             BorderThickness="0,0,1,0"
-            Padding="16">
+            Padding="{DynamicResource Token.Layout.Padding.Uniform.SectionPlus}">
       <DockPanel LastChildFill="True">
         <StackPanel DockPanel.Dock="Top"
-                    Spacing="8"
-                    Margin="0,0,0,16">
+                    Spacing="{DynamicResource Token.Spacing.ControlGap}"
+                    Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_SectionPlus}">
           <TextBlock Text="Stores"
                      FontSize="18"
                      FontWeight="SemiBold"
@@ -41,7 +41,7 @@
                   Classes="primary" />
         </StackPanel>
 
-        <StackPanel Spacing="12">
+        <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
           <TextBlock Text="Active"
                      FontSize="12"
                      FontWeight="SemiBold"
@@ -64,7 +64,7 @@
                      FontSize="12"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource SecondaryTextBrush}"
-                     Margin="0,8,0,0" />
+                     Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}" />
           <ItemsControl IsVisible="{Binding HasArchivedStores}"
                         ItemsSource="{Binding ArchivedStores}">
             <ItemsControl.ItemTemplate>
@@ -82,13 +82,13 @@
     </Border>
 
     <Border Grid.Column="1"
-            Margin="18"
-            Padding="20"
+            Margin="{DynamicResource Token.Layout.Margin.Uniform.Large}"
+            Padding="{DynamicResource Token.Layout.Padding.Uniform.Wide}"
             Background="{DynamicResource ElevatedSurfaceBrush}"
             BorderBrush="{DynamicResource ControlBorderBrush}"
             BorderThickness="1">
       <ScrollViewer>
-        <StackPanel Spacing="12">
+        <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
           <TextBlock Text="Store Management"
                      FontSize="22"
                      FontWeight="SemiBold"
@@ -106,9 +106,9 @@
                   BorderBrush="{DynamicResource TabBorderBrush}"
                   BorderThickness="1"
                   CornerRadius="6"
-                  Padding="4">
+                  Padding="{DynamicResource Token.Layout.CompactPadding}">
             <StackPanel Orientation="Horizontal"
-                        Spacing="8">
+                        Spacing="{DynamicResource Token.Spacing.ControlGap}">
               <Button Content="Basic info"
                       Command="{Binding SelectBasicInfoTabCommand}"
                       Classes="tabButton"
@@ -134,10 +134,10 @@
                   BorderThickness="1"
                   CornerRadius="6"
                   Padding="0">
-            <StackPanel Spacing="12">
+            <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
               <StackPanel IsVisible="{Binding IsBasicInfoTabSelected}"
                           Margin="{DynamicResource Token.Layout.CardPadding}"
-                          Spacing="12">
+                          Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
             <TextBlock Text="Basic info"
                        FontSize="16"
                        FontWeight="SemiBold"
@@ -149,9 +149,9 @@
                      Classes="field" />
             <TextBox Text="{Binding Description}"
                      PlaceholderText="Description"
-                     Margin="0,0,16,0"
+                     Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_SectionPlus.Bottom_None}"
                      Classes="field" />
-            <StackPanel Spacing="4">
+            <StackPanel Spacing="{DynamicResource Token.Spacing.CompactGap}">
               <TextBlock Text="Fulfillment strategy"
                          FontWeight="SemiBold" />
               <ComboBox ItemsSource="{Binding AvailableFulfillmentStrategies}"
@@ -162,18 +162,18 @@
                   <DataTemplate><TextBlock Text="{Binding ., Converter={StaticResource FulfillmentStrategyLabel}}" /></DataTemplate>
                 </ComboBox.ItemTemplate>
               </ComboBox>
-              <StackPanel IsVisible="{Binding ShowStrategyWarning}" Spacing="8">
+              <StackPanel IsVisible="{Binding ShowStrategyWarning}" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                 <TextBlock Text="Changing strategy makes Printify configuration unavailable. The saved key and catalog will be retained. Save this change?" TextWrapping="Wrap" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                   <Button Content="Save strategy change" Command="{Binding ConfirmStrategyCommand}" />
                   <Button Content="Cancel strategy change" Command="{Binding CancelStrategyCommand}" />
                 </StackPanel>
               </StackPanel>
               <StackPanel DataContext="{Binding PrintifyCredentials}" x:DataType="stores:StorePrintifyCredentialsViewModel"
-                          IsVisible="{Binding IsVisible}" Spacing="8">
+                          IsVisible="{Binding IsVisible}" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                 <TextBlock Text="{Binding Status}" IsVisible="{Binding !IsMissing}" TextWrapping="Wrap" />
                 <TextBlock Text="{Binding Status}" IsVisible="{Binding IsMissing}" Foreground="{DynamicResource DangerStrongBrush}" TextWrapping="Wrap" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                   <Button x:Name="PrintifyManageButton" Content="{Binding ManageLabel}" Command="{Binding ManageCommand}" IsEnabled="{Binding CanManage}" />
                   <Button Content="Verify" Command="{Binding VerifyCommand}" IsVisible="{Binding HasKey}" IsEnabled="{Binding CanVerify}" />
                   <Button Content="Retry" Command="{Binding RetryCommand}" IsVisible="{Binding HasError}" />
@@ -189,7 +189,7 @@
             </StackPanel>
             <TextBox Text="{Binding Notes}"
                      PlaceholderText="Notes"
-                     Margin="0,0,16,0"
+                     Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_SectionPlus.Bottom_None}"
                      AcceptsReturn="True"
                      MinHeight="84"
                      Classes="field" />
@@ -207,8 +207,8 @@
                      Classes="field" />
 
             <StackPanel Orientation="Horizontal"
-                        Spacing="8"
-                        Margin="0,8,0,0">
+                        Spacing="{DynamicResource Token.Spacing.ControlGap}"
+                        Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}">
               <Button Content="Save"
                       AutomationProperties.AutomationId="StoreEditor.SaveStore"
                       Command="{Binding SaveSelectedStoreCommand}"
@@ -233,9 +233,9 @@
 
           <Grid IsVisible="{Binding IsNichesTabSelected}"
                 ColumnDefinitions="220,*"
-                ColumnSpacing="16">
+                ColumnSpacing="{DynamicResource Token.Spacing.Gap.SectionPlus}">
             <StackPanel Grid.Column="0"
-                        Spacing="10">
+                        Spacing="{DynamicResource Token.Spacing.GroupGap}">
               <Button Content="New niche"
                       Command="{Binding StartCreateNicheCommand}"
                       Classes="primary" />
@@ -264,7 +264,7 @@
                          FontSize="12"
                          FontWeight="SemiBold"
                          Foreground="{DynamicResource SecondaryTextBrush}"
-                         Margin="0,8,0,0" />
+                         Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}" />
               <ItemsControl IsVisible="{Binding HasArchivedNiches}"
                             ItemsSource="{Binding ArchivedNiches}">
                 <ItemsControl.ItemTemplate>
@@ -280,15 +280,15 @@
             </StackPanel>
 
             <StackPanel Grid.Column="1"
-                        Spacing="10"
-                        Margin="0,0,16,0">
+                        Spacing="{DynamicResource Token.Spacing.GroupGap}"
+                        Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_SectionPlus.Bottom_None}">
               <TextBlock Text="Niche details"
                          FontSize="16"
                          FontWeight="SemiBold"
                          Foreground="{DynamicResource StrongTextBrush}" />
               <Grid ColumnDefinitions="*,Auto"
-                    ColumnSpacing="8"
-                    Margin="0,0,16,0">
+                    ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}"
+                    Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_SectionPlus.Bottom_None}">
                 <TextBox Grid.Column="0"
                          Text="{Binding NicheName}"
                          PlaceholderText="Niche name"
@@ -305,61 +305,61 @@
               <ProgressBar IsVisible="{Binding IsNichePopulationBusy}"
                            IsIndeterminate="True"
                            Height="4"
-                           Margin="0,0,16,0" />
+                           Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_SectionPlus.Bottom_None}" />
               <TextBlock Text="{Binding NichePopulationStatusMessage}"
                          IsVisible="{Binding HasNichePopulationStatus}"
                          TextWrapping="Wrap"
                          FontSize="12"
                          Foreground="{DynamicResource SecondaryTextBrush}"
-                         Margin="0,0,16,0" />
+                         Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_SectionPlus.Bottom_None}" />
               <TextBox Text="{Binding NicheDescription}"
                        PlaceholderText="Description"
                        ToolTip.Tip="Description"
-                       Margin="0,0,16,0"
+                       Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_SectionPlus.Bottom_None}"
                        Classes="field" />
               <TextBox Text="{Binding NicheAudience}"
                        PlaceholderText="Audience"
                        ToolTip.Tip="Audience"
-                       Margin="0,0,16,0"
+                       Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_SectionPlus.Bottom_None}"
                        Classes="field" />
               <TextBox Text="{Binding NicheHumorStyle}"
                        PlaceholderText="Humor style"
                        ToolTip.Tip="Humor style"
-                       Margin="0,0,16,0"
+                       Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_SectionPlus.Bottom_None}"
                        Classes="field" />
               <TextBox Text="{Binding NicheVisualStyleGuidance}"
                        PlaceholderText="Visual style guidance"
                        ToolTip.Tip="Visual style guidance"
-                       Margin="0,0,16,0"
+                       Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_SectionPlus.Bottom_None}"
                        Classes="field" />
               <TextBox Text="{Binding NicheConstraints}"
                        PlaceholderText="Constraints"
                        ToolTip.Tip="Constraints"
-                       Margin="0,0,16,0"
+                       Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_SectionPlus.Bottom_None}"
                        Classes="field" />
               <TextBox Text="{Binding NicheRisks}"
                        PlaceholderText="Risks"
                        ToolTip.Tip="Risks"
-                       Margin="0,0,16,0"
+                       Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_SectionPlus.Bottom_None}"
                        Classes="field" />
               <TextBox Text="{Binding NicheResearchNotes}"
                        PlaceholderText="Research notes"
                        ToolTip.Tip="Research notes"
-                       Margin="0,0,16,0"
+                       Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_SectionPlus.Bottom_None}"
                        AcceptsReturn="True"
                        MinHeight="70"
                        Classes="field" />
               <TextBox Text="{Binding NicheNotes}"
                        PlaceholderText="Notes"
                        ToolTip.Tip="Notes"
-                       Margin="0,0,16,0"
+                       Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_SectionPlus.Bottom_None}"
                        AcceptsReturn="True"
                        MinHeight="70"
                        Classes="field" />
 
               <StackPanel Orientation="Horizontal"
-                          Spacing="8"
-                          Margin="0,8,0,0">
+                          Spacing="{DynamicResource Token.Spacing.ControlGap}"
+                          Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}">
                 <Button Content="Save"
                         Command="{Binding SaveSelectedNicheCommand}"
                         IsEnabled="{Binding CanSaveSelectedNiche}"
@@ -384,9 +384,9 @@
 
           <Grid IsVisible="{Binding IsTagsTabSelected}"
                 ColumnDefinitions="220,*"
-                ColumnSpacing="16">
+                ColumnSpacing="{DynamicResource Token.Spacing.Gap.SectionPlus}">
             <StackPanel Grid.Column="0"
-                        Spacing="10">
+                        Spacing="{DynamicResource Token.Spacing.GroupGap}">
               <Button Content="New tag"
                       Command="{Binding StartCreateTagCommand}"
                       Classes="primary" />
@@ -415,7 +415,7 @@
                          FontSize="12"
                          FontWeight="SemiBold"
                          Foreground="{DynamicResource SecondaryTextBrush}"
-                         Margin="0,8,0,0" />
+                         Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}" />
               <ItemsControl IsVisible="{Binding HasArchivedTags}"
                             ItemsSource="{Binding ArchivedTags}">
                 <ItemsControl.ItemTemplate>
@@ -431,8 +431,8 @@
             </StackPanel>
 
             <StackPanel Grid.Column="1"
-                        Spacing="10"
-                        Margin="0,0,16,0">
+                        Spacing="{DynamicResource Token.Spacing.GroupGap}"
+                        Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_SectionPlus.Bottom_None}">
               <TextBlock Text="Tag details"
                          FontSize="16"
                          FontWeight="SemiBold"
@@ -440,7 +440,7 @@
               <TextBox Text="{Binding TagName}"
                        PlaceholderText="Tag name"
                        Classes="field" />
-              <StackPanel Spacing="4">
+              <StackPanel Spacing="{DynamicResource Token.Spacing.CompactGap}">
                 <TextBlock Text="Color"
                            FontSize="12"
                            FontWeight="SemiBold"
@@ -451,12 +451,12 @@
               </StackPanel>
               <TextBox Text="{Binding TagDescription}"
                        PlaceholderText="Description"
-                       Margin="0,0,64,0"
+                       Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_Broad.Bottom_None}"
                        Classes="field" />
 
               <StackPanel Orientation="Horizontal"
-                          Spacing="8"
-                          Margin="0,8,0,0">
+                          Spacing="{DynamicResource Token.Spacing.ControlGap}"
+                          Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}">
                 <Button Content="Save"
                         Command="{Binding SaveSelectedTagCommand}"
                         IsEnabled="{Binding CanSaveSelectedTag}"
@@ -483,14 +483,14 @@
                   Background="{DynamicResource DangerBackgroundBrush}"
                   BorderBrush="{DynamicResource DangerBorderBrush}"
                   BorderThickness="1"
-                  Padding="12"
-                  Margin="0,8,0,0">
-            <StackPanel Spacing="8">
+                  Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}"
+                  Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}">
+            <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
               <TextBlock Text="{Binding TagDeleteWarningMessage}"
                          FontSize="13"
                          Foreground="{DynamicResource DangerTextBrush}" />
               <StackPanel Orientation="Horizontal"
-                          Spacing="8">
+                          Spacing="{DynamicResource Token.Spacing.ControlGap}">
                 <Button Content="Delete permanently"
                         Command="{Binding ConfirmDeleteTagCommand}"
                         IsEnabled="{Binding CanConfirmDeleteTag}"
@@ -503,9 +503,9 @@
           </Border>
 
           <StackPanel IsVisible="{Binding IsProductsTabSelected}"
-                      Spacing="12">
+                      Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
             <StackPanel IsVisible="{Binding IsCatalogOverview}"
-                        Spacing="12">
+                        Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
               <TextBlock Text="Catalog overview"
                          FontSize="16"
                          FontWeight="SemiBold"
@@ -513,7 +513,7 @@
               <TextBlock Text="Define Blueprints, fulfillment offerings, Variants, and Placeholders. Blueprint is Printify terminology for the base product; Placeholder is the named design target on an offering."
                          TextWrapping="Wrap"
                          Foreground="{DynamicResource SecondaryTextBrush}" />
-              <StackPanel Orientation="Horizontal" Spacing="8">
+              <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                 <Button Content="New Blueprint"
                         Command="{Binding StartCreateProductCommand}"
                         IsEnabled="{Binding CanCreateCatalogItem}"
@@ -532,9 +532,9 @@
                       Focusable="True"
                       KeyDown="OnPrintifyImportKeyDown"
                       Classes="panel"
-                      Padding="12"
+                      Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}"
                       AutomationProperties.AutomationId="Catalog.PrintifyImportPanel">
-                <StackPanel DataContext="{Binding PrintifyCatalogImportSession}" Spacing="8">
+                <StackPanel DataContext="{Binding PrintifyCatalogImportSession}" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                   <TextBlock Text="Import products from Printify" FontWeight="SemiBold" />
                   <TextBlock Text="Select products from the selected Printify shop to add or update locally. No changes are saved until you confirm."
                              TextWrapping="Wrap"
@@ -569,7 +569,7 @@
                                        TextTrimming="CharacterEllipsis"
                                        FontWeight="SemiBold"
                                        VerticalAlignment="Center"
-                                       Margin="8,0" />
+                                       Margin="{DynamicResource Token.Layout.Margin.HorizontalVertical.Control.None}" />
                           </DataTemplate>
                         </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
                       </virtualColumns:VirtualDataGridTemplateColumn>
@@ -582,7 +582,7 @@
                                        TextTrimming="CharacterEllipsis"
                                        Foreground="{DynamicResource SecondaryTextBrush}"
                                        VerticalAlignment="Center"
-                                       Margin="8,0" />
+                                       Margin="{DynamicResource Token.Layout.Margin.HorizontalVertical.Control.None}" />
                           </DataTemplate>
                         </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
                       </virtualColumns:VirtualDataGridTemplateColumn>
@@ -596,14 +596,14 @@
                                        FontSize="12"
                                        Foreground="{DynamicResource SecondaryTextBrush}"
                                        VerticalAlignment="Center"
-                                       Margin="8,0" />
+                                       Margin="{DynamicResource Token.Layout.Margin.HorizontalVertical.Control.None}" />
                           </DataTemplate>
                         </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
                       </virtualColumns:VirtualDataGridTemplateColumn>
                     </virtualGrid:VirtualDataGrid.Columns>
                   </virtualGrid:VirtualDataGrid>
                   <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Foreground="{DynamicResource DangerTextBrush}" TextWrapping="Wrap" />
-                  <StackPanel Orientation="Horizontal" Spacing="8">
+                  <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                     <Button Content="Load selected" Command="{Binding ConfirmCommand}" Classes="primary fixedAction" Width="112" />
                     <Button Content="Cancel" Command="{Binding CancelCommand}" Classes="secondary fixedAction" />
                   </StackPanel>
@@ -619,7 +619,7 @@
                             CommandParameter="{Binding}"
                             Classes="listItem"
                             HorizontalContentAlignment="Left">
-                      <StackPanel Spacing="3">
+                      <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
                         <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
                         <TextBlock Text="{Binding Offerings.Count, StringFormat='{}{0} Blueprint Offering(s)'}"
                                    FontSize="12"
@@ -636,8 +636,8 @@
             </StackPanel>
 
             <StackPanel IsVisible="{Binding IsProductDetail}"
-                        Spacing="12">
-              <StackPanel Spacing="12"
+                        Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
+              <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Panel}"
                           Margin="{DynamicResource Token.Layout.PageInset}"
                           AutomationProperties.AutomationId="Catalog.BlueprintDetailContext">
                 <Button Content="‹  Back to Blueprints"
@@ -653,14 +653,14 @@
                 <TextBlock Text="{Binding SelectedProductSummary}"
                            Foreground="{DynamicResource SecondaryTextBrush}" />
               </StackPanel>
-              <Border Classes="panel" Padding="12"
+              <Border Classes="panel" Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}"
                       AutomationProperties.AutomationId="Catalog.BlueprintBasics">
-                <StackPanel Spacing="8">
+                <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                   <ToggleButton Content="Basics"
                                 IsChecked="{Binding IsBlueprintBasicsExpanded, Mode=TwoWay}"
                                 HorizontalContentAlignment="Left"
                                 ToolTip.Tip="Edit the Blueprint name and description without leaving this page." />
-                  <StackPanel IsVisible="{Binding IsBlueprintBasicsExpanded}" IsEnabled="{Binding !SelectedStore.IsArchived}" Spacing="8">
+                  <StackPanel IsVisible="{Binding IsBlueprintBasicsExpanded}" IsEnabled="{Binding !SelectedStore.IsArchived}" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                     <TextBlock Text="Blueprint is Printify's term for the base product definition."
                                TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBlock Text="Name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -674,7 +674,7 @@
                              AcceptsReturn="True"
                              MinHeight="56"
                              Classes="field" />
-                    <StackPanel Orientation="Horizontal" Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                       <Button Content="Save Blueprint"
                               AutomationProperties.AutomationId="Catalog.SaveBlueprint"
                               Command="{Binding SaveSelectedProductCommand}"
@@ -704,15 +704,15 @@
                             Background="{DynamicResource WarningBackgroundBrush}"
                             BorderBrush="{DynamicResource WarningBorderBrush}"
                             BorderThickness="2"
-                            Padding="12">
-                      <StackPanel Spacing="8">
+                            Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}">
+                      <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                         <TextBlock Text="HIGH-IMPACT BLUEPRINT ARCHIVE"
                                    FontWeight="Bold"
                                    Foreground="{DynamicResource WarningTextBrush}" />
                         <TextBlock Text="{Binding ProductArchiveWarningMessage}"
                                    TextWrapping="Wrap"
                                    Foreground="{DynamicResource WarningTextBrush}" />
-                        <StackPanel Orientation="Horizontal" Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                           <Button Content="Archive Blueprint and dependents"
                                   Command="{Binding ConfirmArchiveSelectedProductCommand}"
                                   AutomationProperties.Name="Confirm archive Blueprint and dependents"
@@ -729,15 +729,15 @@
                             Background="{DynamicResource WarningBackgroundBrush}"
                             BorderBrush="{DynamicResource WarningBorderBrush}"
                             BorderThickness="2"
-                            Padding="12">
-                      <StackPanel Spacing="8">
+                            Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}">
+                      <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                         <TextBlock Text="REACTIVATE BLUEPRINT AND CATALOG"
                                    FontWeight="Bold"
                                    Foreground="{DynamicResource WarningTextBrush}" />
                         <TextBlock Text="{Binding ProductReactivateWarningMessage}"
                                    TextWrapping="Wrap"
                                    Foreground="{DynamicResource WarningTextBrush}" />
-                        <StackPanel Orientation="Horizontal" Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                           <Button Content="Reactivate Blueprint"
                                   Command="{Binding ConfirmReactivateSelectedProductCommand}"
                                   IsEnabled="{Binding CanReactivateSelectedProduct}"
@@ -753,9 +753,9 @@
                   </StackPanel>
                 </StackPanel>
               </Border>
-              <Border Classes="panel" Padding="12"
+              <Border Classes="panel" Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}"
                       AutomationProperties.AutomationId="Catalog.BlueprintOfferingList">
-                <StackPanel Spacing="8">
+                <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                   <TextBlock Text="Blueprint Offerings"
                              FontWeight="SemiBold"
                              ToolTip.Tip="An Offering is a concrete fulfillment choice for a Blueprint." />
@@ -839,13 +839,13 @@
             </StackPanel>
 
               <StackPanel IsVisible="{Binding IsOfferingContext}"
-                          Spacing="12">
+                          Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
                 <Border AutomationProperties.AutomationId="Catalog.ContextHeader"
                         BorderBrush="{DynamicResource SubtleBorderBrush}"
                         BorderThickness="0,0,0,1"
-                        Padding="0,0,0,12"
+                        Padding="{DynamicResource Token.Layout.Padding.Sides.Left_None.Top_None.Right_None.Bottom_Panel}"
                         Margin="{DynamicResource Token.Layout.PageInset}">
-                  <StackPanel Spacing="8">
+                  <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                     <Button Content="‹  Back to Blueprint"
                             Command="{Binding BackToProductCommand}"
                             IsVisible="{Binding IsOfferingDetail}"
@@ -878,7 +878,7 @@
                       Background="{DynamicResource WarningBackgroundBrush}"
                       BorderBrush="{DynamicResource WarningBorderBrush}"
                       BorderThickness="1"
-                      Padding="12">
+                      Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}">
                 <TextBlock Text="This Blueprint Offering could not be repaired into the normalized catalog. Return to the Blueprint and reopen it, or review the catalog error below."
                            TextWrapping="Wrap"
                            Foreground="{DynamicResource WarningTextBrush}" />
@@ -888,12 +888,12 @@
                          TextWrapping="Wrap"
                          Foreground="{DynamicResource DangerTextBrush}" />
 
-              <Border Classes="panel" Padding="12" IsVisible="{Binding IsCreatingNewOffering}">
-                <StackPanel Spacing="8">
+              <Border Classes="panel" Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}" IsVisible="{Binding IsCreatingNewOffering}">
+                <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                   <TextBlock Text="New Blueprint Offering" FontWeight="SemiBold" />
                   <TextBlock Text="Choose the fulfillment relationship first. After saving, Options, Variants, Placeholders, and Mockup Templates become available."
                              TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                  <StackPanel Spacing="8">
+                  <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                     <TextBlock Text="Name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBox x:Name="OfferingNameTextBox" Text="{Binding OfferingName}" PlaceholderText="Offering name" Classes="field" />
                     <TextBlock Text="Fulfillment type" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -909,7 +909,7 @@
                     <TextBlock Text="Description" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBox Text="{Binding OfferingDescription}" AcceptsReturn="True" MinHeight="96" Classes="field"
                              AutomationProperties.AutomationId="Catalog.NewOfferingDescription" />
-                    <StackPanel Orientation="Horizontal" Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                       <Button Content="Save Blueprint Offering"
                               Command="{Binding SaveSelectedOfferingCommand}"
                               IsEnabled="{Binding CanSaveSelectedOffering}"
@@ -922,18 +922,18 @@
             </StackPanel>
           </Border>
 
-              <Border Classes="panel" Padding="12" IsVisible="{Binding IsOfferingDetail}"
+              <Border Classes="panel" Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}" IsVisible="{Binding IsOfferingDetail}"
                       AutomationProperties.AutomationId="Catalog.OfferingBasics">
-                <StackPanel Spacing="8">
+                <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                   <ToggleButton Content="Basics" IsChecked="{Binding IsBasicsSectionExpanded, Mode=TwoWay}" HorizontalContentAlignment="Left" />
-                  <StackPanel IsVisible="{Binding IsBasicsSectionExpanded}" Spacing="8">
+                  <StackPanel IsVisible="{Binding IsBasicsSectionExpanded}" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                     <TextBlock Text="Name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBox Text="{Binding CatalogSetup.OfferingName}" PlaceholderText="Offering name" Classes="field" />
                     <TextBlock Text="Fulfillment type" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBlock Text="{Binding CatalogSetup.OfferingKindLabel}" />
-                    <StackPanel IsVisible="{Binding !CatalogSetup.IsProviderNetworkOffering}" Spacing="4">
+                    <StackPanel IsVisible="{Binding !CatalogSetup.IsProviderNetworkOffering}" Spacing="{DynamicResource Token.Spacing.CompactGap}">
                       <TextBlock Text="Print Provider" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
                         <ComboBox Grid.Column="0"
                                   ItemsSource="{Binding CatalogSetup.AvailablePrintProviders}"
                                   SelectedItem="{Binding CatalogSetup.SelectedPrintProvider}"
@@ -944,12 +944,12 @@
                                 Command="{Binding CatalogSetup.StartAddPrintProviderCommand}"
                                 Classes="secondary" />
                       </Grid>
-                      <StackPanel IsVisible="{Binding CatalogSetup.IsAddingPrintProvider}" Spacing="6">
+                      <StackPanel IsVisible="{Binding CatalogSetup.IsAddingPrintProvider}" Spacing="{DynamicResource Token.Spacing.InlineGap}">
                         <TextBlock Text="New Print Provider" FontWeight="SemiBold" />
                         <TextBox Text="{Binding CatalogSetup.NewPrintProviderName}"
                                  PlaceholderText="Provider name, for example SwiftPOD"
                                  Classes="field" />
-                        <StackPanel Orientation="Horizontal" Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                           <Button Content="Create and select Provider"
                                   Command="{Binding CatalogSetup.CreatePrintProviderCommand}"
                                   Classes="primary" />
@@ -959,7 +959,7 @@
                         </StackPanel>
                       </StackPanel>
                     </StackPanel>
-                    <StackPanel IsVisible="{Binding CatalogSetup.IsProviderNetworkOffering}" Spacing="4">
+                    <StackPanel IsVisible="{Binding CatalogSetup.IsProviderNetworkOffering}" Spacing="{DynamicResource Token.Spacing.CompactGap}">
                       <TextBlock Text="Provider Network code" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                       <TextBox Text="{Binding CatalogSetup.ProviderNetworkCode}" Classes="field" />
                       <TextBlock Text="A Provider Network can route fulfillment through different Print Providers. Its stable code preserves identity if the display label changes."
@@ -969,7 +969,7 @@
                     <TextBox Text="{Binding CatalogSetup.OfferingDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              AcceptsReturn="True" MinHeight="96" Classes="field"
                              AutomationProperties.AutomationId="Catalog.OfferingDescription" />
-                    <StackPanel Orientation="Horizontal" Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                       <Button Content="Save Blueprint Offering" Command="{Binding CatalogSetup.SaveOfferingCommand}" Classes="primary offeringAction" />
                       <Button Content="Archive Blueprint Offering"
                               Command="{Binding CatalogSetup.RequestArchiveOfferingCommand}"
@@ -991,8 +991,8 @@
               <Border IsVisible="{Binding CatalogSetup.IsArchiveOfferingConfirmationVisible}"
                       Background="{DynamicResource DangerBackgroundBrush}"
                       BorderBrush="{DynamicResource DangerBorderBrush}"
-                      BorderThickness="1" Padding="12">
-                <StackPanel Spacing="8">
+                      BorderThickness="1" Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}">
+                <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                   <TextBlock Text="Archive Blueprint Offering?" FontWeight="SemiBold" />
                   <TextBlock Text="This is reversible. The Offering and its active catalog-owned dependents will be archived together; nothing will be permanently deleted."
                              TextWrapping="Wrap" Foreground="{DynamicResource DangerTextBrush}" />
@@ -1016,7 +1016,7 @@
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
-                  <StackPanel Orientation="Horizontal" Spacing="8">
+                  <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                     <Button Content="Archive Offering and Dependents"
                             Command="{Binding CatalogSetup.ConfirmArchiveOfferingCommand}"
                             Classes="danger fixedDanger" />
@@ -1028,18 +1028,18 @@
               <Border IsVisible="{Binding CatalogSetup.IsDeleteOfferingConfirmationVisible}"
                       Background="{DynamicResource DangerBackgroundBrush}"
                       BorderBrush="{DynamicResource DangerBorderBrush}"
-                      BorderThickness="1" Padding="12">
-                <StackPanel Spacing="8">
+                      BorderThickness="1" Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}">
+                <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                   <TextBlock Text="Delete Blueprint Offering permanently?" FontWeight="SemiBold" />
                   <TextBlock Text="This cannot be undone. All catalog-owned descendants will be removed. External references block deletion until they are resolved." TextWrapping="Wrap" Foreground="{DynamicResource DangerTextBrush}" />
                   <TextBlock Text="{Binding CatalogSetup.DeleteOfferingPlan.OfferingName}" FontWeight="SemiBold" />
                   <ItemsControl ItemsSource="{Binding CatalogSetup.DeleteOfferingPlan.ExternalBlockers}"><ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding DisplayText}" Foreground="{DynamicResource DangerTextBrush}" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
-                  <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="Delete permanently" Command="{Binding CatalogSetup.ConfirmDeleteOfferingCommand}" Classes="danger fixedDanger" /><Button Content="Cancel" Command="{Binding CatalogSetup.CancelDeleteOfferingCommand}" Classes="secondary fixedAction" /></StackPanel>
+                  <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}"><Button Content="Delete permanently" Command="{Binding CatalogSetup.ConfirmDeleteOfferingCommand}" Classes="danger fixedDanger" /><Button Content="Cancel" Command="{Binding CatalogSetup.CancelDeleteOfferingCommand}" Classes="secondary fixedAction" /></StackPanel>
                 </StackPanel>
               </Border>
 
-              <Border Classes="panel" Padding="12" IsVisible="{Binding IsOfferingDetail}">
-                <StackPanel Spacing="10"
+              <Border Classes="panel" Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}" IsVisible="{Binding IsOfferingDetail}">
+                <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}"
                             AutomationProperties.AutomationId="Catalog.OfferingSetup">
                 <TextBlock Text="Setup" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource StrongTextBrush}" />
                 <TextBlock Text="Configure each part of this Offering in a focused screen. Provider means the fulfillment partner that produces the item; Printify is the catalog and integration source."
@@ -1047,15 +1047,15 @@
                 <Border IsVisible="{Binding IsChoiceNetworkOffering}"
                         Background="{DynamicResource WarningBackgroundBrush}"
                         BorderBrush="{DynamicResource WarningBorderBrush}"
-                        BorderThickness="1" Padding="10">
+                        BorderThickness="1" Padding="{DynamicResource Token.Layout.Padding.Uniform.Group}">
                   <TextBlock Text="Printify Choice is a Provider Network, not a single Print Provider. The actual fulfillment partner may vary by order or catalog availability."
                              TextWrapping="Wrap" Foreground="{DynamicResource WarningTextBrush}" />
                 </Border>
                 <TextBlock IsVisible="{Binding SelectedStore.IsArchived}"
                            Text="This Store is archived. Catalog setup is available for review but cannot be changed."
                            TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
-                <Border Classes="listItem" Padding="10">
-                  <Grid ColumnDefinitions="2*,Auto,Auto" ColumnSpacing="12">
+                <Border Classes="listItem" Padding="{DynamicResource Token.Layout.Padding.Uniform.Group}">
+                  <Grid ColumnDefinitions="2*,Auto,Auto" ColumnSpacing="{DynamicResource Token.Spacing.Gap.Panel}">
                     <Grid.RowDefinitions>
                       <RowDefinition Height="Auto" />
                       <RowDefinition Height="30" />
@@ -1064,7 +1064,7 @@
                       <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <StackPanel Grid.Row="0" Grid.Column="0" Spacing="3">
+                    <StackPanel Grid.Row="0" Grid.Column="0" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
                       <TextBlock Text="Variants" FontWeight="SemiBold" />
                       <TextBlock Text="Possible choices and explicit sellable combinations."
                                  TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -1076,7 +1076,7 @@
                             AutomationProperties.Name="Manage Variants"
                             AutomationProperties.AutomationId="Catalog.ManageVariants" />
 
-                    <StackPanel Grid.Row="2" Grid.Column="0" Spacing="3">
+                    <StackPanel Grid.Row="2" Grid.Column="0" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
                       <TextBlock Text="Design Areas" FontWeight="SemiBold" />
                       <TextBlock Text="Printable regions and compatible Variants."
                                  TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -1088,7 +1088,7 @@
                             AutomationProperties.Name="Manage Design Areas"
                             AutomationProperties.AutomationId="Catalog.ManageDesignAreas" />
 
-                    <StackPanel Grid.Row="4" Grid.Column="0" Spacing="3">
+                    <StackPanel Grid.Row="4" Grid.Column="0" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
                       <TextBlock Text="Mockup Templates" FontWeight="SemiBold" />
                       <TextBlock Text="Provider images linked to Design Areas and Colors."
                                  TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -1101,9 +1101,9 @@
                             AutomationProperties.AutomationId="Catalog.ManageMockupTemplates" />
                   </Grid>
                 </Border>
-                <Border Classes="panel" Padding="10"
+                <Border Classes="panel" Padding="{DynamicResource Token.Layout.Padding.Uniform.Group}"
                         AutomationProperties.AutomationId="Catalog.OfferingReadiness">
-                  <StackPanel Spacing="6">
+                  <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
                     <TextBlock Text="Setup readiness" FontWeight="SemiBold" />
                     <TextBlock Text="{Binding CatalogSetup.OfferingReadinessSummary}"
                                TextWrapping="Wrap"
@@ -1141,9 +1141,9 @@
                 </StackPanel>
               </Border>
 
-              <Border Classes="panel" Padding="12" IsVisible="{Binding IsVariantManagement}"
+              <Border Classes="panel" Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}" IsVisible="{Binding IsVariantManagement}"
                       AutomationProperties.AutomationId="Catalog.VariantAvailableChoices">
-                <StackPanel Spacing="8">
+                <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                   <TextBlock Text="1. Available choices" FontSize="18" FontWeight="SemiBold" />
                   <TextBlock Text="Define which Color, Size, and other values may be combined. This does not make every combination sellable."
                              TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -1156,10 +1156,10 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="stores:OfferingChoiceGroupViewModel">
-                        <Border Classes="choiceCard" Padding="10" Width="{Binding CardWidth}" Margin="0,0,10,10"
+                        <Border Classes="choiceCard" Padding="{DynamicResource Token.Layout.Padding.Uniform.Group}" Width="{Binding CardWidth}" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_Group.Bottom_Group}"
                                 AutomationProperties.AutomationId="Catalog.OptionCard">
-                          <StackPanel Spacing="6">
-                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                          <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
+                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
                               <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
                               <TextBlock Grid.Column="1" Text="{Binding KindLabel}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}"
                                          VerticalAlignment="Center" />
@@ -1194,7 +1194,7 @@
                                                                              IsSortable="False" IsResizable="False">
                                   <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
                                     <DataTemplate x:DataType="stores:AvailableOptionValueGridRowViewModel">
-                                      <Border Classes="optionValueGridRow" Classes.alternate="{Binding IsAlternate}" Padding="8,0">
+                                      <Border Classes="optionValueGridRow" Classes.alternate="{Binding IsAlternate}" Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Control.None}">
                                         <TextBlock Text="{Binding Value}" TextTrimming="CharacterEllipsis"
                                                    VerticalAlignment="Center" ToolTip.Tip="{Binding Value}"
                                                    AutomationProperties.Name="{Binding AccessibleName}"
@@ -1205,25 +1205,25 @@
                                 </virtualColumns:VirtualDataGridTemplateColumn>
                               </virtualGrid:VirtualDataGrid.Columns>
                             </virtualGrid:VirtualDataGrid>
-                            <StackPanel IsVisible="{Binding IsColor}" Spacing="6">
+                            <StackPanel IsVisible="{Binding IsColor}" Spacing="{DynamicResource Token.Spacing.InlineGap}">
                               <TextBlock IsVisible="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.HasNoColors}"
                                          Text="No Colors configured." Foreground="{DynamicResource SecondaryTextBrush}"
                                          AutomationProperties.AutomationId="Catalog.ColorNoValues" />
-                              <StackPanel IsVisible="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.HasColors}" Spacing="6">
+                              <StackPanel IsVisible="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.HasColors}" Spacing="{DynamicResource Token.Spacing.InlineGap}">
                                 <TextBox Classes="field"
                                          PlaceholderText="Search colors"
                                          AutomationProperties.Name="Search Colors"
                                          AutomationProperties.AutomationId="Catalog.ColorSearch"
                                          Text="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                                  <StackPanel Grid.Column="0" Spacing="3">
+                                <Grid ColumnDefinitions="*,*" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
+                                  <StackPanel Grid.Column="0" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
                                     <TextBlock Text="Sort by" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" />
                                     <ComboBox ItemsSource="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.SortOptions}"
                                               SelectedItem="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.SortOption, Mode=TwoWay}"
                                               AutomationProperties.Name="Sort Colors"
                                               AutomationProperties.AutomationId="Catalog.ColorSort" />
                                   </StackPanel>
-                                  <StackPanel Grid.Column="1" Spacing="3">
+                                  <StackPanel Grid.Column="1" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
                                     <TextBlock Text="Rows per page" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" />
                                     <ComboBox ItemsSource="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.PageSizes}"
                                               SelectedItem="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.PageSize, Mode=TwoWay}"
@@ -1241,7 +1241,7 @@
                                       <virtualColumns:VirtualDataGridTemplateColumn Header="Color" Width="348" IsSortable="False" IsResizable="False">
                                         <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
                                           <DataTemplate x:DataType="stores:AvailableColorGridRowViewModel">
-                                            <Border Classes="colorChoiceGridRow" Classes.alternate="{Binding IsAlternate}" Padding="8,0">
+                                            <Border Classes="colorChoiceGridRow" Classes.alternate="{Binding IsAlternate}" Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Control.None}">
                                               <TextBlock Text="{Binding ColorName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
                                                          ToolTip.Tip="{Binding ColorName}" />
                                             </Border>
@@ -1257,24 +1257,24 @@
                                              AutomationProperties.AutomationId="Catalog.ColorNoMatches" />
                                 </Grid>
                               </StackPanel>
-                              <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                              <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
                                 <TextBlock Grid.Column="0"
                                            Text="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.PageSummary}"
                                            VerticalAlignment="Center"
                                            AutomationProperties.AutomationId="Catalog.ColorPageSummary" />
                                 <Button Grid.Column="1" Content="Previous"
                                         Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.PreviousPageCommand}"
-                                        Classes="secondary" Padding="8,4"
+                                        Classes="secondary" Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Control.Compact}"
                                         AutomationProperties.Name="Previous Colors page"
                                         AutomationProperties.AutomationId="Catalog.ColorPreviousPage" />
                                 <Button Grid.Column="2" Content="Next"
                                         Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.NextPageCommand}"
-                                        Classes="secondary" Padding="8,4"
+                                        Classes="secondary" Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Control.Compact}"
                                         AutomationProperties.Name="Next Colors page"
                                         AutomationProperties.AutomationId="Catalog.ColorNextPage" />
                               </Grid>
                             </StackPanel>
-                            <StackPanel Orientation="Horizontal" Spacing="8">
+                            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                               <Button Content="Manage values"
                                       Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.ManageOptionCommand}"
                                       CommandParameter="{Binding Option}" Classes="secondary" />
@@ -1285,10 +1285,10 @@
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
                   <Button x:Name="AddOptionButton" Content="Add Option" Command="{Binding CatalogSetup.StartAddOptionCommand}" Classes="secondary" />
-                  <StackPanel IsVisible="{Binding CatalogSetup.IsAddingOption}" Spacing="6">
+                  <StackPanel IsVisible="{Binding CatalogSetup.IsAddingOption}" Spacing="{DynamicResource Token.Spacing.InlineGap}">
                     <ComboBox ItemsSource="{Binding CatalogSetup.OptionKinds}" SelectedItem="{Binding CatalogSetup.SelectedOptionKind}" />
                     <TextBox Text="{Binding CatalogSetup.OptionName}" PlaceholderText="Option name" Classes="field" />
-                    <StackPanel Orientation="Horizontal" Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                       <Button Content="Save Option" Command="{Binding CatalogSetup.CreateOptionCommand}" Classes="primary fixedAction" />
                       <Button Content="Cancel" Command="{Binding CatalogSetup.CancelAddOptionCommand}" Classes="secondary fixedAction" />
                     </StackPanel>
@@ -1296,15 +1296,15 @@
                 </StackPanel>
               </Border>
 
-              <Border Classes="panel" Padding="12" IsVisible="{Binding IsVariantManagement}"
+              <Border Classes="panel" Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}" IsVisible="{Binding IsVariantManagement}"
                       AutomationProperties.AutomationId="Catalog.VariantSellableVariants">
-                <StackPanel Spacing="8">
-                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                    <StackPanel Grid.Column="0" Spacing="2">
+                <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{DynamicResource Token.Spacing.Gap.Panel}">
+                    <StackPanel Grid.Column="0" Spacing="{DynamicResource Token.Spacing.Gap.Micro}">
                       <TextBlock Text="2. Sellable Variants" FontSize="18" FontWeight="SemiBold" />
                       <TextBlock Text="{Binding CatalogSetup.AvailableVariantCount, StringFormat='{}{0} configured'}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                     </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                       <Button x:Name="AddVariantButton" Content="Add Variant" Command="{Binding CatalogSetup.StartAddVariantCommand}" Classes="secondary" />
                       <Button x:Name="BulkAddVariantButton" Content="Bulk add" Command="{Binding CatalogSetup.StartBulkVariantsCommand}" Classes="secondary" />
                     </StackPanel>
@@ -1321,7 +1321,7 @@
                         <virtualColumns:VirtualDataGridTemplateColumn Header="Name" Width="140" IsSortable="False" IsResizable="False">
                           <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
                             <DataTemplate x:DataType="stores:SellableVariantRowViewModel">
-                              <Border Classes="listItem" Padding="8,0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                              <Border Classes="listItem" Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Control.None}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
                                 <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center"
                                            TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
                                            ToolTip.Tip="{Binding Name}" AutomationProperties.Name="Variant name"
@@ -1333,7 +1333,7 @@
                         <virtualColumns:VirtualDataGridTemplateColumn Header="Color" Width="82" IsSortable="False" IsResizable="False">
                           <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
                             <DataTemplate x:DataType="stores:SellableVariantRowViewModel">
-                              <Border Classes="listItem" Padding="8,0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                              <Border Classes="listItem" Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Control.None}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
                                 <TextBlock Text="{Binding Color}" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}"
                                            TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
                                            ToolTip.Tip="{Binding Color}" AutomationProperties.Name="Color"
@@ -1345,7 +1345,7 @@
                         <virtualColumns:VirtualDataGridTemplateColumn Header="Size" Width="66" IsSortable="False" IsResizable="False">
                           <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
                             <DataTemplate x:DataType="stores:SellableVariantRowViewModel">
-                              <Border Classes="listItem" Padding="8,0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                              <Border Classes="listItem" Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Control.None}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
                                 <TextBlock Text="{Binding Size}" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}"
                                            TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
                                            ToolTip.Tip="{Binding Size}" AutomationProperties.Name="Size"
@@ -1357,7 +1357,7 @@
                         <virtualColumns:VirtualDataGridTemplateColumn Header="Other" Width="110" IsSortable="False" IsResizable="False">
                           <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
                             <DataTemplate x:DataType="stores:SellableVariantRowViewModel">
-                              <Border Classes="listItem" Padding="8,0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                              <Border Classes="listItem" Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Control.None}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
                                 <TextBlock Text="{Binding Other}" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}"
                                            TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
                                            ToolTip.Tip="{Binding Other}" AutomationProperties.Name="Other option values"
@@ -1369,7 +1369,7 @@
                         <virtualColumns:VirtualDataGridTemplateColumn Header="Action" Width="84" IsSortable="False" IsResizable="False">
                           <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
                             <DataTemplate x:DataType="stores:SellableVariantRowViewModel">
-                              <Border Classes="listItem" Padding="4,0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                              <Border Classes="listItem" Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Compact.None}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
                                 <Button MinWidth="72" Content="Archive" CommandParameter="{Binding}"
                                         Classes="secondary sellableVariantArchive"
                                         AutomationProperties.Name="{Binding Name, StringFormat='Archive Variant {0}'}" />
@@ -1382,11 +1382,11 @@
                 </StackPanel>
               </Border>
 
-              <Border IsVisible="{Binding IsDesignAreaManagement}" Classes="panel" Padding="12"
+              <Border IsVisible="{Binding IsDesignAreaManagement}" Classes="panel" Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}"
                         AutomationProperties.AutomationId="Catalog.DesignAreaList">
-                  <StackPanel Spacing="10">
+                  <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
                     <Grid ColumnDefinitions="*,Auto">
-                      <StackPanel Grid.Column="0" Spacing="3">
+                      <StackPanel Grid.Column="0" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
                         <TextBlock Text="Design Areas" FontSize="18" FontWeight="SemiBold" />
                         <TextBlock Text="Printable regions for this Offering." Foreground="{DynamicResource SecondaryTextBrush}" />
                       </StackPanel>
@@ -1402,7 +1402,7 @@
                         <virtualColumns:VirtualDataGridTemplateColumn Header="Name" Width="104" IsSortable="False" IsResizable="False">
                           <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
                             <DataTemplate x:DataType="stores:DesignAreaCardViewModel">
-                              <Border Classes="designAreaGridCell" Padding="6,4" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                              <Border Classes="designAreaGridCell" Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Inline.Compact}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
                                 <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center"
                                            TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
                                            ToolTip.Tip="{Binding Name}" AutomationProperties.Name="{Binding Name}"
@@ -1414,7 +1414,7 @@
                         <virtualColumns:VirtualDataGridTemplateColumn Header="Placement" Width="62" IsSortable="False" IsResizable="False">
                           <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
                             <DataTemplate x:DataType="stores:DesignAreaCardViewModel">
-                              <Border Classes="designAreaGridCell" Padding="6,4" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                              <Border Classes="designAreaGridCell" Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Inline.Compact}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
                                 <TextBlock Text="{Binding Placement}" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}"
                                            TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
                                            ToolTip.Tip="{Binding Placement}" AutomationProperties.Name="{Binding Placement}"
@@ -1426,7 +1426,7 @@
                         <virtualColumns:VirtualDataGridTemplateColumn Header="Maximum size" Width="100" IsSortable="False" IsResizable="False">
                           <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
                             <DataTemplate x:DataType="stores:DesignAreaCardViewModel">
-                              <Border Classes="designAreaGridCell" Padding="6,4" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                              <Border Classes="designAreaGridCell" Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Inline.Compact}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
                                 <TextBlock Text="{Binding MaximumSizeSummary}" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}"
                                            TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
                                            ToolTip.Tip="{Binding MaximumSizeSummary}" AutomationProperties.Name="{Binding MaximumSizeSummary, StringFormat='Maximum size: {0}'}"
@@ -1438,8 +1438,8 @@
                         <virtualColumns:VirtualDataGridTemplateColumn Header="Compatibility" Width="106" IsSortable="False" IsResizable="False">
                           <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
                             <DataTemplate x:DataType="stores:DesignAreaCardViewModel">
-                              <Border Classes="designAreaGridCell" Padding="6,3" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
-                                <StackPanel VerticalAlignment="Center" Spacing="1">
+                              <Border Classes="designAreaGridCell" Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Inline.Tight}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                                <StackPanel VerticalAlignment="Center" Spacing="{DynamicResource Token.Spacing.Gap.Hairline}">
                                   <TextBlock Text="{Binding CompatibilitySummary}" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}"
                                              TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
                                              ToolTip.Tip="{Binding CompatibilityAccessibilitySummary}"
@@ -1458,13 +1458,13 @@
                         <virtualColumns:VirtualDataGridTemplateColumn Header="Actions" Width="112" IsSortable="False" IsResizable="False">
                           <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
                             <DataTemplate x:DataType="stores:DesignAreaCardViewModel">
-                              <Border Classes="designAreaGridCell" Padding="4,0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
-                                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                                  <Button Width="42" MinHeight="28" Padding="2,2" FontSize="11" Content="Edit"
+                              <Border Classes="designAreaGridCell" Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Compact.None}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.CompactGap}" VerticalAlignment="Center">
+                                  <Button Width="42" MinHeight="28" Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Micro.Micro}" FontSize="11" Content="Edit"
                                           Command="{Binding $parent[virtualGrid:VirtualDataGrid].DataContext.EditPlaceholderCommand}"
                                           CommandParameter="{Binding}" Classes="secondary designAreaEdit"
                                           AutomationProperties.Name="{Binding Name, StringFormat='Edit Design Area {0}'}" />
-                                  <Button Width="58" MinHeight="28" Padding="2,2" FontSize="11" Content="Archive"
+                                  <Button Width="58" MinHeight="28" Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Micro.Micro}" FontSize="11" Content="Archive"
                                           Command="{Binding $parent[virtualGrid:VirtualDataGrid].DataContext.ArchivePlaceholderCommand}"
                                           CommandParameter="{Binding}" Classes="danger designAreaArchive"
                                           AutomationProperties.Name="{Binding Name, StringFormat='Archive Design Area {0}'}" />
@@ -1479,9 +1479,9 @@
               </Border>
 
               <Grid IsVisible="{Binding IsMockupTemplateManagement}">
-                <Border Classes="panel" Padding="12"
+                <Border Classes="panel" Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}"
                         AutomationProperties.AutomationId="Catalog.MockupTemplateList">
-                  <StackPanel Spacing="8">
+                  <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                   <TextBlock Text="Mockup Templates" FontSize="18" FontWeight="SemiBold" />
                   <TextBlock Text="Each template groups local mockup source images under one shared Design Area. Compatible concrete Variants are derived from their applicability."
                              TextWrapping="Wrap"
@@ -1555,10 +1555,10 @@
                       </virtualColumns:VirtualDataGridTemplateColumn>
                     </virtualGrid:VirtualDataGrid.Columns>
                   </virtualGrid:VirtualDataGrid>
-                  <Border Classes="panel" Padding="8"
+                  <Border Classes="panel" Padding="{DynamicResource Token.Layout.PreviewPadding}"
                           IsVisible="{Binding CatalogSetup.HasSelectedMockupTemplateCard}"
                           AutomationProperties.AutomationId="Catalog.SelectedMockupTemplateDetails">
-                    <StackPanel Spacing="6">
+                    <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
                       <TextBlock Text="{Binding CatalogSetup.SelectedMockupTemplateCard.Name}"
                                  FontWeight="SemiBold"
                                  AutomationProperties.Name="{Binding CatalogSetup.SelectedMockupTemplateCard.Name}" />
@@ -1574,7 +1574,7 @@
                       <TextBlock Text="{Binding CatalogSetup.SelectedMockupTemplateCard.RevisionSummary}"
                                  TextWrapping="Wrap"
                                  AutomationProperties.Name="{Binding CatalogSetup.SelectedMockupTemplateCard.RevisionSummary}" />
-                      <StackPanel Orientation="Horizontal" Spacing="8">
+                      <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                         <Button Content="Edit"
                                 Command="{Binding CatalogSetup.EditTemplateCommand}"
                                 CommandParameter="{Binding CatalogSetup.SelectedMockupTemplateCard}"
@@ -1592,8 +1592,8 @@
                   </Border>
                   <Border IsVisible="{Binding !CatalogSetup.HasAvailablePlaceholders}"
                           Background="{DynamicResource WarningBackgroundBrush}"
-                          BorderBrush="{DynamicResource WarningBorderBrush}" BorderThickness="1" Padding="10">
-                    <StackPanel Spacing="6">
+                          BorderBrush="{DynamicResource WarningBorderBrush}" BorderThickness="1" Padding="{DynamicResource Token.Layout.Padding.Uniform.Group}">
+                    <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
                       <TextBlock Text="Create a Design Area before configuring Mockup Templates." TextWrapping="Wrap" Foreground="{DynamicResource WarningTextBrush}" />
                       <Button Content="Manage Design Areas" Command="{Binding OpenDesignAreaManagementCommand}" Classes="secondary" />
                     </StackPanel>
@@ -1603,12 +1603,12 @@
                 </Border>
               </Grid>
 
-              <Border Classes="panel" Padding="12" IsVisible="{Binding IsOfferingDetail}">
-                <StackPanel Spacing="8">
+              <Border Classes="panel" Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}" IsVisible="{Binding IsOfferingDetail}">
+                <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                   <ToggleButton Content="Advanced"
                                 IsChecked="{Binding IsAdvancedSectionExpanded, Mode=TwoWay}"
                                 HorizontalContentAlignment="Left" />
-                  <StackPanel IsVisible="{Binding IsAdvancedSectionExpanded}" Spacing="8">
+                  <StackPanel IsVisible="{Binding IsAdvancedSectionExpanded}" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                     <TextBlock Text="Provider-network identity and external identifiers are preserved by the catalog model. Shopify publication and credentials are future integration work."
                                TextWrapping="Wrap"
                                FontSize="12"
@@ -1625,14 +1625,14 @@
                   Background="{DynamicResource DangerBackgroundBrush}"
                   BorderBrush="{DynamicResource DangerBorderBrush}"
                   BorderThickness="1"
-                  Padding="12"
-                  Margin="0,8,0,0">
-            <StackPanel Spacing="8">
+                  Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}"
+                  Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}">
+            <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
               <TextBlock Text="{Binding ProductDeleteWarningMessage}"
                          FontSize="13"
                          Foreground="{DynamicResource DangerTextBrush}" />
               <StackPanel Orientation="Horizontal"
-                          Spacing="8">
+                          Spacing="{DynamicResource Token.Spacing.ControlGap}">
                 <Button Content="Delete permanently"
                         Command="{Binding ConfirmDeleteProductCommand}"
                         Classes="danger fixedDanger" />
@@ -1647,14 +1647,14 @@
                   Background="{DynamicResource DangerBackgroundBrush}"
                   BorderBrush="{DynamicResource DangerBorderBrush}"
                   BorderThickness="1"
-                  Padding="12"
-                  Margin="0,8,0,0">
-            <StackPanel Spacing="8">
+                  Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}"
+                  Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}">
+            <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
               <TextBlock Text="{Binding OfferingDeleteWarningMessage}"
                          FontSize="13"
                          Foreground="{DynamicResource DangerTextBrush}" />
               <StackPanel Orientation="Horizontal"
-                          Spacing="8">
+                          Spacing="{DynamicResource Token.Spacing.ControlGap}">
                 <Button Content="Delete permanently"
                         Command="{Binding ConfirmDeleteOfferingCommand}"
                         Classes="danger fixedDanger" />
@@ -1669,14 +1669,14 @@
                   Background="{DynamicResource DangerBackgroundBrush}"
                   BorderBrush="{DynamicResource DangerBorderBrush}"
                   BorderThickness="1"
-                  Padding="12"
-                  Margin="0,8,0,0">
-            <StackPanel Spacing="8">
+                  Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}"
+                  Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}">
+            <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
               <TextBlock Text="{Binding DeleteWarningMessage}"
                          FontSize="13"
                          Foreground="{DynamicResource DangerTextBrush}" />
               <StackPanel Orientation="Horizontal"
-                          Spacing="8">
+                          Spacing="{DynamicResource Token.Spacing.ControlGap}">
                 <Button Content="Delete permanently"
                         Command="{Binding ConfirmDeleteStoreCommand}"
                         Classes="danger fixedDanger" />
@@ -1691,14 +1691,14 @@
                   Background="{DynamicResource DangerBackgroundBrush}"
                   BorderBrush="{DynamicResource DangerBorderBrush}"
                   BorderThickness="1"
-                  Padding="12"
-                  Margin="0,8,0,0">
-            <StackPanel Spacing="8">
+                  Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}"
+                  Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}">
+            <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
               <TextBlock Text="{Binding NicheDeleteWarningMessage}"
                          FontSize="13"
                          Foreground="{DynamicResource DangerTextBrush}" />
               <StackPanel Orientation="Horizontal"
-                          Spacing="8">
+                          Spacing="{DynamicResource Token.Spacing.ControlGap}">
                 <Button Content="Delete permanently"
                         Command="{Binding ConfirmDeleteNicheCommand}"
                         Classes="danger fixedDanger" />
@@ -1713,14 +1713,14 @@
                   Background="{DynamicResource WarningBackgroundBrush}"
                   BorderBrush="{DynamicResource WarningBorderBrush}"
                   BorderThickness="1"
-                  Padding="12"
-                  Margin="0,8,0,0">
-            <StackPanel Spacing="8">
+                  Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}"
+                  Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}">
+            <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
               <TextBlock Text="{Binding DiscardChangesMessage}"
                          FontSize="13"
                          Foreground="{DynamicResource StrongTextBrush}" />
               <StackPanel Orientation="Horizontal"
-                          Spacing="8">
+                          Spacing="{DynamicResource Token.Spacing.ControlGap}">
                 <Button Content="Discard changes"
                         Command="{Binding ConfirmDiscardChangesCommand}"
                         Classes="danger fixedDanger" />

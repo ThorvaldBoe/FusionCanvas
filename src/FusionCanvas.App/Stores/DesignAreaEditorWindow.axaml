@@ -14,8 +14,8 @@
         Background="{DynamicResource ApplicationBackgroundBrush}"
         AutomationProperties.Name="{Binding DesignAreaEditorDialogTitle}"
         AutomationProperties.AutomationId="Catalog.DesignAreaEditorDialog">
-  <Grid RowDefinitions="Auto,*,Auto" Margin="20" RowSpacing="14">
-    <StackPanel Grid.Row="0" Spacing="4">
+  <Grid RowDefinitions="Auto,*,Auto" Margin="{DynamicResource Token.Layout.Margin.Uniform.Wide}" RowSpacing="{DynamicResource Token.Spacing.SectionGap}">
+    <StackPanel Grid.Row="0" Spacing="{DynamicResource Token.Spacing.CompactGap}">
       <TextBlock Text="{Binding DesignAreaEditorDialogTitle}" FontSize="20" FontWeight="SemiBold" />
       <TextBlock Text="Configure the printable region, artwork guidance, and compatible Variants for this Offering."
                  TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -24,7 +24,7 @@
     </StackPanel>
 
     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-      <StackPanel Spacing="8" Margin="0,0,8,0" AutomationProperties.AutomationId="Catalog.DesignAreaEditorForm">
+      <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_Control.Bottom_None}" AutomationProperties.AutomationId="Catalog.DesignAreaEditorForm">
         <TextBlock Text="Identity" FontWeight="SemiBold" />
         <TextBlock Text="Name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
         <TextBox x:Name="DesignAreaNameTextBox" Text="{Binding PlaceholderName}" PlaceholderText="Front" Classes="field"
@@ -36,40 +36,40 @@
         <TextBlock Text="Description (optional)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
         <TextBox Text="{Binding PlaceholderDescription}" AcceptsReturn="True" MinHeight="56" Classes="field" AutomationProperties.Name="Description" />
 
-        <TextBlock Text="Maximum design size" FontWeight="SemiBold" Margin="0,8,0,0" />
-        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-          <StackPanel Grid.Column="0" Spacing="4">
+        <TextBlock Text="Maximum design size" FontWeight="SemiBold" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}" />
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
+          <StackPanel Grid.Column="0" Spacing="{DynamicResource Token.Spacing.CompactGap}">
             <TextBlock Text="Width (px)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
             <TextBox Text="{Binding PlaceholderWidth}" Classes="field" AutomationProperties.Name="Width (px)" />
           </StackPanel>
-          <StackPanel Grid.Column="1" Spacing="4">
+          <StackPanel Grid.Column="1" Spacing="{DynamicResource Token.Spacing.CompactGap}">
             <TextBlock Text="Height (px)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
             <TextBox Text="{Binding PlaceholderHeight}" Classes="field" AutomationProperties.Name="Height (px)" />
           </StackPanel>
         </Grid>
         <TextBlock Text="{Binding PhysicalSizeSummary}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
 
-        <TextBlock Text="Recommended artwork" FontWeight="SemiBold" Margin="0,8,0,0" />
+        <TextBlock Text="Recommended artwork" FontWeight="SemiBold" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}" />
         <TextBlock Text="Maximum printable dimensions are shown in pixels first. Inches and millimetres are derived only when reliable DPI metadata is available."
                    TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
           <TextBox Grid.Column="0" Text="{Binding ArtworkWidth}" PlaceholderText="Width (px)" Classes="field" AutomationProperties.Name="Recommended artwork width (px)" />
           <TextBox Grid.Column="1" Text="{Binding ArtworkHeight}" PlaceholderText="Height (px)" Classes="field" AutomationProperties.Name="Recommended artwork height (px)" />
           <TextBox Grid.Column="2" Text="{Binding ArtworkDpi}" PlaceholderText="DPI" Classes="field" AutomationProperties.Name="Recommended artwork DPI" />
         </Grid>
-        <Grid ColumnDefinitions="2*,3*" ColumnSpacing="8">
+        <Grid ColumnDefinitions="2*,3*" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
           <TextBox Grid.Column="0" Text="{Binding ArtworkFormat}" PlaceholderText="Format (PNG)" Classes="field" AutomationProperties.Name="Recommended artwork format" />
           <TextBox Grid.Column="1" Text="{Binding ArtworkBackground}" PlaceholderText="Background (transparent)" Classes="field" AutomationProperties.Name="Recommended artwork background" />
         </Grid>
 
-        <TextBlock Text="Compatibility" FontWeight="SemiBold" Margin="0,8,0,0" />
+        <TextBlock Text="Compatibility" FontWeight="SemiBold" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}" />
         <CheckBox Content="Compatible with all current Variants"
                   IsChecked="{Binding PlaceholderUsesAllVariants, Mode=TwoWay}"
                   AutomationProperties.Name="Compatible with all current Variants" />
         <CheckBox Content="Primary for artwork generation"
                   IsChecked="{Binding PlaceholderPrimaryForArtworkGeneration, Mode=TwoWay}"
                   AutomationProperties.Name="Primary for artwork generation" />
-        <StackPanel IsVisible="{Binding !PlaceholderUsesAllVariants}" Spacing="4">
+        <StackPanel IsVisible="{Binding !PlaceholderUsesAllVariants}" Spacing="{DynamicResource Token.Spacing.CompactGap}">
           <TextBlock Text="Compatible Variants" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
           <ItemsControl ItemsSource="{Binding PlaceholderVariantChoices}">
             <ItemsControl.ItemTemplate>
@@ -80,7 +80,7 @@
           </ItemsControl>
         </StackPanel>
 
-        <Expander Header="Advanced provider data" Margin="0,8,0,0">
+        <Expander Header="Advanced provider data" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}">
           <TextBox Text="{Binding PlaceholderProviderReference}"
                    PlaceholderText="Provider Design Area reference"
                    Classes="field"
@@ -91,14 +91,14 @@
     </ScrollViewer>
 
     <Grid Grid.Row="2">
-      <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsDesignAreaDiscardConfirmationVisible}">
+      <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}" IsVisible="{Binding !IsDesignAreaDiscardConfirmationVisible}">
         <Button Content="Save design area" Command="{Binding CreatePlaceholderCommand}" Classes="primary" AutomationProperties.Name="Save design area" />
         <Button Content="Cancel" Command="{Binding RequestCancelDesignAreaCommand}" Classes="secondary" AutomationProperties.Name="Cancel Design Area editing" />
       </StackPanel>
-      <Border IsVisible="{Binding IsDesignAreaDiscardConfirmationVisible}" Classes="discardPrompt" Padding="12">
-        <Grid RowDefinitions="Auto,Auto" RowSpacing="8">
+      <Border IsVisible="{Binding IsDesignAreaDiscardConfirmationVisible}" Classes="discardPrompt" Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}">
+        <Grid RowDefinitions="Auto,Auto" RowSpacing="{DynamicResource Token.Spacing.ControlGap}">
           <TextBlock Text="Discard unsaved Design Area changes?" TextWrapping="Wrap" />
-          <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
+          <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
             <Button Content="Discard changes" Command="{Binding ConfirmDiscardDesignAreaCommand}" Classes="danger" />
             <Button x:Name="KeepEditingButton" Content="Keep editing" Command="{Binding KeepEditingDesignAreaCommand}" Classes="secondary" />
           </StackPanel>

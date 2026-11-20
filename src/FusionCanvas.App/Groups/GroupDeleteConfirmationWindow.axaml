@@ -8,8 +8,8 @@
         SizeToContent="Height"
         CanResize="False"
         WindowStartupLocation="CenterOwner">
-  <Grid RowDefinitions="Auto,Auto" Margin="24" RowSpacing="22">
-    <StackPanel Spacing="10">
+  <Grid RowDefinitions="Auto,Auto" Margin="{DynamicResource Token.Layout.PageInset}" RowSpacing="{DynamicResource Token.Spacing.Gap.WidePlus}">
+    <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
       <TextBlock Text="{Binding Title}"
                  FontSize="20"
                  FontWeight="SemiBold"
@@ -21,7 +21,7 @@
               BorderBrush="{DynamicResource DangerBorderBrush}"
               BorderThickness="1"
               CornerRadius="6"
-              Padding="12">
+              Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}">
         <TextBlock Text="This action cannot be undone. Reusable asset files are retained, but links from deleted groups and items are removed."
                    TextWrapping="Wrap"
                    Foreground="{DynamicResource DangerTextBrush}" />
@@ -31,7 +31,7 @@
     <StackPanel Grid.Row="1"
                 Orientation="Horizontal"
                 HorizontalAlignment="Right"
-                Spacing="8">
+                Spacing="{DynamicResource Token.Spacing.ControlGap}">
       <Button Content="Cancel"
               MinWidth="90"
               Click="OnCancelClick" />

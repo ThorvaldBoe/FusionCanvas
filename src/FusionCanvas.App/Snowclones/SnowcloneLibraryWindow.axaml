@@ -10,8 +10,8 @@
         MinWidth="700"
         MinHeight="500"
         Background="{DynamicResource ApplicationBackgroundBrush}">
-  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="20">
-    <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,14">
+  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="{DynamicResource Token.Layout.Margin.Uniform.Wide}">
+    <StackPanel Grid.Row="0" Spacing="{DynamicResource Token.Spacing.CompactGap}" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Section}">
       <TextBlock Text="Snowclone Library"
                  FontSize="22"
                  FontWeight="SemiBold"
@@ -23,8 +23,8 @@
 
     <Grid Grid.Row="1"
           ColumnDefinitions="*,Auto,Auto,Auto"
-          ColumnSpacing="8"
-          Margin="0,0,0,14">
+          ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}"
+          Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Section}">
       <TextBox x:Name="SearchBox"
                Grid.Column="0"
                Text="{Binding SearchText}"
@@ -47,9 +47,9 @@
               Classes="secondary" />
     </Grid>
 
-    <Grid Grid.Row="2" ColumnDefinitions="300,*" ColumnSpacing="16">
+    <Grid Grid.Row="2" ColumnDefinitions="300,*" ColumnSpacing="{DynamicResource Token.Spacing.Gap.SectionPlus}">
       <Border Grid.Column="0"
-              Padding="12"
+              Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}"
               Background="{DynamicResource PanelSurfaceBrush}"
               BorderBrush="{DynamicResource ControlBorderBrush}"
               BorderThickness="1"
@@ -60,7 +60,7 @@
                      FontSize="13"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource StrongTextBrush}"
-                     Margin="0,0,0,10" />
+                     Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Group}" />
 
           <Grid Grid.Row="1">
             <ScrollViewer>
@@ -81,7 +81,7 @@
             <StackPanel IsVisible="{Binding IsEmpty}"
                         VerticalAlignment="Center"
                         HorizontalAlignment="Center"
-                        Spacing="4">
+                        Spacing="{DynamicResource Token.Spacing.CompactGap}">
               <TextBlock Text="No snowclones yet"
                          FontWeight="SemiBold"
                          Foreground="{DynamicResource StrongTextBrush}" />
@@ -93,7 +93,7 @@
             <StackPanel IsVisible="{Binding HasNoResults}"
                         VerticalAlignment="Center"
                         HorizontalAlignment="Center"
-                        Spacing="8">
+                        Spacing="{DynamicResource Token.Spacing.ControlGap}">
               <TextBlock Text="No matching snowclones"
                          FontWeight="SemiBold"
                          Foreground="{DynamicResource StrongTextBrush}" />
@@ -108,19 +108,19 @@
                   Command="{Binding NewCommand}"
                   IsEnabled="{Binding CanMutate}"
                   HorizontalAlignment="Left"
-                  Margin="0,10,0,0"
+                  Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Group.Right_None.Bottom_None}"
                   Classes="primary" />
         </Grid>
       </Border>
 
       <Border Grid.Column="1"
-              Padding="16"
+              Padding="{DynamicResource Token.Layout.Padding.Uniform.SectionPlus}"
               Background="{DynamicResource ElevatedSurfaceBrush}"
               BorderBrush="{DynamicResource ControlBorderBrush}"
               BorderThickness="1"
               CornerRadius="6">
         <ScrollViewer>
-          <StackPanel Spacing="12">
+          <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
             <TextBlock Text="Snowclone details"
                        FontSize="16"
                        FontWeight="SemiBold"
@@ -130,7 +130,7 @@
                        Text="Select a snowclone or create a new one."
                        Foreground="{DynamicResource SecondaryTextBrush}" />
 
-            <StackPanel IsVisible="{Binding HasSelection}" Spacing="6">
+            <StackPanel IsVisible="{Binding HasSelection}" Spacing="{DynamicResource Token.Spacing.InlineGap}">
               <TextBlock Text="Phrase"
                          FontSize="12"
                          FontWeight="SemiBold"
@@ -141,7 +141,7 @@
                        Classes="field" />
             </StackPanel>
 
-            <StackPanel IsVisible="{Binding HasSelection}" Spacing="6">
+            <StackPanel IsVisible="{Binding HasSelection}" Spacing="{DynamicResource Token.Spacing.InlineGap}">
               <TextBlock Text="Guidance"
                          FontSize="12"
                          FontWeight="SemiBold"
@@ -157,7 +157,7 @@
 
             <StackPanel IsVisible="{Binding HasSelection}"
                         Orientation="Horizontal"
-                        Spacing="8">
+                        Spacing="{DynamicResource Token.Spacing.ControlGap}">
               <Button Content="Save"
                       Command="{Binding SaveCommand}"
                       IsEnabled="{Binding CanSave}"
@@ -169,7 +169,7 @@
             </StackPanel>
 
             <StackPanel Orientation="Horizontal"
-                        Spacing="8"
+                        Spacing="{DynamicResource Token.Spacing.ControlGap}"
                         IsVisible="{Binding IsBusy}">
               <ProgressBar Width="92"
                            Height="3"
@@ -190,16 +190,16 @@
                        Foreground="{DynamicResource AccentBrush}" />
 
             <Border IsVisible="{Binding UnsavedPromptVisible}"
-                    Padding="12"
+                    Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}"
                     Background="{DynamicResource WarningBackgroundBrush}"
                     BorderBrush="{DynamicResource WarningBorderBrush}"
                     BorderThickness="1"
                     CornerRadius="6">
-              <StackPanel Spacing="8">
+              <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                 <TextBlock Text="{Binding UnsavedPromptMessage}"
                            TextWrapping="Wrap"
                            Foreground="{DynamicResource StrongTextBrush}" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                   <Button Content="Save"
                           Command="{Binding SaveAndContinueCommand}"
                           Classes="primary fixedAction" />
@@ -214,16 +214,16 @@
             </Border>
 
             <Border IsVisible="{Binding DeleteConfirmationVisible}"
-                    Padding="12"
+                    Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}"
                     Background="{DynamicResource DangerBackgroundBrush}"
                     BorderBrush="{DynamicResource DangerBorderBrush}"
                     BorderThickness="1"
                     CornerRadius="6">
-              <StackPanel Spacing="8">
+              <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                 <TextBlock Text="{Binding DeletePromptMessage}"
                            TextWrapping="Wrap"
                            Foreground="{DynamicResource DangerTextBrush}" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                   <Button Content="Delete permanently"
                           Command="{Binding ConfirmDeleteCommand}"
                           Classes="danger" />
@@ -242,7 +242,7 @@
             Content="Close"
             Command="{Binding CloseCommand}"
             HorizontalAlignment="Right"
-            Margin="0,14,0,0"
+            Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Section.Right_None.Bottom_None}"
             Classes="secondary fixedAction" />
   </Grid>
 

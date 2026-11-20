@@ -12,14 +12,14 @@
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ApplicationBackgroundBrush}"
         AutomationProperties.AutomationId="Catalog.OptionValueManagementDialog">
-  <Grid RowDefinitions="*,Auto" Margin="20" RowSpacing="16">
-    <StackPanel Grid.Row="0" Spacing="8" AutomationProperties.AutomationId="Catalog.OptionValueEditor">
+  <Grid RowDefinitions="*,Auto" Margin="{DynamicResource Token.Layout.Margin.Uniform.Wide}" RowSpacing="{DynamicResource Token.Spacing.Gap.SectionPlus}">
+    <StackPanel Grid.Row="0" Spacing="{DynamicResource Token.Spacing.ControlGap}" AutomationProperties.AutomationId="Catalog.OptionValueEditor">
       <Grid ColumnDefinitions="*,Auto">
-        <StackPanel Grid.Column="0" Spacing="2">
+        <StackPanel Grid.Column="0" Spacing="{DynamicResource Token.Spacing.Gap.Micro}">
           <TextBlock Text="Manage values" FontWeight="SemiBold" />
           <TextBlock Text="{Binding SelectedOption.Name}" Foreground="{DynamicResource SecondaryTextBrush}" />
         </StackPanel>
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
           <Button x:Name="OptionValueCancelButton" Content="Cancel" Click="OnCancelClick" Classes="secondary" />
           <Button x:Name="OptionValueDoneButton" Content="Done" Click="OnDoneClick" Classes="secondary" />
         </StackPanel>
@@ -29,11 +29,11 @@
       <ItemsControl ItemsSource="{Binding AvailableValues}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="catalog:OfferingOptionValue">
-            <Border Classes="listItem" Padding="8" DragDrop.AllowDrop="True" DragDrop.DragOver="OnValueDragOver" DragDrop.Drop="OnValueDrop">
-              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+            <Border Classes="listItem" Padding="{DynamicResource Token.Layout.PreviewPadding}" DragDrop.AllowDrop="True" DragDrop.DragOver="OnValueDragOver" DragDrop.Drop="OnValueDrop">
+              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
                 <Button Grid.Column="0" Content="☷" Classes="grip" PointerPressed="OnGripPointerPressed" PointerMoved="OnGripPointerMoved" ToolTip.Tip="Drag to reorder" AutomationProperties.Name="{Binding Value, StringFormat='Drag to reorder {0}'}" />
                 <TextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" VerticalAlignment="Center" />
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.InlineGap}">
                   <Button Content="↑" Command="{Binding $parent[ItemsControl].DataContext.MoveOptionValueUpCommand}" CommandParameter="{Binding}" Classes="secondary compact" ToolTip.Tip="Move up" AutomationProperties.Name="{Binding Value, StringFormat='Move {0} up'}" />
                   <Button Content="↓" Command="{Binding $parent[ItemsControl].DataContext.MoveOptionValueDownCommand}" CommandParameter="{Binding}" Classes="secondary compact" ToolTip.Tip="Move down" AutomationProperties.Name="{Binding Value, StringFormat='Move {0} down'}" />
                   <Button Content="Edit" Command="{Binding $parent[ItemsControl].DataContext.EditOptionValueCommand}" CommandParameter="{Binding}" Classes="secondary" AutomationProperties.Name="{Binding Value, StringFormat='Edit {0}'}" />
@@ -45,16 +45,16 @@
         </ItemsControl.ItemTemplate>
       </ItemsControl>
       <Button x:Name="AddOptionValueButton" Content="Add Option Value" Command="{Binding StartAddOptionValueCommand}" Classes="secondary" />
-      <StackPanel IsVisible="{Binding IsAddingOptionValue}" Spacing="6">
+      <StackPanel IsVisible="{Binding IsAddingOptionValue}" Spacing="{DynamicResource Token.Spacing.InlineGap}">
         <TextBox x:Name="OptionValueTextBox" Text="{Binding OptionValue}" PlaceholderText="Option Value" Classes="field" />
-        <StackPanel Orientation="Horizontal" Spacing="8">
+        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
           <Button Content="Save Option Value" Command="{Binding CreateOptionValueCommand}" Classes="primary fixedAction" />
           <Button Content="Cancel add" Command="{Binding CancelAddOptionValueCommand}" Classes="secondary fixedAction" />
         </StackPanel>
       </StackPanel>
-      <StackPanel IsVisible="{Binding IsEditingOptionValue}" Spacing="6">
+      <StackPanel IsVisible="{Binding IsEditingOptionValue}" Spacing="{DynamicResource Token.Spacing.InlineGap}">
         <TextBox x:Name="OptionValueEditTextBox" Text="{Binding OptionValue}" PlaceholderText="Option Value" Classes="field" />
-        <StackPanel Orientation="Horizontal" Spacing="8">
+        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
           <Button Content="Save edit" Command="{Binding SaveOptionValueEditCommand}" Classes="primary fixedAction" />
           <Button Content="Cancel edit" Command="{Binding CancelOptionValueEditCommand}" Classes="secondary fixedAction" />
         </StackPanel>

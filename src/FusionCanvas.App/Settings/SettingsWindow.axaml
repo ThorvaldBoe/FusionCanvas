@@ -16,13 +16,13 @@
             Background="{DynamicResource PanelSurfaceBrush}"
             BorderBrush="{DynamicResource ControlBorderBrush}"
             BorderThickness="0,0,1,0"
-            Padding="12">
-      <StackPanel Spacing="6">
+            Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}">
+      <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
         <TextBlock Text="Settings"
                    FontSize="16"
                    FontWeight="SemiBold"
                    Foreground="{DynamicResource StrongTextBrush}"
-                   Margin="0,0,0,8" />
+                   Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Control}" />
         <ListBox x:Name="SectionSelector"
                  AutomationProperties.AutomationId="Settings.SectionSelector"
                  ItemsSource="{Binding Sections}"
@@ -32,7 +32,7 @@
                  Padding="0">
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="settings:SettingsSection">
-              <TextBlock Text="{Binding}" FontSize="14" Padding="6,4" />
+              <TextBlock Text="{Binding}" FontSize="14" Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Inline.Compact}" />
             </DataTemplate>
           </ListBox.ItemTemplate>
         </ListBox>
@@ -41,18 +41,18 @@
 
     <ScrollViewer Grid.Column="1">
       <Grid Margin="{DynamicResource Token.Layout.PageInset}">
-        <StackPanel IsVisible="{Binding IsGeneralSection}" Spacing="18">
+        <StackPanel IsVisible="{Binding IsGeneralSection}" Spacing="{DynamicResource Token.Spacing.Gap.Large}">
           <TextBlock Text="General"
                      FontSize="20"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource PrimaryTextBrush}" />
-          <Border Padding="14"
+          <Border Padding="{DynamicResource Token.Layout.CardPadding}"
                   Background="{DynamicResource ElevatedSurfaceBrush}"
                   BorderBrush="{DynamicResource ControlBorderBrush}"
                   BorderThickness="1"
                   CornerRadius="6">
-            <StackPanel Spacing="10">
-              <StackPanel Spacing="3">
+            <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
+              <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
                 <TextBlock Text="Appearance"
                            FontSize="14"
                            FontWeight="SemiBold"
@@ -75,18 +75,18 @@
           </Border>
         </StackPanel>
 
-        <StackPanel IsVisible="{Binding IsWorkspaceSection}" Spacing="18">
+        <StackPanel IsVisible="{Binding IsWorkspaceSection}" Spacing="{DynamicResource Token.Spacing.Gap.Large}">
           <TextBlock Text="Workspace"
                      FontSize="20"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource PrimaryTextBrush}" />
-          <Border Padding="14"
+          <Border Padding="{DynamicResource Token.Layout.CardPadding}"
                   Background="{DynamicResource ElevatedSurfaceBrush}"
                   BorderBrush="{DynamicResource ControlBorderBrush}"
                   BorderThickness="1"
                   CornerRadius="6">
-            <StackPanel Spacing="12">
-              <StackPanel Spacing="3">
+            <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
+              <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
                 <TextBlock Text="Active workspace"
                            FontSize="12"
                            FontWeight="SemiBold"
@@ -108,17 +108,17 @@
           <settings:WorkspaceTelemetrySettingsView DataContext="{Binding Telemetry}" />
         </StackPanel>
 
-        <StackPanel IsVisible="{Binding IsTermsSection}" Spacing="18">
+        <StackPanel IsVisible="{Binding IsTermsSection}" Spacing="{DynamicResource Token.Spacing.Gap.Large}">
           <TextBlock Text="Terms and responsible use"
                      FontSize="20"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource PrimaryTextBrush}" />
-          <Border Padding="14"
+          <Border Padding="{DynamicResource Token.Layout.CardPadding}"
                   Background="{DynamicResource ElevatedSurfaceBrush}"
                   BorderBrush="{DynamicResource ControlBorderBrush}"
                   BorderThickness="1"
                   CornerRadius="6">
-            <StackPanel Spacing="10">
+            <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
               <TextBlock Text="App-wide acknowledgement"
                          FontSize="14"
                          FontWeight="SemiBold"
@@ -144,18 +144,18 @@
           <settings:AiSettingsView DataContext="{Binding Ai}" />
         </Panel>
 
-        <StackPanel IsVisible="{Binding IsAboutSection}" Spacing="18">
+        <StackPanel IsVisible="{Binding IsAboutSection}" Spacing="{DynamicResource Token.Spacing.Gap.Large}">
           <TextBlock Text="About"
                      FontSize="20"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource PrimaryTextBrush}" />
-          <Border Padding="14"
+          <Border Padding="{DynamicResource Token.Layout.CardPadding}"
                   Background="{DynamicResource ElevatedSurfaceBrush}"
                   BorderBrush="{DynamicResource ControlBorderBrush}"
                   BorderThickness="1"
                   CornerRadius="6">
-            <StackPanel Spacing="12">
-              <StackPanel Spacing="3">
+            <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
+              <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
                 <TextBlock Text="FusionCanvas"
                            FontSize="16"
                            FontWeight="SemiBold"
@@ -164,17 +164,17 @@
                            FontSize="14"
                            Foreground="{DynamicResource PrimaryTextBrush}" />
               </StackPanel>
-              <Border Padding="10"
+              <Border Padding="{DynamicResource Token.Layout.Padding.Uniform.Group}"
                       Background="{DynamicResource PanelSurfaceBrush}"
                       BorderBrush="{DynamicResource ControlBorderBrush}"
                       BorderThickness="1"
                       CornerRadius="5">
-                <StackPanel Spacing="8">
+                <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                   <TextBlock Text="Updates"
                              FontSize="14"
                              FontWeight="SemiBold"
                              Foreground="{DynamicResource StrongTextBrush}" />
-                  <StackPanel Spacing="4">
+                  <StackPanel Spacing="{DynamicResource Token.Spacing.CompactGap}">
                     <TextBlock Text="Update track" Foreground="{DynamicResource PrimaryTextBrush}" />
                     <ComboBox ItemsSource="{Binding Updates.AvailableTracks}"
                               SelectedItem="{Binding Updates.SelectedTrack, Mode=TwoWay}"
@@ -185,7 +185,7 @@
                   <TextBlock Text="{Binding Updates.StatusMessage}"
                              TextWrapping="Wrap"
                              Foreground="{DynamicResource PrimaryTextBrush}" />
-                  <StackPanel Orientation="Horizontal" Spacing="8">
+                  <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                     <Button Content="Check for updates"
                             Command="{Binding Updates.CheckCommand}"
                             IsVisible="{Binding Updates.IsCheckButtonVisible}"
@@ -207,7 +207,7 @@
                   </StackPanel>
                 </StackPanel>
               </Border>
-              <StackPanel Spacing="3">
+              <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
                 <TextBlock Text="Diagnostics"
                            FontSize="12"
                            FontWeight="SemiBold"
@@ -243,18 +243,18 @@
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
                 MaxWidth="420"
-                Padding="16"
+                Padding="{DynamicResource Token.Layout.Padding.Uniform.SectionPlus}"
                 Background="{DynamicResource WarningBackgroundBrush}"
                 BorderBrush="{DynamicResource WarningBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="6">
-          <StackPanel Spacing="10">
+          <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
             <TextBlock Text="Discard the unsaved API key draft?"
                        FontWeight="SemiBold"
                        TextWrapping="Wrap" />
             <TextBlock Text="The draft has not been written to the native credential store."
                        TextWrapping="Wrap" />
-            <StackPanel Orientation="Horizontal" Spacing="8">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
               <Button Content="Discard" Command="{Binding ConfirmDiscardCommand}" />
               <Button Content="Keep editing" Command="{Binding CancelDiscardCommand}" />
             </StackPanel>
@@ -263,7 +263,7 @@
       </Grid>
     </ScrollViewer>
     <ProgressBar Grid.ColumnSpan="2"
-                 Margin="24,8,24,0"
+                 Margin="{DynamicResource Token.Layout.Margin.Sides.Left_Page.Top_Control.Right_Page.Bottom_None}"
                  VerticalAlignment="Top"
                  IsVisible="{Binding IsBusy}"
                  IsIndeterminate="True"

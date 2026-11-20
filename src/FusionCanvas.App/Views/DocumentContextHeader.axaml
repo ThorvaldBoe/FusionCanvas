@@ -4,8 +4,8 @@
              x:Class="FusionCanvas.App.Views.DocumentContextHeader"
              x:DataType="views:MainWindowViewModel">
   <Grid ColumnDefinitions="*,Auto,Auto,Auto"
-        ColumnSpacing="8">
-    <StackPanel Grid.Column="0" Spacing="3">
+        ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
+    <StackPanel Grid.Column="0" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
       <TextBlock Text="{Binding DocumentWindow.ActiveDetailTitle}"
                  FontSize="24"
                  FontWeight="SemiBold"
@@ -29,7 +29,7 @@
             IsEnabled="{Binding CanOpenIdeation}"
             Command="{Binding OpenIdeationCommand}"
             Content="Ideation…"
-            Margin="0,0,12,0"
+            Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_Panel.Bottom_None}"
             AutomationProperties.Name="Open Ideation"
             ToolTip.Tip="{Binding IdeationUnavailableMessage}"
             VerticalAlignment="Center" />

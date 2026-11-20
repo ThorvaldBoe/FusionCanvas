@@ -3,8 +3,8 @@
              xmlns:settings="clr-namespace:FusionCanvas.App.Settings"
              x:Class="FusionCanvas.App.Settings.AiSettingsView"
              x:DataType="settings:AiSettingsViewModel">
-  <StackPanel Spacing="18" IsEnabled="{Binding !IsBusy}">
-    <StackPanel Spacing="3">
+  <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Large}" IsEnabled="{Binding !IsBusy}">
+    <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
       <TextBlock Text="AI" FontSize="20" FontWeight="SemiBold"
                  Foreground="{DynamicResource PrimaryTextBrush}" />
       <TextBlock Text="Connect OpenRouter and choose application-wide text generation settings."
@@ -12,33 +12,33 @@
                  Foreground="{DynamicResource SecondaryTextBrush}" />
     </StackPanel>
 
-    <Border Padding="14" Background="{DynamicResource ElevatedSurfaceBrush}"
+    <Border Padding="{DynamicResource Token.Layout.CardPadding}" Background="{DynamicResource ElevatedSurfaceBrush}"
             BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6">
-      <StackPanel Spacing="10">
+      <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
         <TextBlock Text="OpenRouter connection" FontWeight="SemiBold"
                    Foreground="{DynamicResource StrongTextBrush}" />
         <TextBlock Text="{Binding CredentialStatus}" />
-        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsEditingCredential}">
+        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}" IsVisible="{Binding !IsEditingCredential}">
           <Button x:Name="AddOrReplaceKeyButton" Content="Add or replace key" Command="{Binding AddOrReplaceCommand}" />
           <Button Content="Validate" Command="{Binding ValidateCredentialCommand}" />
           <Button Content="Remove" Command="{Binding RequestRemoveCommand}" IsVisible="{Binding HasCredential}" />
         </StackPanel>
-        <StackPanel Spacing="8" IsVisible="{Binding IsEditingCredential}">
+        <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}" IsVisible="{Binding IsEditingCredential}">
           <TextBox x:Name="ApiKeyDraft"
                    PasswordChar="●"
                    PlaceholderText="OpenRouter API key"
                    Text="{Binding CredentialDraft, Mode=TwoWay}" />
-          <StackPanel Orientation="Horizontal" Spacing="8">
+          <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
             <Button Content="Save" Command="{Binding SaveCredentialCommand}" Classes="primary" />
             <Button Content="Cancel" Command="{Binding CancelCredentialCommand}" />
           </StackPanel>
         </StackPanel>
-        <Border IsVisible="{Binding ConfirmRemove}" Padding="10"
+        <Border IsVisible="{Binding ConfirmRemove}" Padding="{DynamicResource Token.Layout.Padding.Uniform.Group}"
                 Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="4">
-          <StackPanel Spacing="8">
+          <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
             <TextBlock Text="Remove the saved OpenRouter key from the native credential store?"
                        TextWrapping="Wrap" />
-            <StackPanel Orientation="Horizontal" Spacing="8">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
               <Button Content="Remove key" Command="{Binding RemoveCredentialCommand}" />
               <Button Content="Cancel" Command="{Binding CancelRemoveCommand}" />
             </StackPanel>
@@ -47,11 +47,11 @@
       </StackPanel>
     </Border>
 
-    <Border Padding="14" Background="{DynamicResource ElevatedSurfaceBrush}"
+    <Border Padding="{DynamicResource Token.Layout.CardPadding}" Background="{DynamicResource ElevatedSurfaceBrush}"
             BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6">
-      <StackPanel Spacing="10">
+      <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
         <TextBlock Text="Privacy and models" FontWeight="SemiBold" />
-        <StackPanel Spacing="3">
+        <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
           <TextBlock Text="Model availability" FontWeight="SemiBold" />
           <TextBlock Text="Search the models allowed by the privacy setting below. Requiring Zero Data Retention narrows the list to compatible models." TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
         </StackPanel>
@@ -59,26 +59,26 @@
                       IsChecked="{Binding RequireZeroDataRetention, Mode=TwoWay}" />
         <TextBlock Text="When enabled, requests are restricted to endpoints OpenRouter marks as Zero Data Retention compatible."
                    TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-        <Border IsVisible="{Binding ConfirmZdrOptOut}" Padding="10"
+        <Border IsVisible="{Binding ConfirmZdrOptOut}" Padding="{DynamicResource Token.Layout.Padding.Uniform.Group}"
                 Background="{DynamicResource WarningBackgroundBrush}" CornerRadius="4">
-          <StackPanel Spacing="8">
+          <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
             <TextBlock Text="Allow providers that may retain submitted content?" TextWrapping="Wrap" />
-            <StackPanel Orientation="Horizontal" Spacing="8">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
               <Button Content="Allow retention" Command="{Binding ConfirmZdrOptOutCommand}" />
               <Button Content="Keep ZDR" Command="{Binding CancelZdrOptOutCommand}" />
             </StackPanel>
           </StackPanel>
         </Border>
-        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
           <TextBox Grid.Column="0" PlaceholderText="Search models" Text="{Binding ModelSearch, Mode=TwoWay}" />
           <Button Grid.Column="1" Content="Refresh models" Command="{Binding RefreshModelsCommand}" />
         </Grid>
       </StackPanel>
     </Border>
 
-    <Border Padding="14" Background="{DynamicResource ElevatedSurfaceBrush}"
+    <Border Padding="{DynamicResource Token.Layout.CardPadding}" Background="{DynamicResource ElevatedSurfaceBrush}"
             BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6">
-      <StackPanel Spacing="12">
+      <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
         <TextBlock Text="Artwork" FontWeight="SemiBold" FontSize="16" />
         <TextBlock Text="{Binding ArtworkReadiness}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
         <TextBlock Text="Choose an image-capable model independently from General text generation." TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -86,9 +86,9 @@
       </StackPanel>
     </Border>
 
-    <Border Padding="14" Background="{DynamicResource ElevatedSurfaceBrush}"
+    <Border Padding="{DynamicResource Token.Layout.CardPadding}" Background="{DynamicResource ElevatedSurfaceBrush}"
             BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6">
-      <StackPanel Spacing="12">
+      <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
         <TextBlock Text="General" FontWeight="SemiBold" FontSize="16" />
         <TextBlock Text="{Binding GeneralReadiness}" FontSize="12"
                    Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -101,10 +101,10 @@
                   Content="Advanced: configure application areas separately"
                   IsChecked="{Binding AdvancedMode, Mode=TwoWay}" />
 
-    <StackPanel IsVisible="{Binding AdvancedMode}" Spacing="14">
-      <Border Padding="14" Background="{DynamicResource ElevatedSurfaceBrush}"
+    <StackPanel IsVisible="{Binding AdvancedMode}" Spacing="{DynamicResource Token.Spacing.SectionGap}">
+      <Border Padding="{DynamicResource Token.Layout.CardPadding}" Background="{DynamicResource ElevatedSurfaceBrush}"
               BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6">
-        <StackPanel Spacing="10">
+        <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
           <TextBlock Text="Ideation" FontWeight="SemiBold" FontSize="16" />
           <TextBlock Text="{Binding IdeationReadiness}" FontSize="12"
                      Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -114,9 +114,9 @@
           </Panel>
         </StackPanel>
       </Border>
-      <Border Padding="14" Background="{DynamicResource ElevatedSurfaceBrush}"
+      <Border Padding="{DynamicResource Token.Layout.CardPadding}" Background="{DynamicResource ElevatedSurfaceBrush}"
               BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6">
-        <StackPanel Spacing="10">
+        <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
           <TextBlock Text="Concept" FontWeight="SemiBold" FontSize="16" />
           <TextBlock Text="{Binding ConceptReadiness}" FontSize="12"
                      Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -126,9 +126,9 @@
           </Panel>
         </StackPanel>
       </Border>
-      <Border Padding="14" Background="{DynamicResource ElevatedSurfaceBrush}"
+      <Border Padding="{DynamicResource Token.Layout.CardPadding}" Background="{DynamicResource ElevatedSurfaceBrush}"
               BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6">
-        <StackPanel Spacing="10">
+        <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
           <TextBlock Text="SLL sketch" FontWeight="SemiBold" FontSize="16" />
           <TextBlock Text="{Binding SllReadiness}" FontSize="12"
                      Foreground="{DynamicResource SecondaryTextBrush}" />

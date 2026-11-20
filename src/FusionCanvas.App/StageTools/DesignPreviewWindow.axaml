@@ -11,8 +11,8 @@
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ApplicationBackgroundBrush}"
         CanResize="True">
-  <DockPanel LastChildFill="True" Margin="16">
-    <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,12,0,0">
+  <DockPanel LastChildFill="True" Margin="{DynamicResource Token.Layout.Margin.Uniform.SectionPlus}">
+    <StackPanel DockPanel.Dock="Bottom" Spacing="{DynamicResource Token.Spacing.ControlGap}" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Panel.Right_None.Bottom_None}">
       <TextBlock Text="{Binding PreviewStatusMessage}"
                  IsVisible="{Binding HasPreviewStatusMessage}"
                  TextWrapping="Wrap"
@@ -23,7 +23,7 @@
                  TextWrapping="Wrap"
                  Foreground="{DynamicResource DangerTextBrush}"
                  AutomationProperties.LiveSetting="Polite" />
-      <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="{DynamicResource Token.Spacing.ControlGap}">
         <Button x:Name="AdjustArtworkButton"
                 Content="Adjust artwork"
                 IsVisible="{Binding CanBeginArtworkAdjustment}"
@@ -54,7 +54,7 @@
             BorderBrush="{DynamicResource ControlBorderBrush}"
             BorderThickness="1"
             CornerRadius="6"
-            Padding="8"
+            Padding="{DynamicResource Token.Layout.PreviewPadding}"
             HorizontalAlignment="Stretch"
             VerticalAlignment="Stretch">
       <Grid>
