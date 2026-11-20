@@ -1464,13 +1464,15 @@
                                            VerticalAlignment="Center" />
                                 <Button Content="×"
                                         Padding="0"
-                                        Width="18"
-                                        Height="18"
+                                        Width="{DynamicResource Token.Control.CompactHeight}"
+                                        Height="{DynamicResource Token.Control.CompactHeight}"
                                         FontSize="13"
                                         Background="Transparent"
                                         BorderThickness="0"
                                         Foreground="{DynamicResource AccentSoftForegroundBrush}"
                                         ToolTip.Tip="Remove tag"
+                                        AutomationProperties.Name="Remove tag"
+                                        AutomationProperties.AutomationId="Workspace.ItemInspector.RemoveTag"
                                         Command="{Binding $parent[ItemsControl].DataContext.ItemInspector.RemoveTagCommand}"
                                         CommandParameter="{Binding}" />
                               </StackPanel>
