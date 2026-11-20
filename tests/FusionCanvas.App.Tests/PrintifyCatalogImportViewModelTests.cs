@@ -6,14 +6,15 @@ namespace FusionCanvas.App.Tests;
 public sealed class PrintifyCatalogImportViewModelTests
 {
     [Fact]
-    public void ImportItemUsesBlueprintNameBeforeProductTitle()
+    public void ImportItemSummarizesBlueprintProvidersAndShopProducts()
     {
-        var named = new PrintifyCatalogImportItemViewModel(new("product-a", "Loading Spinner T-shirt | Minimal Tech Graphic", null, 68, 9, "Gildan 64000"));
-        var fallback = new PrintifyCatalogImportItemViewModel(new("product-b", "Fallback product", null, 77, 9));
+        var named = new PrintifyCatalogImportItemViewModel(new(68, "Gildan 64000", 2, [new(9, "SwiftPOD")], ["Product A", "Product B"]));
+        var fallback = new PrintifyCatalogImportItemViewModel(new(77, "", 1, [new(12, "Provider 12")], ["Fallback product"]));
 
         Assert.Equal("Gildan 64000", named.BlueprintName);
-        Assert.Equal("Loading Spinner T-shirt | Minimal Tech Graphic", named.ProductTitle);
-        Assert.Contains("product-a", named.Subtitle);
+        Assert.Contains("SwiftPOD", named.ProviderSummary);
+        Assert.Contains("2 shop products", named.ShopProductSummary);
+        Assert.Contains("Product B", named.SelectionAccessibleName);
         Assert.Equal("Blueprint 77", fallback.BlueprintName);
     }
 
@@ -29,7 +30,7 @@ public sealed class PrintifyCatalogImportViewModelTests
 
         viewModel.Open();
         currentScope = secondScope;
-        pending.SetResult(new(PrintifyCatalogResultKind.Succeeded, "loaded", [new(68, "Tee", null, null, null)]));
+        pending.SetResult(Loaded((68, "Tee")));
         await WaitForAsync(() => !viewModel.IsBusy);
 
         Assert.Empty(viewModel.Blueprints);
@@ -50,7 +51,7 @@ public sealed class PrintifyCatalogImportViewModelTests
 
         Assert.False(viewModel.IsBusy);
         Assert.False(viewModel.IsOpen);
-        pending.SetResult(new(PrintifyCatalogResultKind.Succeeded, "late", [new(68, "Late", null, null, null)]));
+        pending.SetResult(Loaded((68, "Late")));
         await Task.Yield();
 
         Assert.Empty(viewModel.Blueprints);
@@ -71,12 +72,12 @@ public sealed class PrintifyCatalogImportViewModelTests
         viewModel.Open();
         await WaitForAsync(() => viewModel.IsBusy);
 
-        oldPending.SetResult(new(PrintifyCatalogResultKind.Succeeded, "old", [new(68, "Old", null, null, null)]));
-        newPending.SetResult(new(PrintifyCatalogResultKind.Succeeded, "new", [new(77, "New", null, null, null)]));
+        oldPending.SetResult(Loaded((68, "Old")));
+        newPending.SetResult(Loaded((77, "New")));
         await WaitForAsync(() => !viewModel.IsBusy);
 
         Assert.Single(viewModel.Blueprints);
-        Assert.Equal("77", viewModel.Blueprints[0].Id);
+        Assert.Equal(77, viewModel.Blueprints[0].Id);
     }
 
     [Fact]
@@ -87,7 +88,7 @@ public sealed class PrintifyCatalogImportViewModelTests
         var refreshed = false;
         var service = new StubService
         {
-            BlueprintsTask = Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Succeeded, "loaded", [new(68, "Tee", null, null, null)])),
+            BlueprintsTask = Task.FromResult(Loaded((68, "Tee"))),
             SelectedTask = pending.Task
         };
         var viewModel = new PrintifyCatalogImportViewModel(service, () => scope, (_, _) => { refreshed = true; return Task.CompletedTask; });
@@ -112,7 +113,7 @@ public sealed class PrintifyCatalogImportViewModelTests
         var refreshed = false;
         var service = new StubService
         {
-            BlueprintsTask = Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Succeeded, "loaded", [new(68, "Tee", null, null, null)])),
+            BlueprintsTask = Task.FromResult(Loaded((68, "Tee"))),
             SelectedTask = Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Succeeded, "imported", SelectedCatalog: []))
         };
         var viewModel = new PrintifyCatalogImportViewModel(service, () => scope, (_, _) => { refreshed = true; return Task.CompletedTask; });
@@ -147,7 +148,7 @@ public sealed class PrintifyCatalogImportViewModelTests
                 await release.Task.WaitAsync(TestContext.Current.CancellationToken);
                 waitHandle.WaitOne();
                 cancellationToken.ThrowIfCancellationRequested();
-                return new(PrintifyCatalogResultKind.Succeeded, "late", [new(68, "Late", null, null, null)]);
+                return Loaded((68, "Late"));
             }
             catch (Exception exception)
             {
@@ -189,7 +190,7 @@ public sealed class PrintifyCatalogImportViewModelTests
         var scope = new StoreCredentialScope(Guid.NewGuid(), Guid.NewGuid());
         var service = new StubService
         {
-            BlueprintsTask = Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Succeeded, "loaded", [new(68, "Tee", null, null, null)]))
+            BlueprintsTask = Task.FromResult(Loaded((68, "Tee")))
         };
         var viewModel = new PrintifyCatalogImportViewModel(service, () => scope);
 
@@ -211,7 +212,7 @@ public sealed class PrintifyCatalogImportViewModelTests
         var scope = new StoreCredentialScope(Guid.NewGuid(), Guid.NewGuid());
         var service = new StubService
         {
-            BlueprintsTask = Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Succeeded, "loaded", [new(68, "Tee", null, null, null)])),
+            BlueprintsTask = Task.FromResult(Loaded((68, "Tee"))),
             SelectedTask = Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.PermissionDenied, "Printify rejected the request."))
         };
         var viewModel = new PrintifyCatalogImportViewModel(service, () => scope);
@@ -233,6 +234,10 @@ public sealed class PrintifyCatalogImportViewModelTests
             await Task.Delay(10, TestContext.Current.CancellationToken);
         Assert.True(predicate());
     }
+
+    private static PrintifyCatalogResult Loaded(params (int Id, string Name)[] blueprints) =>
+        new(PrintifyCatalogResultKind.Succeeded, "loaded", ShopBlueprints: blueprints.Select(value =>
+            new PrintifyShopBlueprintSummary(value.Id, value.Name, 1, [new(9, "Provider 9")], ["Shop product"])).ToArray());
 
     private sealed class StubService : IPrintifyCatalogImportService
     {
