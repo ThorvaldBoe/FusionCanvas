@@ -63,3 +63,13 @@ The audit remains PROVISIONAL until the remaining findings are fixed and revalid
 
 - UI-003 / [#970](https://github.com/ThorvaldBoe/FusionCanvas/issues/970): PASS after fix at `2517971`; the tag-removal button now meets the 28-DIP compact target and exposes an action-specific accessible name. The new headless view regression test and complete 2,552-test solution baseline pass.
 - All four findings are fixed and revalidated. Overall review stays PROVISIONAL because FC-UI v1.4 and the UI Source Extract Definition v1.4 are Draft, and inaccessible/state-gated runtime observations remain UNKNOWN.
+
+
+## Final process checkpoint — 2026-11-20T19:36:00+01:00
+
+- **Status:** PROVISIONAL. The Light Baseline selected review is operationally complete; FC-UI v1.4 and UI Source Extract v1.4 remain Draft, so no certification is claimed.
+- **Coverage:** 36 source items inventoried, routed by retained manual fallback, in scope, and completed; 0 filtered. The final assessment matrix records 72 current PASS outcomes for FC-UI-015 and FC-UI-024, plus six targeted revalidation outcomes for FC-UI-022, FC-UI-096, FC-UI-097, FC-UI-031, and FC-UI-098. Approximately 100% process coverage; this is not a compliance score.
+- **Findings:** UI-001 through UI-005 were reported in [#966](https://github.com/ThorvaldBoe/FusionCanvas/issues/966), [#968](https://github.com/ThorvaldBoe/FusionCanvas/issues/968), [#969](https://github.com/ThorvaldBoe/FusionCanvas/issues/969), and [#970](https://github.com/ThorvaldBoe/FusionCanvas/issues/970). All issues are closed by merged PRs [#971](https://github.com/ThorvaldBoe/FusionCanvas/pull/971), [#972](https://github.com/ThorvaldBoe/FusionCanvas/pull/972), [#973](https://github.com/ThorvaldBoe/FusionCanvas/pull/973), and [#974](https://github.com/ThorvaldBoe/FusionCanvas/pull/974); all affected results were revalidated.
+- **Remaining UNKNOWN evidence:** Rendered Design/Listing stages disabled for the inspected sample, provider-dependent or empty workflows not entered, and confirmation/edit dialogs not opened where doing so could mutate workspace data. These are not passes.
+- **Standards:** No factory instruction change was required because the initial reported defect was detected by FC-UI-022/096. No open findings or challenges remain in the selected review.
+- **Last checkpoint and end time:** 2026-11-20T19:36:00+01:00; issue remediation, affected-result revalidation, final selected-check matrix, and limits recorded.

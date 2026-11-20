@@ -1003,3 +1003,26 @@ extensions:
         criteria: [FC-UI-031, FC-UI-098]
         result: PASS
         evidence: Tag-removal button uses the 28-DIP compact height token for width and height and exposes Name "Remove tag" plus a stable AutomationId; headless test validates 28×28-DIP bounds.
+
+  - extension_revision: 9
+    repository_revision: 2f81d46840032b8dfed8121448e52c29f77878e7
+    working_tree_state: audit-artifacts-only-changed; application source committed
+    generated_at: 2026-11-20T19:36:00+01:00
+    standard_version: "1.4"
+    extract_definition_version: "1.4"
+    change_summary: Completed the Light Baseline selected-check matrix and issue remediation revalidation; no application source changed in this extension.
+    current_total_surfaces: 36
+    counts_by_kind: {window: 33, user_control: 3}
+    selected_check_matrix:
+      audit_record: docs/software-factory/audits/ea3e5c63-7c7a-4878-9baf-fd3e0e593916/9a40b036-3082-4a58-8abe-5e7539d0b851/Audit.md
+      current_outcomes: 72
+      criteria: [FC-UI-015, FC-UI-024]
+      result: PASS
+      evidence: Current source scan at the merged revision found no positive numeric spacing literals and no numeric TextBlock FontSize literals outside DesignTokens.axaml; each of the 36 inventoried surfaces has one assessment per criterion.
+    findings:
+      issue_ids: [966, 968, 969, 970]
+      merged_pull_requests: [971, 972, 973, 974]
+      status: closed-and-revalidated
+    audit_status: PROVISIONAL
+    remaining_unknowns: Rendered evidence for state-gated Design/Listing states and provider-dependent or unsafe-to-open confirmation/edit workflows remains UNKNOWN; not treated as PASS.
+    standard_changes: none; the initial reported finding was detected by FC-UI-022/096.
