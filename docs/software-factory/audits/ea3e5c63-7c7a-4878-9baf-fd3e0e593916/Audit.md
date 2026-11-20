@@ -58,3 +58,8 @@ The audit remains PROVISIONAL until the remaining findings are fixed and revalid
 
 - UI-002/UI-005 / [#969](https://github.com/ThorvaldBoe/FusionCanvas/issues/969): PASS after semantic typography migration at `6a3cced`; all three former 10-DIP labels now render at the 11-DIP Label token. Static scan found zero numeric TextBlock font-size literals outside the token dictionary.
 - UI-003 / [#970](https://github.com/ThorvaldBoe/FusionCanvas/issues/970) remains under remediation.
+
+## Remediation completion update — 2026-11-20
+
+- UI-003 / [#970](https://github.com/ThorvaldBoe/FusionCanvas/issues/970): PASS after fix at `2517971`; the tag-removal button now meets the 28-DIP compact target and exposes an action-specific accessible name. The new headless view regression test and complete 2,552-test solution baseline pass.
+- All four findings are fixed and revalidated. Overall review stays PROVISIONAL because FC-UI v1.4 and the UI Source Extract Definition v1.4 are Draft, and inaccessible/state-gated runtime observations remain UNKNOWN.

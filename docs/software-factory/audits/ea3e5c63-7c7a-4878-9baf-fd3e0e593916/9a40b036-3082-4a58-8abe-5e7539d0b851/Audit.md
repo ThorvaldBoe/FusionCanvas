@@ -246,3 +246,7 @@ Review status: PROVISIONAL; selected review scope complete, not a clean certific
 UI-002/UI-005 (#969) and UI-003 (#970) remain open pending their fixes. Runtime-only and state-gated observations remain UNKNOWN. Overall audit status remains PROVISIONAL because findings remain open and the standard/definition are Draft.
 
 | UI-002/UI-005 / #969 | `6a3cced` | FC-UI-024, FC-UI-097 | PASS | Replaced 334 audited literal TextBlock font sizes across 26 surfaces and four more in the shared context header with semantic typography resources. The three 10-DIP labels now use the 11-DIP Label resource. Static scan finds zero numeric TextBlock FontSize literals outside DesignTokens.axaml. Full solution: 2,551 passed, 0 failed. |
+
+| UI-003 / #970 | `2517971` | FC-UI-031, FC-UI-098 | PASS | Tag-removal button now uses the shared 28-DIP compact target token and has an action-specific accessible name and stable automation ID. New headless view test verifies name and 28×28-DIP bounds. Full solution: 2,552 passed, 0 failed. |
+
+All four audit issues are now fixed and revalidated. Audit outcome remains PROVISIONAL because the normative standard and source-extract definition are Draft, and rendered-state evidence for unreachable states remains UNKNOWN; no unknown state is treated as a pass.

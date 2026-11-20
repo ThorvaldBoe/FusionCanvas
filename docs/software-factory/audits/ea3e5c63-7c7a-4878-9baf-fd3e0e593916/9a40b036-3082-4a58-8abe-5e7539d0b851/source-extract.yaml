@@ -988,3 +988,18 @@ extensions:
         criteria: [FC-UI-024, FC-UI-097]
         result: PASS
         evidence: Zero numeric TextBlock FontSize literals remain outside DesignTokens.axaml; three labels formerly set to 10 DIPs now use the 11-DIP Label token.
+  - extension_revision: 8
+    repository_revision: 2517971
+    working_tree_state: audit-artifacts-only-changed; application source committed
+    generated_at: 2026-11-20T19:25:00+01:00
+    standard_version: "1.4"
+    extract_definition_version: "1.4"
+    change_summary: Revalidated FC-UI-031 and FC-UI-098 after the tag-removal target and accessible name fix; all four audit findings now pass after revalidation.
+    current_total_surfaces: 36
+    counts_by_kind: {window: 33, user_control: 3}
+    revalidation:
+      UI-003:
+        source_revision: 2517971
+        criteria: [FC-UI-031, FC-UI-098]
+        result: PASS
+        evidence: Tag-removal button uses the 28-DIP compact height token for width and height and exposes Name "Remove tag" plus a stable AutomationId; headless test validates 28×28-DIP bounds.
