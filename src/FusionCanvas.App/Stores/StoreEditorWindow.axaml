@@ -136,6 +136,7 @@
                   Padding="0">
             <StackPanel Spacing="12">
               <StackPanel IsVisible="{Binding IsBasicInfoTabSelected}"
+                          Margin="{DynamicResource Token.Layout.CardPadding}"
                           Spacing="12">
             <TextBlock Text="Basic info"
                        FontSize="16"
