@@ -12,7 +12,7 @@
   <Grid RowDefinitions="Auto,Auto,Auto" Margin="{DynamicResource Token.Layout.PageInset}" RowSpacing="{DynamicResource Token.Spacing.Gap.SectionPlus}">
     <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
       <TextBlock Text="Group selected entities"
-                 FontSize="20"
+                 FontSize="{DynamicResource Token.Typography.SurfaceHeading}"
                  FontWeight="SemiBold" />
       <TextBlock Text="Create a group and move the selected Items and groups beneath it."
                  TextWrapping="Wrap"

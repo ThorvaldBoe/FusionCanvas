@@ -28,8 +28,8 @@
               HorizontalAlignment="Right"
               VerticalAlignment="Bottom">
         <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.CompactGap}">
-          <TextBlock Text="Version" Foreground="White" FontSize="12" />
-          <TextBlock Text="{Binding ProductVersion}" Foreground="White" FontSize="12" />
+          <TextBlock Text="Version" Foreground="White" FontSize="{DynamicResource Token.Typography.Caption}" />
+          <TextBlock Text="{Binding ProductVersion}" Foreground="White" FontSize="{DynamicResource Token.Typography.Caption}" />
         </StackPanel>
       </Border>
     </Grid>

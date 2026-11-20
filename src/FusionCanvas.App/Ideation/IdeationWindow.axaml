@@ -15,7 +15,7 @@
         RowSpacing="{DynamicResource Token.Spacing.SectionGap}">
     <StackPanel Grid.Row="0" Spacing="{DynamicResource Token.Spacing.CompactGap}">
       <TextBlock Text="Ideation"
-                 FontSize="24"
+                 FontSize="{DynamicResource Token.Typography.Title}"
                  FontWeight="SemiBold"
                  Foreground="{DynamicResource PrimaryTextBrush}" />
       <TextBlock Text="{Binding ScopeLabel}"

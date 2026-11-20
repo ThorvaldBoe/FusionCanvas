@@ -24,7 +24,7 @@
           <Button x:Name="OptionValueDoneButton" Content="Done" Click="OnDoneClick" Classes="secondary" />
         </StackPanel>
       </Grid>
-      <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" FontSize="12" Foreground="{DynamicResource DangerTextBrush}" />
+      <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource DangerTextBrush}" />
       <TextBlock IsVisible="{Binding !HasAvailableValues}" Text="No Values configured for this Option." Foreground="{DynamicResource SecondaryTextBrush}" />
       <ItemsControl ItemsSource="{Binding AvailableValues}">
         <ItemsControl.ItemTemplate>

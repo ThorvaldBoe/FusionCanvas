@@ -21,8 +21,8 @@
         <Button x:Name="BulkAddCancelButton" Grid.Column="1" Content="Cancel" Click="OnCancelClick" Classes="secondary" />
       </Grid>
       <TextBlock Text="Select an enabled Color and the Sizes you want to sell. Fusion Canvas previews only combinations confirmed by the provider catalog before creating anything."
-                 TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-      <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" FontSize="12" Foreground="{DynamicResource DangerTextBrush}" />
+                 TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
+      <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource DangerTextBrush}" />
       <ComboBox x:Name="BulkColorComboBox" ItemsSource="{Binding AvailableColors}"
                 SelectedItem="{Binding BulkColor}"
                 DisplayMemberBinding="{Binding Value}"

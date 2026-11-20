@@ -12,11 +12,11 @@
   <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="{DynamicResource Token.Layout.Margin.Uniform.Wide}">
     <StackPanel Grid.Row="0" Spacing="{DynamicResource Token.Spacing.CompactGap}" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Section}">
       <TextBlock Text="Import Items"
-                 FontSize="22"
+                 FontSize="{DynamicResource Token.Typography.PageHeading}"
                  FontWeight="SemiBold"
                  Foreground="{DynamicResource StrongTextBrush}" />
       <TextBlock Text="{Binding TargetLabel}"
-                 FontSize="12"
+                 FontSize="{DynamicResource Token.Typography.Caption}"
                  Foreground="{DynamicResource SecondaryTextBrush}" />
     </StackPanel>
 
@@ -46,7 +46,7 @@
         <Grid RowDefinitions="Auto,*">
           <TextBlock Grid.Row="0"
                      Text="Raw source"
-                     FontSize="13"
+                     FontSize="{DynamicResource Token.Typography.Body}"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource StrongTextBrush}"
                      Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Group}" />
@@ -71,7 +71,7 @@
           <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Group}">
             <TextBlock Grid.Column="0"
                        Text="Preview"
-                       FontSize="13"
+                       FontSize="{DynamicResource Token.Typography.Body}"
                        FontWeight="SemiBold"
                        Foreground="{DynamicResource StrongTextBrush}" />
             <Button Grid.Column="1"

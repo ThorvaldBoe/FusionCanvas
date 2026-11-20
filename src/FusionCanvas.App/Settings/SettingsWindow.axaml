@@ -19,7 +19,7 @@
             Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}">
       <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
         <TextBlock Text="Settings"
-                   FontSize="16"
+                   FontSize="{DynamicResource Token.Typography.SubsectionHeading}"
                    FontWeight="SemiBold"
                    Foreground="{DynamicResource StrongTextBrush}"
                    Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Control}" />
@@ -32,7 +32,7 @@
                  Padding="0">
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="settings:SettingsSection">
-              <TextBlock Text="{Binding}" FontSize="14" Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Inline.Compact}" />
+              <TextBlock Text="{Binding}" FontSize="{DynamicResource Token.Typography.SectionHeading}" Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Inline.Compact}" />
             </DataTemplate>
           </ListBox.ItemTemplate>
         </ListBox>
@@ -43,7 +43,7 @@
       <Grid Margin="{DynamicResource Token.Layout.PageInset}">
         <StackPanel IsVisible="{Binding IsGeneralSection}" Spacing="{DynamicResource Token.Spacing.Gap.Large}">
           <TextBlock Text="General"
-                     FontSize="20"
+                     FontSize="{DynamicResource Token.Typography.SurfaceHeading}"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource PrimaryTextBrush}" />
           <Border Padding="{DynamicResource Token.Layout.CardPadding}"
@@ -54,11 +54,11 @@
             <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
               <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
                 <TextBlock Text="Appearance"
-                           FontSize="14"
+                           FontSize="{DynamicResource Token.Typography.SectionHeading}"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource StrongTextBrush}" />
                 <TextBlock Text="Choose the application-wide color appearance."
-                           FontSize="12"
+                           FontSize="{DynamicResource Token.Typography.Caption}"
                            Foreground="{DynamicResource SecondaryTextBrush}" />
               </StackPanel>
               <ToggleSwitch Content="Dark mode"
@@ -69,7 +69,7 @@
               <TextBlock IsVisible="{Binding HasMessage}"
                          Text="{Binding ErrorMessage}"
                          TextWrapping="Wrap"
-                         FontSize="12"
+                         FontSize="{DynamicResource Token.Typography.Caption}"
                          Foreground="{DynamicResource DangerTextBrush}" />
             </StackPanel>
           </Border>
@@ -77,7 +77,7 @@
 
         <StackPanel IsVisible="{Binding IsWorkspaceSection}" Spacing="{DynamicResource Token.Spacing.Gap.Large}">
           <TextBlock Text="Workspace"
-                     FontSize="20"
+                     FontSize="{DynamicResource Token.Typography.SurfaceHeading}"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource PrimaryTextBrush}" />
           <Border Padding="{DynamicResource Token.Layout.CardPadding}"
@@ -88,11 +88,11 @@
             <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
               <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
                 <TextBlock Text="Active workspace"
-                           FontSize="12"
+                           FontSize="{DynamicResource Token.Typography.Caption}"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource SecondaryTextBrush}" />
                 <TextBlock Text="{Binding WorkspaceName}"
-                           FontSize="16"
+                           FontSize="{DynamicResource Token.Typography.SubsectionHeading}"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource PrimaryTextBrush}"
                            TextTrimming="CharacterEllipsis" />
@@ -110,7 +110,7 @@
 
         <StackPanel IsVisible="{Binding IsTermsSection}" Spacing="{DynamicResource Token.Spacing.Gap.Large}">
           <TextBlock Text="Terms and responsible use"
-                     FontSize="20"
+                     FontSize="{DynamicResource Token.Typography.SurfaceHeading}"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource PrimaryTextBrush}" />
           <Border Padding="{DynamicResource Token.Layout.CardPadding}"
@@ -120,7 +120,7 @@
                   CornerRadius="6">
             <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
               <TextBlock Text="App-wide acknowledgement"
-                         FontSize="14"
+                         FontSize="{DynamicResource Token.Typography.SectionHeading}"
                          FontWeight="SemiBold"
                          Foreground="{DynamicResource StrongTextBrush}" />
               <TextBlock Text="{Binding TermsConsentSummary}"
@@ -128,7 +128,7 @@
                          Foreground="{DynamicResource PrimaryTextBrush}" />
               <TextBlock Text="Provider policies are maintained by Printify and Shopify. Review the current official documents before using connected features."
                          TextWrapping="Wrap"
-                         FontSize="12"
+                         FontSize="{DynamicResource Token.Typography.Caption}"
                          Foreground="{DynamicResource SecondaryTextBrush}" />
               <Button Content="Review terms and policies"
                       Click="OnReviewTerms"
@@ -146,7 +146,7 @@
 
         <StackPanel IsVisible="{Binding IsAboutSection}" Spacing="{DynamicResource Token.Spacing.Gap.Large}">
           <TextBlock Text="About"
-                     FontSize="20"
+                     FontSize="{DynamicResource Token.Typography.SurfaceHeading}"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource PrimaryTextBrush}" />
           <Border Padding="{DynamicResource Token.Layout.CardPadding}"
@@ -157,11 +157,11 @@
             <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
               <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
                 <TextBlock Text="FusionCanvas"
-                           FontSize="16"
+                           FontSize="{DynamicResource Token.Typography.SubsectionHeading}"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource StrongTextBrush}" />
                 <TextBlock Text="{Binding Version.ProductVersion, StringFormat='Version {0}'}"
-                           FontSize="14"
+                           FontSize="{DynamicResource Token.Typography.SectionHeading}"
                            Foreground="{DynamicResource PrimaryTextBrush}" />
               </StackPanel>
               <Border Padding="{DynamicResource Token.Layout.Padding.Uniform.Group}"
@@ -171,7 +171,7 @@
                       CornerRadius="5">
                 <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                   <TextBlock Text="Updates"
-                             FontSize="14"
+                             FontSize="{DynamicResource Token.Typography.SectionHeading}"
                              FontWeight="SemiBold"
                              Foreground="{DynamicResource StrongTextBrush}" />
                   <StackPanel Spacing="{DynamicResource Token.Spacing.CompactGap}">
@@ -209,7 +209,7 @@
               </Border>
               <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
                 <TextBlock Text="Diagnostics"
-                           FontSize="12"
+                           FontSize="{DynamicResource Token.Typography.Caption}"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource SecondaryTextBrush}" />
                 <TextBox Text="{Binding DiagnosticsText, Mode=OneWay}"

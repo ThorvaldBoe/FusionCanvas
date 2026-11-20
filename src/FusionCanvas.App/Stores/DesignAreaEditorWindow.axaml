@@ -16,7 +16,7 @@
         AutomationProperties.AutomationId="Catalog.DesignAreaEditorDialog">
   <Grid RowDefinitions="Auto,*,Auto" Margin="{DynamicResource Token.Layout.Margin.Uniform.Wide}" RowSpacing="{DynamicResource Token.Spacing.SectionGap}">
     <StackPanel Grid.Row="0" Spacing="{DynamicResource Token.Spacing.CompactGap}">
-      <TextBlock Text="{Binding DesignAreaEditorDialogTitle}" FontSize="20" FontWeight="SemiBold" />
+      <TextBlock Text="{Binding DesignAreaEditorDialogTitle}" FontSize="{DynamicResource Token.Typography.SurfaceHeading}" FontWeight="SemiBold" />
       <TextBlock Text="Configure the printable region, artwork guidance, and compatible Variants for this Offering."
                  TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
       <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" TextWrapping="Wrap"
@@ -26,32 +26,32 @@
     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
       <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_Control.Bottom_None}" AutomationProperties.AutomationId="Catalog.DesignAreaEditorForm">
         <TextBlock Text="Identity" FontWeight="SemiBold" />
-        <TextBlock Text="Name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+        <TextBlock Text="Name" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
         <TextBox x:Name="DesignAreaNameTextBox" Text="{Binding PlaceholderName}" PlaceholderText="Front" Classes="field"
                  AutomationProperties.Name="Name" />
-        <TextBlock Text="Position" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+        <TextBlock Text="Position" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
         <TextBox Text="{Binding PlaceholderPosition}" PlaceholderText="front" Classes="field" AutomationProperties.Name="Position" />
-        <TextBlock Text="Decoration method" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+        <TextBlock Text="Decoration method" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
         <TextBox Text="{Binding PlaceholderDecorationMethod}" PlaceholderText="DTG" Classes="field" AutomationProperties.Name="Decoration method" />
-        <TextBlock Text="Description (optional)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+        <TextBlock Text="Description (optional)" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
         <TextBox Text="{Binding PlaceholderDescription}" AcceptsReturn="True" MinHeight="56" Classes="field" AutomationProperties.Name="Description" />
 
         <TextBlock Text="Maximum design size" FontWeight="SemiBold" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}" />
         <Grid ColumnDefinitions="*,*" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
           <StackPanel Grid.Column="0" Spacing="{DynamicResource Token.Spacing.CompactGap}">
-            <TextBlock Text="Width (px)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+            <TextBlock Text="Width (px)" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
             <TextBox Text="{Binding PlaceholderWidth}" Classes="field" AutomationProperties.Name="Width (px)" />
           </StackPanel>
           <StackPanel Grid.Column="1" Spacing="{DynamicResource Token.Spacing.CompactGap}">
-            <TextBlock Text="Height (px)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+            <TextBlock Text="Height (px)" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
             <TextBox Text="{Binding PlaceholderHeight}" Classes="field" AutomationProperties.Name="Height (px)" />
           </StackPanel>
         </Grid>
-        <TextBlock Text="{Binding PhysicalSizeSummary}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+        <TextBlock Text="{Binding PhysicalSizeSummary}" TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
 
         <TextBlock Text="Recommended artwork" FontWeight="SemiBold" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}" />
         <TextBlock Text="Maximum printable dimensions are shown in pixels first. Inches and millimetres are derived only when reliable DPI metadata is available."
-                   TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                   TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
         <Grid ColumnDefinitions="*,*,*" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
           <TextBox Grid.Column="0" Text="{Binding ArtworkWidth}" PlaceholderText="Width (px)" Classes="field" AutomationProperties.Name="Recommended artwork width (px)" />
           <TextBox Grid.Column="1" Text="{Binding ArtworkHeight}" PlaceholderText="Height (px)" Classes="field" AutomationProperties.Name="Recommended artwork height (px)" />
@@ -70,7 +70,7 @@
                   IsChecked="{Binding PlaceholderPrimaryForArtworkGeneration, Mode=TwoWay}"
                   AutomationProperties.Name="Primary for artwork generation" />
         <StackPanel IsVisible="{Binding !PlaceholderUsesAllVariants}" Spacing="{DynamicResource Token.Spacing.CompactGap}">
-          <TextBlock Text="Compatible Variants" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <TextBlock Text="Compatible Variants" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
           <ItemsControl ItemsSource="{Binding PlaceholderVariantChoices}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="stores:VariantChoiceViewModel">

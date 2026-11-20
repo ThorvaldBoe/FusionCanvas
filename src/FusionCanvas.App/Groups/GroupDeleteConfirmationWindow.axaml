@@ -11,12 +11,12 @@
   <Grid RowDefinitions="Auto,Auto" Margin="{DynamicResource Token.Layout.PageInset}" RowSpacing="{DynamicResource Token.Spacing.Gap.WidePlus}">
     <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
       <TextBlock Text="{Binding Title}"
-                 FontSize="20"
+                 FontSize="{DynamicResource Token.Typography.SurfaceHeading}"
                  FontWeight="SemiBold"
                  Foreground="{DynamicResource DangerStrongBrush}" />
       <TextBlock Text="{Binding WarningMessage}"
                  TextWrapping="Wrap"
-                 FontSize="14" />
+                 FontSize="{DynamicResource Token.Typography.SectionHeading}" />
       <Border Background="{DynamicResource DangerBackgroundBrush}"
               BorderBrush="{DynamicResource DangerBorderBrush}"
               BorderThickness="1"

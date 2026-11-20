@@ -13,11 +13,11 @@
   <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="{DynamicResource Token.Layout.Margin.Uniform.Wide}">
     <StackPanel Grid.Row="0" Spacing="{DynamicResource Token.Spacing.CompactGap}" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Section}">
       <TextBlock Text="Snowclone Library"
-                 FontSize="22"
+                 FontSize="{DynamicResource Token.Typography.PageHeading}"
                  FontWeight="SemiBold"
                  Foreground="{DynamicResource StrongTextBrush}" />
       <TextBlock Text="Maintain reusable phrase structures and guidance for future ideation."
-                 FontSize="12"
+                 FontSize="{DynamicResource Token.Typography.Caption}"
                  Foreground="{DynamicResource SecondaryTextBrush}" />
     </StackPanel>
 
@@ -57,7 +57,7 @@
         <Grid RowDefinitions="Auto,*,Auto">
           <TextBlock Grid.Row="0"
                      Text="Phrases"
-                     FontSize="13"
+                     FontSize="{DynamicResource Token.Typography.Body}"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource StrongTextBrush}"
                      Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Group}" />
@@ -86,7 +86,7 @@
                          FontWeight="SemiBold"
                          Foreground="{DynamicResource StrongTextBrush}" />
               <TextBlock Text="Create one or import a CSV."
-                         FontSize="11"
+                         FontSize="{DynamicResource Token.Typography.Label}"
                          Foreground="{DynamicResource SecondaryTextBrush}" />
             </StackPanel>
 
@@ -122,7 +122,7 @@
         <ScrollViewer>
           <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
             <TextBlock Text="Snowclone details"
-                       FontSize="16"
+                       FontSize="{DynamicResource Token.Typography.SubsectionHeading}"
                        FontWeight="SemiBold"
                        Foreground="{DynamicResource StrongTextBrush}" />
 
@@ -132,7 +132,7 @@
 
             <StackPanel IsVisible="{Binding HasSelection}" Spacing="{DynamicResource Token.Spacing.InlineGap}">
               <TextBlock Text="Phrase"
-                         FontSize="12"
+                         FontSize="{DynamicResource Token.Typography.Caption}"
                          FontWeight="SemiBold"
                          Foreground="{DynamicResource SecondaryTextBrush}" />
               <TextBox x:Name="PhraseBox"
@@ -143,7 +143,7 @@
 
             <StackPanel IsVisible="{Binding HasSelection}" Spacing="{DynamicResource Token.Spacing.InlineGap}">
               <TextBlock Text="Guidance"
-                         FontSize="12"
+                         FontSize="{DynamicResource Token.Typography.Caption}"
                          FontWeight="SemiBold"
                          Foreground="{DynamicResource SecondaryTextBrush}" />
               <TextBox x:Name="GuidanceBox"

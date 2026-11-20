@@ -32,7 +32,7 @@
                     Spacing="{DynamicResource Token.Spacing.ControlGap}"
                     Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_SectionPlus}">
           <TextBlock Text="Stores"
-                     FontSize="18"
+                     FontSize="{DynamicResource Token.Typography.ToolTitle}"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource PrimaryTextBrush}" />
           <Button Content="New store"
@@ -43,7 +43,7 @@
 
         <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
           <TextBlock Text="Active"
-                     FontSize="12"
+                     FontSize="{DynamicResource Token.Typography.Caption}"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource SecondaryTextBrush}" />
           <ItemsControl ItemsSource="{Binding EditorActiveStores}"
@@ -61,7 +61,7 @@
 
           <TextBlock IsVisible="{Binding HasArchivedStores}"
                      Text="Archived"
-                     FontSize="12"
+                     FontSize="{DynamicResource Token.Typography.Caption}"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource SecondaryTextBrush}"
                      Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}" />
@@ -90,12 +90,12 @@
       <ScrollViewer>
         <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
           <TextBlock Text="Store Management"
-                     FontSize="22"
+                     FontSize="{DynamicResource Token.Typography.PageHeading}"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource PrimaryTextBrush}" />
           <TextBlock Text="{Binding ErrorMessage}"
                      IsVisible="{Binding HasError}"
-                     FontSize="12"
+                     FontSize="{DynamicResource Token.Typography.Caption}"
                      Foreground="{DynamicResource DangerTextBrush}" />
           <ProgressBar IsVisible="{Binding IsBusy}"
                        IsIndeterminate="True"
@@ -139,7 +139,7 @@
                           Margin="{DynamicResource Token.Layout.CardPadding}"
                           Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
             <TextBlock Text="Basic info"
-                       FontSize="16"
+                       FontSize="{DynamicResource Token.Typography.SubsectionHeading}"
                        FontWeight="SemiBold"
                        Foreground="{DynamicResource StrongTextBrush}" />
             <TextBox x:Name="StoreNameTextBox"
@@ -240,12 +240,12 @@
                       Command="{Binding StartCreateNicheCommand}"
                       Classes="primary" />
               <TextBlock Text="Active niches"
-                         FontSize="12"
+                         FontSize="{DynamicResource Token.Typography.Caption}"
                          FontWeight="SemiBold"
                          Foreground="{DynamicResource SecondaryTextBrush}" />
               <TextBlock Text="No active niches"
                          IsVisible="{Binding !HasActiveNiches}"
-                         FontSize="12"
+                         FontSize="{DynamicResource Token.Typography.Caption}"
                          Foreground="{DynamicResource SecondaryTextBrush}" />
               <ItemsControl ItemsSource="{Binding EditorActiveNiches}">
                 <ItemsControl.ItemTemplate>
@@ -261,7 +261,7 @@
 
               <TextBlock IsVisible="{Binding HasArchivedNiches}"
                          Text="Archived niches"
-                         FontSize="12"
+                         FontSize="{DynamicResource Token.Typography.Caption}"
                          FontWeight="SemiBold"
                          Foreground="{DynamicResource SecondaryTextBrush}"
                          Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}" />
@@ -283,7 +283,7 @@
                         Spacing="{DynamicResource Token.Spacing.GroupGap}"
                         Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_SectionPlus.Bottom_None}">
               <TextBlock Text="Niche details"
-                         FontSize="16"
+                         FontSize="{DynamicResource Token.Typography.SubsectionHeading}"
                          FontWeight="SemiBold"
                          Foreground="{DynamicResource StrongTextBrush}" />
               <Grid ColumnDefinitions="*,Auto"
@@ -309,7 +309,7 @@
               <TextBlock Text="{Binding NichePopulationStatusMessage}"
                          IsVisible="{Binding HasNichePopulationStatus}"
                          TextWrapping="Wrap"
-                         FontSize="12"
+                         FontSize="{DynamicResource Token.Typography.Caption}"
                          Foreground="{DynamicResource SecondaryTextBrush}"
                          Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_SectionPlus.Bottom_None}" />
               <TextBox Text="{Binding NicheDescription}"
@@ -391,12 +391,12 @@
                       Command="{Binding StartCreateTagCommand}"
                       Classes="primary" />
               <TextBlock Text="Active tags"
-                         FontSize="12"
+                         FontSize="{DynamicResource Token.Typography.Caption}"
                          FontWeight="SemiBold"
                          Foreground="{DynamicResource SecondaryTextBrush}" />
               <TextBlock Text="No active tags"
                          IsVisible="{Binding !HasActiveTags}"
-                         FontSize="12"
+                         FontSize="{DynamicResource Token.Typography.Caption}"
                          Foreground="{DynamicResource SecondaryTextBrush}" />
               <ItemsControl ItemsSource="{Binding EditorActiveTags}">
                 <ItemsControl.ItemTemplate>
@@ -412,7 +412,7 @@
 
               <TextBlock IsVisible="{Binding HasArchivedTags}"
                          Text="Archived tags"
-                         FontSize="12"
+                         FontSize="{DynamicResource Token.Typography.Caption}"
                          FontWeight="SemiBold"
                          Foreground="{DynamicResource SecondaryTextBrush}"
                          Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}" />
@@ -434,7 +434,7 @@
                         Spacing="{DynamicResource Token.Spacing.GroupGap}"
                         Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_SectionPlus.Bottom_None}">
               <TextBlock Text="Tag details"
-                         FontSize="16"
+                         FontSize="{DynamicResource Token.Typography.SubsectionHeading}"
                          FontWeight="SemiBold"
                          Foreground="{DynamicResource StrongTextBrush}" />
               <TextBox Text="{Binding TagName}"
@@ -442,7 +442,7 @@
                        Classes="field" />
               <StackPanel Spacing="{DynamicResource Token.Spacing.CompactGap}">
                 <TextBlock Text="Color"
-                           FontSize="12"
+                           FontSize="{DynamicResource Token.Typography.Caption}"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource SecondaryTextBrush}" />
                 <TextBox Text="{Binding TagColor}"
@@ -487,7 +487,7 @@
                   Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}">
             <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
               <TextBlock Text="{Binding TagDeleteWarningMessage}"
-                         FontSize="13"
+                         FontSize="{DynamicResource Token.Typography.Body}"
                          Foreground="{DynamicResource DangerTextBrush}" />
               <StackPanel Orientation="Horizontal"
                           Spacing="{DynamicResource Token.Spacing.ControlGap}">
@@ -507,7 +507,7 @@
             <StackPanel IsVisible="{Binding IsCatalogOverview}"
                         Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
               <TextBlock Text="Catalog overview"
-                         FontSize="16"
+                         FontSize="{DynamicResource Token.Typography.SubsectionHeading}"
                          FontWeight="SemiBold"
                          Foreground="{DynamicResource StrongTextBrush}" />
               <TextBlock Text="Define Blueprints, fulfillment offerings, Variants, and Placeholders. Blueprint is Printify terminology for the base product; Placeholder is the named design target on an offering."
@@ -593,7 +593,7 @@
                                        ToolTip.Tip="{Binding Subtitle}"
                                        AutomationProperties.HelpText="{Binding Subtitle}"
                                        TextTrimming="CharacterEllipsis"
-                                       FontSize="12"
+                                       FontSize="{DynamicResource Token.Typography.Caption}"
                                        Foreground="{DynamicResource SecondaryTextBrush}"
                                        VerticalAlignment="Center"
                                        Margin="{DynamicResource Token.Layout.Margin.HorizontalVertical.Control.None}" />
@@ -622,11 +622,11 @@
                       <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
                         <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
                         <TextBlock Text="{Binding Offerings.Count, StringFormat='{}{0} Blueprint Offering(s)'}"
-                                   FontSize="12"
+                                   FontSize="{DynamicResource Token.Typography.Caption}"
                                    Foreground="{DynamicResource SecondaryTextBrush}" />
                         <TextBlock IsVisible="{Binding IsArchived}"
                                    Text="Archived"
-                                   FontSize="12"
+                                   FontSize="{DynamicResource Token.Typography.Caption}"
                                    Foreground="{DynamicResource WarningTextBrush}" />
                       </StackPanel>
                     </Button>
@@ -644,10 +644,10 @@
                         Command="{Binding BackToProductsCommand}"
                         Classes="secondary" />
                 <TextBlock Text="{Binding CatalogBreadcrumb}"
-                           FontSize="12"
+                           FontSize="{DynamicResource Token.Typography.Caption}"
                            Foreground="{DynamicResource SecondaryTextBrush}" />
                 <TextBlock Text="{Binding ProductName}"
-                           FontSize="20"
+                           FontSize="{DynamicResource Token.Typography.SurfaceHeading}"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource StrongTextBrush}" />
                 <TextBlock Text="{Binding SelectedProductSummary}"
@@ -662,14 +662,14 @@
                                 ToolTip.Tip="Edit the Blueprint name and description without leaving this page." />
                   <StackPanel IsVisible="{Binding IsBlueprintBasicsExpanded}" IsEnabled="{Binding !SelectedStore.IsArchived}" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                     <TextBlock Text="Blueprint is Printify's term for the base product definition."
-                               TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                    <TextBlock Text="Name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                               TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBlock Text="Name" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBox x:Name="ProductNameTextBox"
                              Text="{Binding ProductName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              PlaceholderText="Blueprint name"
                              Classes="field"
                              AutomationProperties.AutomationId="Catalog.BlueprintName" />
-                    <TextBlock Text="Description" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBlock Text="Description" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBox Text="{Binding ProductDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              AcceptsReturn="True"
                              MinHeight="56"
@@ -760,7 +760,7 @@
                              FontWeight="SemiBold"
                              ToolTip.Tip="An Offering is a concrete fulfillment choice for a Blueprint." />
                   <TextBlock Text="An Offering is one way this Blueprint is supplied."
-                             FontSize="12"
+                             FontSize="{DynamicResource Token.Typography.Caption}"
                              Foreground="{DynamicResource SecondaryTextBrush}" />
                   <Button Content="Add Blueprint Offering"
                           Command="{Binding StartCreateOfferingCommand}"
@@ -855,21 +855,21 @@
                             IsVisible="{Binding !IsOfferingDetail}"
                             Classes="secondary" />
                     <TextBlock Text="{Binding CatalogBreadcrumb}"
-                               FontSize="12"
+                               FontSize="{DynamicResource Token.Typography.Caption}"
                                Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBlock Text="{Binding OfferingName}"
                                IsVisible="{Binding IsCreatingNewOffering}"
-                               FontSize="20"
+                               FontSize="{DynamicResource Token.Typography.SurfaceHeading}"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource StrongTextBrush}" />
                     <TextBlock Text="{Binding CatalogSetup.OfferingName}"
                                IsVisible="{Binding CatalogSetup.HasSelectedOffering}"
-                               FontSize="20"
+                               FontSize="{DynamicResource Token.Typography.SurfaceHeading}"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource StrongTextBrush}" />
                     <TextBlock Text="{Binding CatalogSetup.OfferingReadinessStatus}"
                                IsVisible="{Binding CatalogSetup.HasSelectedOffering}"
-                               FontSize="12"
+                               FontSize="{DynamicResource Token.Typography.Caption}"
                                Foreground="{DynamicResource SecondaryTextBrush}"
                                AutomationProperties.AutomationId="Catalog.OfferingStatus" />
                   </StackPanel>
@@ -892,21 +892,21 @@
                 <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                   <TextBlock Text="New Blueprint Offering" FontWeight="SemiBold" />
                   <TextBlock Text="Choose the fulfillment relationship first. After saving, Options, Variants, Placeholders, and Mockup Templates become available."
-                             TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                             TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
                   <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
-                    <TextBlock Text="Name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBlock Text="Name" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBox x:Name="OfferingNameTextBox" Text="{Binding OfferingName}" PlaceholderText="Offering name" Classes="field" />
-                    <TextBlock Text="Fulfillment type" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBlock Text="Fulfillment type" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <ComboBox SelectedIndex="{Binding OfferingKindIndex}" Classes="field">
                       <ComboBoxItem Content="Fixed Print Provider" />
                       <ComboBoxItem Content="Printify Choice Provider Network" />
                     </ComboBox>
-                    <TextBlock IsVisible="{Binding !IsChoiceNetworkOffering}" Text="Print Provider name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBlock IsVisible="{Binding !IsChoiceNetworkOffering}" Text="Print Provider name" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBox IsVisible="{Binding !IsChoiceNetworkOffering}"
                              Text="{Binding OfferingProviderName}"
                              PlaceholderText="Print Provider name"
                              Classes="field" />
-                    <TextBlock Text="Description" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBlock Text="Description" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBox Text="{Binding OfferingDescription}" AcceptsReturn="True" MinHeight="96" Classes="field"
                              AutomationProperties.AutomationId="Catalog.NewOfferingDescription" />
                     <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
@@ -927,12 +927,12 @@
                 <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                   <ToggleButton Content="Basics" IsChecked="{Binding IsBasicsSectionExpanded, Mode=TwoWay}" HorizontalContentAlignment="Left" />
                   <StackPanel IsVisible="{Binding IsBasicsSectionExpanded}" Spacing="{DynamicResource Token.Spacing.ControlGap}">
-                    <TextBlock Text="Name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBlock Text="Name" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBox Text="{Binding CatalogSetup.OfferingName}" PlaceholderText="Offering name" Classes="field" />
-                    <TextBlock Text="Fulfillment type" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBlock Text="Fulfillment type" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBlock Text="{Binding CatalogSetup.OfferingKindLabel}" />
                     <StackPanel IsVisible="{Binding !CatalogSetup.IsProviderNetworkOffering}" Spacing="{DynamicResource Token.Spacing.CompactGap}">
-                      <TextBlock Text="Print Provider" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                      <TextBlock Text="Print Provider" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
                       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
                         <ComboBox Grid.Column="0"
                                   ItemsSource="{Binding CatalogSetup.AvailablePrintProviders}"
@@ -960,12 +960,12 @@
                       </StackPanel>
                     </StackPanel>
                     <StackPanel IsVisible="{Binding CatalogSetup.IsProviderNetworkOffering}" Spacing="{DynamicResource Token.Spacing.CompactGap}">
-                      <TextBlock Text="Provider Network code" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                      <TextBlock Text="Provider Network code" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
                       <TextBox Text="{Binding CatalogSetup.ProviderNetworkCode}" Classes="field" />
                       <TextBlock Text="A Provider Network can route fulfillment through different Print Providers. Its stable code preserves identity if the display label changes."
-                                 TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                                 TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
                     </StackPanel>
-                    <TextBlock Text="Description" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBlock Text="Description" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBox Text="{Binding CatalogSetup.OfferingDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              AcceptsReturn="True" MinHeight="96" Classes="field"
                              AutomationProperties.AutomationId="Catalog.OfferingDescription" />
@@ -1041,7 +1041,7 @@
               <Border Classes="panel" Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}" IsVisible="{Binding IsOfferingDetail}">
                 <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}"
                             AutomationProperties.AutomationId="Catalog.OfferingSetup">
-                <TextBlock Text="Setup" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource StrongTextBrush}" />
+                <TextBlock Text="Setup" FontSize="{DynamicResource Token.Typography.SubsectionHeading}" FontWeight="SemiBold" Foreground="{DynamicResource StrongTextBrush}" />
                 <TextBlock Text="Configure each part of this Offering in a focused screen. Provider means the fulfillment partner that produces the item; Printify is the catalog and integration source."
                            TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
                 <Border IsVisible="{Binding IsChoiceNetworkOffering}"
@@ -1067,7 +1067,7 @@
                     <StackPanel Grid.Row="0" Grid.Column="0" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
                       <TextBlock Text="Variants" FontWeight="SemiBold" />
                       <TextBlock Text="Possible choices and explicit sellable combinations."
-                                 TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                                 TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
                     </StackPanel>
                     <TextBlock Grid.Row="0" Grid.Column="1" VerticalAlignment="Center" TextAlignment="Right"
                                Text="{Binding CatalogSetup.AvailableVariantCount, StringFormat='{}{0} configured'}"
@@ -1079,7 +1079,7 @@
                     <StackPanel Grid.Row="2" Grid.Column="0" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
                       <TextBlock Text="Design Areas" FontWeight="SemiBold" />
                       <TextBlock Text="Printable regions and compatible Variants."
-                                 TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                                 TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
                     </StackPanel>
                     <TextBlock Grid.Row="2" Grid.Column="1" VerticalAlignment="Center" TextAlignment="Right"
                                Text="{Binding CatalogSetup.AvailableDesignAreaCount, StringFormat='{}{0} configured'}"
@@ -1091,7 +1091,7 @@
                     <StackPanel Grid.Row="4" Grid.Column="0" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
                       <TextBlock Text="Mockup Templates" FontWeight="SemiBold" />
                       <TextBlock Text="Provider images linked to Design Areas and Colors."
-                                 TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                                 TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
                     </StackPanel>
                     <TextBlock Grid.Row="4" Grid.Column="1" VerticalAlignment="Center" TextAlignment="Right"
                                Text="{Binding CatalogSetup.AvailableTemplateCount, StringFormat='{}{0} configured'}"
@@ -1111,7 +1111,7 @@
                                AutomationProperties.Name="Offering setup readiness"
                                AutomationProperties.AutomationId="Catalog.OfferingReadinessSummary" />
                     <TextBlock Text="{Binding CatalogSetup.ReadyMockupTemplateCount, StringFormat='{}{0} ready Mockup Templates'}"
-                               FontSize="12"
+                               FontSize="{DynamicResource Token.Typography.Caption}"
                                Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBlock Text="{Binding CatalogSetup.OfferingReadinessError}"
                                IsVisible="{Binding CatalogSetup.HasOfferingReadinessError}"
@@ -1144,9 +1144,9 @@
               <Border Classes="panel" Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}" IsVisible="{Binding IsVariantManagement}"
                       AutomationProperties.AutomationId="Catalog.VariantAvailableChoices">
                 <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
-                  <TextBlock Text="1. Available choices" FontSize="18" FontWeight="SemiBold" />
+                  <TextBlock Text="1. Available choices" FontSize="{DynamicResource Token.Typography.ToolTitle}" FontWeight="SemiBold" />
                   <TextBlock Text="Define which Color, Size, and other values may be combined. This does not make every combination sellable."
-                             TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                             TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
                   <TextBlock IsVisible="{Binding !CatalogSetup.HasAvailableOptions}" Text="No Options configured." Foreground="{DynamicResource SecondaryTextBrush}" />
                   <ItemsControl ItemsSource="{Binding CatalogSetup.AvailableChoiceGroups}">
                     <ItemsControl.ItemsPanel>
@@ -1161,7 +1161,7 @@
                           <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
                             <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
                               <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                              <TextBlock Grid.Column="1" Text="{Binding KindLabel}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}"
+                              <TextBlock Grid.Column="1" Text="{Binding KindLabel}" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}"
                                          VerticalAlignment="Center" />
                               <Button Grid.Column="2"
                                       Content="..."
@@ -1217,14 +1217,14 @@
                                          Text="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 <Grid ColumnDefinitions="*,*" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
                                   <StackPanel Grid.Column="0" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
-                                    <TextBlock Text="Sort by" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" />
+                                    <TextBlock Text="Sort by" FontSize="{DynamicResource Token.Typography.Label}" Foreground="{DynamicResource SecondaryTextBrush}" />
                                     <ComboBox ItemsSource="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.SortOptions}"
                                               SelectedItem="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.SortOption, Mode=TwoWay}"
                                               AutomationProperties.Name="Sort Colors"
                                               AutomationProperties.AutomationId="Catalog.ColorSort" />
                                   </StackPanel>
                                   <StackPanel Grid.Column="1" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
-                                    <TextBlock Text="Rows per page" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" />
+                                    <TextBlock Text="Rows per page" FontSize="{DynamicResource Token.Typography.Label}" Foreground="{DynamicResource SecondaryTextBrush}" />
                                     <ComboBox ItemsSource="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.PageSizes}"
                                               SelectedItem="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.PageSize, Mode=TwoWay}"
                                               AutomationProperties.Name="Colors per page"
@@ -1301,8 +1301,8 @@
                 <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                   <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{DynamicResource Token.Spacing.Gap.Panel}">
                     <StackPanel Grid.Column="0" Spacing="{DynamicResource Token.Spacing.Gap.Micro}">
-                      <TextBlock Text="2. Sellable Variants" FontSize="18" FontWeight="SemiBold" />
-                      <TextBlock Text="{Binding CatalogSetup.AvailableVariantCount, StringFormat='{}{0} configured'}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                      <TextBlock Text="2. Sellable Variants" FontSize="{DynamicResource Token.Typography.ToolTitle}" FontWeight="SemiBold" />
+                      <TextBlock Text="{Binding CatalogSetup.AvailableVariantCount, StringFormat='{}{0} configured'}" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                       <Button x:Name="AddVariantButton" Content="Add Variant" Command="{Binding CatalogSetup.StartAddVariantCommand}" Classes="secondary" />
@@ -1310,7 +1310,7 @@
                     </StackPanel>
                   </Grid>
                     <TextBlock Text="A Variant is one concrete combination of Option Values, such as Black and Medium."
-                               TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                               TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBlock IsVisible="{Binding !CatalogSetup.HasAvailableOptions}" Text="Add Options and Values before creating Variants." Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBlock IsVisible="{Binding !CatalogSetup.HasAvailableVariants}" Text="No concrete Variants configured." Foreground="{DynamicResource SecondaryTextBrush}" />
                     <virtualGrid:VirtualDataGrid x:Name="SellableVariantGrid" Height="224" Classes="sellableVariantGrid"
@@ -1387,7 +1387,7 @@
                   <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
                     <Grid ColumnDefinitions="*,Auto">
                       <StackPanel Grid.Column="0" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
-                        <TextBlock Text="Design Areas" FontSize="18" FontWeight="SemiBold" />
+                        <TextBlock Text="Design Areas" FontSize="{DynamicResource Token.Typography.ToolTitle}" FontWeight="SemiBold" />
                         <TextBlock Text="Printable regions for this Offering." Foreground="{DynamicResource SecondaryTextBrush}" />
                       </StackPanel>
                       <Button x:Name="AddDesignAreaButton" Grid.Column="1" Content="Add Design Area" Command="{Binding CatalogSetup.StartAddPlaceholderCommand}" Classes="primary" />
@@ -1440,13 +1440,13 @@
                             <DataTemplate x:DataType="stores:DesignAreaCardViewModel">
                               <Border Classes="designAreaGridCell" Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Inline.Tight}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
                                 <StackPanel VerticalAlignment="Center" Spacing="{DynamicResource Token.Spacing.Gap.Hairline}">
-                                  <TextBlock Text="{Binding CompatibilitySummary}" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}"
+                                  <TextBlock Text="{Binding CompatibilitySummary}" FontSize="{DynamicResource Token.Typography.Label}" Foreground="{DynamicResource SecondaryTextBrush}"
                                              TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
                                              ToolTip.Tip="{Binding CompatibilityAccessibilitySummary}"
                                              AutomationProperties.Name="{Binding CompatibilityAccessibilitySummary}"
                                              AutomationProperties.HelpText="{Binding CompatibilityAccessibilitySummary}" />
                                   <TextBlock Text="Primary" IsVisible="{Binding IsPrimaryForArtworkGeneration}"
-                                             FontSize="10" Foreground="{DynamicResource AccentBrush}"
+                                             FontSize="{DynamicResource Token.Typography.Label}" Foreground="{DynamicResource AccentBrush}"
                                              TextWrapping="NoWrap"
                                              ToolTip.Tip="Primary for artwork generation"
                                              AutomationProperties.Name="Primary for artwork generation" />
@@ -1482,10 +1482,10 @@
                 <Border Classes="panel" Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}"
                         AutomationProperties.AutomationId="Catalog.MockupTemplateList">
                   <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
-                  <TextBlock Text="Mockup Templates" FontSize="18" FontWeight="SemiBold" />
+                  <TextBlock Text="Mockup Templates" FontSize="{DynamicResource Token.Typography.ToolTitle}" FontWeight="SemiBold" />
                   <TextBlock Text="Each template groups local mockup source images under one shared Design Area. Compatible concrete Variants are derived from their applicability."
                              TextWrapping="Wrap"
-                             FontSize="12"
+                             FontSize="{DynamicResource Token.Typography.Caption}"
                              Foreground="{DynamicResource SecondaryTextBrush}" />
                   <TextBlock Text="{Binding CatalogSetup.ProviderCatalogMessage}"
                              IsVisible="{Binding CatalogSetup.HasProviderCatalogMessage}"
@@ -1611,9 +1611,9 @@
                   <StackPanel IsVisible="{Binding IsAdvancedSectionExpanded}" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                     <TextBlock Text="Provider-network identity and external identifiers are preserved by the catalog model. Shopify publication and credentials are future integration work."
                                TextWrapping="Wrap"
-                               FontSize="12"
+                               FontSize="{DynamicResource Token.Typography.Caption}"
                                Foreground="{DynamicResource SecondaryTextBrush}" />
-                    <TextBlock Text="External offering ID" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBlock Text="External offering ID" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBox Text="{Binding CatalogSetup.ExternalOfferingId}" Classes="field" />
                   </StackPanel>
                   </StackPanel>
@@ -1629,7 +1629,7 @@
                   Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}">
             <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
               <TextBlock Text="{Binding ProductDeleteWarningMessage}"
-                         FontSize="13"
+                         FontSize="{DynamicResource Token.Typography.Body}"
                          Foreground="{DynamicResource DangerTextBrush}" />
               <StackPanel Orientation="Horizontal"
                           Spacing="{DynamicResource Token.Spacing.ControlGap}">
@@ -1651,7 +1651,7 @@
                   Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}">
             <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
               <TextBlock Text="{Binding OfferingDeleteWarningMessage}"
-                         FontSize="13"
+                         FontSize="{DynamicResource Token.Typography.Body}"
                          Foreground="{DynamicResource DangerTextBrush}" />
               <StackPanel Orientation="Horizontal"
                           Spacing="{DynamicResource Token.Spacing.ControlGap}">
@@ -1673,7 +1673,7 @@
                   Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}">
             <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
               <TextBlock Text="{Binding DeleteWarningMessage}"
-                         FontSize="13"
+                         FontSize="{DynamicResource Token.Typography.Body}"
                          Foreground="{DynamicResource DangerTextBrush}" />
               <StackPanel Orientation="Horizontal"
                           Spacing="{DynamicResource Token.Spacing.ControlGap}">
@@ -1695,7 +1695,7 @@
                   Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}">
             <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
               <TextBlock Text="{Binding NicheDeleteWarningMessage}"
-                         FontSize="13"
+                         FontSize="{DynamicResource Token.Typography.Body}"
                          Foreground="{DynamicResource DangerTextBrush}" />
               <StackPanel Orientation="Horizontal"
                           Spacing="{DynamicResource Token.Spacing.ControlGap}">
@@ -1717,7 +1717,7 @@
                   Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}">
             <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
               <TextBlock Text="{Binding DiscardChangesMessage}"
-                         FontSize="13"
+                         FontSize="{DynamicResource Token.Typography.Body}"
                          Foreground="{DynamicResource StrongTextBrush}" />
               <StackPanel Orientation="Horizontal"
                           Spacing="{DynamicResource Token.Spacing.ControlGap}">

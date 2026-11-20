@@ -17,9 +17,9 @@
         <TextBlock Grid.Column="0" Text="Add Variant" FontWeight="SemiBold" />
         <Button x:Name="AddVariantCancelButton" Grid.Column="1" Content="Cancel" Click="OnCancelClick" Classes="secondary" />
       </Grid>
-      <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" FontSize="12" Foreground="{DynamicResource DangerTextBrush}" />
+      <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource DangerTextBrush}" />
       <TextBox x:Name="VariantNameTextBox" Text="{Binding VariantName}" PlaceholderText="Variant name (optional)" Classes="field" />
-      <TextBlock Text="Option Values" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+      <TextBlock Text="Option Values" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
       <TextBlock IsVisible="{Binding !HasAvailableOptions}" Text="Add Options and Values before creating Variants." Foreground="{DynamicResource SecondaryTextBrush}" />
       <ItemsControl ItemsSource="{Binding VariantValueChoices}">
         <ItemsControl.ItemTemplate>

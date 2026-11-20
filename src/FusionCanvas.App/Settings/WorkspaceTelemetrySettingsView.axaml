@@ -10,9 +10,9 @@
           CornerRadius="6">
     <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
       <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
-        <TextBlock Text="Diagnostics" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource StrongTextBrush}" />
+        <TextBlock Text="Diagnostics" FontSize="{DynamicResource Token.Typography.SectionHeading}" FontWeight="SemiBold" Foreground="{DynamicResource StrongTextBrush}" />
         <TextBlock Text="Telemetry is stored locally for this workspace. Captured service bodies may include creative content. Recognized credentials are redacted, and records expire automatically."
-                   FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+                   FontSize="{DynamicResource Token.Typography.Caption}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
       </StackPanel>
       <TextBlock IsVisible="{Binding HasNoWorkspace}" Text="Select an active workspace to manage diagnostics." TextWrapping="Wrap" />
       <StackPanel IsEnabled="{Binding HasWorkspace}" Spacing="{DynamicResource Token.Spacing.Gap.ControlPlus}">
@@ -33,7 +33,7 @@
       <Border IsEnabled="{Binding HasWorkspace}" Padding="{DynamicResource Token.Layout.Padding.Uniform.Group}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="4">
         <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
           <TextBlock Text="Search telemetry" FontWeight="SemiBold" />
-          <TextBlock Text="Enter optional UTC timestamps in ISO 8601 format. The end time is exclusive." FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <TextBlock Text="Enter optional UTC timestamps in ISO 8601 format. The end time is exclusive." FontSize="{DynamicResource Token.Typography.Caption}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
           <Grid ColumnDefinitions="*,*" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
             <TextBox Grid.Column="0" PlaceholderText="From (UTC)" Text="{Binding FromText, Mode=TwoWay}" />
             <TextBox Grid.Column="1" PlaceholderText="To (UTC)" Text="{Binding ToText, Mode=TwoWay}" />
@@ -61,7 +61,7 @@
               </StackPanel>
             </StackPanel>
           </Border>
-          <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
         </StackPanel>
       </Border>
     </StackPanel>

@@ -24,30 +24,30 @@
   </Window.Styles>
   <Grid Margin="{DynamicResource Token.Layout.Margin.Uniform.SectionPlus}" RowDefinitions="Auto,Auto,*,Auto,Auto,Auto" RowSpacing="{DynamicResource Token.Spacing.Gap.Panel}">
     <StackPanel Grid.Row="0" Spacing="{DynamicResource Token.Spacing.CompactGap}">
-      <TextBlock Text="Mockup Template" FontSize="18" FontWeight="SemiBold" />
+      <TextBlock Text="Mockup Template" FontSize="{DynamicResource Token.Typography.ToolTitle}" FontWeight="SemiBold" />
       <TextBlock Text="Upload source images first, then configure each selected image independently." TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
     </StackPanel>
 
     <Grid Grid.Row="1" ColumnDefinitions="*,*,*" ColumnSpacing="{DynamicResource Token.Spacing.Gap.SectionPlus}">
       <StackPanel Grid.Column="0" Spacing="{DynamicResource Token.Spacing.CompactGap}">
-        <TextBlock Text="Template name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+        <TextBlock Text="Template name" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
         <TextBox x:Name="TemplateNameTextBox" Text="{Binding TemplateName}" PlaceholderText="Mockup Template name" Classes="field" IsReadOnly="{Binding !CanEdit}" AutomationProperties.Name="Template name" />
       </StackPanel>
       <StackPanel Grid.Column="1" Spacing="{DynamicResource Token.Spacing.CompactGap}">
-        <TextBlock Text="Shared Design Area" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+        <TextBlock Text="Shared Design Area" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
         <ComboBox ItemsSource="{Binding AvailablePlaceholders}" SelectedItem="{Binding SelectedPlaceholder}" DisplayMemberBinding="{Binding Name}" PlaceholderText="Linked Design Area" IsEnabled="{Binding CanEdit}" AutomationProperties.Name="Shared Design Area" />
       </StackPanel>
       <StackPanel Grid.Column="2" Spacing="{DynamicResource Token.Spacing.CompactGap}">
-        <TextBlock Text="Maximum mockup long edge (px)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+        <TextBlock Text="Maximum mockup long edge (px)" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
         <TextBox Text="{Binding MaximumMockupLongEdgeText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                  PlaceholderText="2000" Classes="field" IsReadOnly="{Binding !CanEdit}"
                  AutomationProperties.Name="Maximum mockup long edge in pixels"
                  AutomationProperties.HelpText="{Binding MaximumMockupLongEdgeHelpText}" />
         <TextBlock Text="{Binding MaximumMockupLongEdgeHelpText}" TextWrapping="Wrap"
-                   Foreground="{DynamicResource SecondaryTextBrush}" FontSize="12" />
+                   Foreground="{DynamicResource SecondaryTextBrush}" FontSize="{DynamicResource Token.Typography.Caption}" />
         <TextBlock Text="{Binding MaximumMockupLongEdgeValidationMessage}"
                    IsVisible="{Binding HasMaximumMockupLongEdgeValidationMessage}"
-                   Foreground="{DynamicResource WarningTextBrush}" TextWrapping="Wrap" FontSize="12" />
+                   Foreground="{DynamicResource WarningTextBrush}" TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Caption}" />
       </StackPanel>
     </Grid>
 
@@ -55,8 +55,8 @@
       <StackPanel Grid.Row="0" Spacing="{DynamicResource Token.Spacing.ControlGap}">
       <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
         <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Micro}">
-          <TextBlock Text="Mockup source images" FontSize="16" FontWeight="SemiBold" />
-          <TextBlock Text="Select a row to edit its metadata below." FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <TextBlock Text="Mockup source images" FontSize="{DynamicResource Token.Typography.SubsectionHeading}" FontWeight="SemiBold" />
+          <TextBlock Text="Select a row to edit its metadata below." FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
         </StackPanel>
         <Button Grid.Column="1" Content="{Binding LocalSourceArchiveLabel}" Command="{Binding RemoveLocalSourceCommand}" IsEnabled="{Binding HasSelectedLocalSources}"
                 AutomationProperties.Name="Archive selected source images" AutomationProperties.HelpText="Archive every selected source image." Classes="secondary" />
@@ -75,7 +75,7 @@
         <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
           <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
             <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Micro}">
-              <TextBlock Text="Coverage planning" FontSize="14" FontWeight="SemiBold" />
+              <TextBlock Text="Coverage planning" FontSize="{DynamicResource Token.Typography.SectionHeading}" FontWeight="SemiBold" />
               <TextBlock Text="{Binding CoverageStateLabel}" FontWeight="SemiBold"
                          IsVisible="{Binding HasCoverageStatus}" AutomationProperties.Name="Mockup coverage state" />
               <TextBlock Text="{Binding CoverageStateHelp}" TextWrapping="Wrap"
@@ -211,7 +211,7 @@
     <Border Grid.Row="3" Classes="listItem" Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}" IsVisible="{Binding HasSelectedLocalSource}" AutomationProperties.AutomationId="Catalog.MockupSelectedImageEditor">
       <Grid ColumnDefinitions="3*,2*" ColumnSpacing="{DynamicResource Token.Spacing.Gap.SectionPlus}">
         <StackPanel Grid.Column="0" Spacing="{DynamicResource Token.Spacing.ControlGap}">
-          <TextBlock Text="Image and design placement" FontSize="16" FontWeight="SemiBold" />
+          <TextBlock Text="Image and design placement" FontSize="{DynamicResource Token.Typography.SubsectionHeading}" FontWeight="SemiBold" />
           <TextBlock Text="{Binding SelectedLocalSource.DisplayName}" Foreground="{DynamicResource SecondaryTextBrush}" />
           <Grid Height="240">
             <stores:MockupPlacementEditor x:Name="PlacementEditor" IsEnabled="{Binding CanEdit}"
@@ -236,11 +236,11 @@
             <ComboBox Width="220" ItemsSource="{Binding MappedSourceChoices}" SelectedItem="{Binding SelectedMappingSource}" DisplayMemberBinding="{Binding DisplayName}" IsEnabled="{Binding CanEdit}" />
             <Button Content="Apply" Command="{Binding ReuseMappingCommand}" CommandParameter="{Binding SelectedMappingSource}" Classes="secondary" />
           </StackPanel>
-          <TextBlock Text="Mapping is optional while this image is being configured. Set positive in-bounds values before using it." TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <TextBlock Text="Mapping is optional while this image is being configured. Set positive in-bounds values before using it." TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
         </StackPanel>
         <StackPanel Grid.Column="1" Spacing="{DynamicResource Token.Spacing.ControlGap}">
-          <TextBlock Text="Image metadata" FontSize="16" FontWeight="SemiBold" />
-          <TextBlock Text="Color (choose one or more)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <TextBlock Text="Image metadata" FontSize="{DynamicResource Token.Typography.SubsectionHeading}" FontWeight="SemiBold" />
+          <TextBlock Text="Color (choose one or more)" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
           <TextBox Text="{Binding TemplateColorSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                    PlaceholderText="Search Colors"
                    Classes="field"
@@ -263,11 +263,11 @@
           <TextBlock Text="No Colors match this search. Clear or change the query."
                      IsVisible="{Binding HasNoMatchingTemplateColors}"
                      TextWrapping="Wrap"
-                     FontSize="12"
+                     FontSize="{DynamicResource Token.Typography.Caption}"
                      Foreground="{DynamicResource SecondaryTextBrush}"
                      AutomationProperties.AutomationId="Catalog.MockupColorSearchNoResults" />
           <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
-            <TextBlock Text="Size and other options" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" VerticalAlignment="Center" />
+            <TextBlock Text="Size and other options" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" VerticalAlignment="Center" />
             <Button Content="Select all" Command="{Binding SelectAllTemplateSizesCommand}" Classes="link" Padding="0" />
           </StackPanel>
           <ItemsControl ItemsSource="{Binding TemplateAdditionalOptionChoices}">
@@ -277,14 +277,14 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-          <TextBlock Text="Image-space mapping (pixels)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <TextBlock Text="Image-space mapping (pixels)" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
           <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}" RowSpacing="{DynamicResource Token.Spacing.ControlGap}">
-            <TextBlock Grid.Row="0" Grid.Column="0" Text="X" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-            <TextBlock Grid.Row="0" Grid.Column="1" Text="Y" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="X" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
+            <TextBlock Grid.Row="0" Grid.Column="1" Text="Y" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
             <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding MappingXText}" Classes="field" IsReadOnly="{Binding !CanEdit}" AutomationProperties.Name="X" />
             <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding MappingYText}" Classes="field" IsReadOnly="{Binding !CanEdit}" AutomationProperties.Name="Y" />
-            <TextBlock Grid.Row="2" Grid.Column="0" Text="Width" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-            <TextBlock Grid.Row="2" Grid.Column="1" Text="Height" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Width" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
+            <TextBlock Grid.Row="2" Grid.Column="1" Text="Height" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
             <TextBox Grid.Row="3" Grid.Column="0" Text="{Binding MappingWidthText}" Classes="field" IsReadOnly="{Binding !CanEdit}" AutomationProperties.Name="Width" />
             <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding MappingHeightText}" Classes="field" IsReadOnly="{Binding !CanEdit}" AutomationProperties.Name="Height" />
           </Grid>

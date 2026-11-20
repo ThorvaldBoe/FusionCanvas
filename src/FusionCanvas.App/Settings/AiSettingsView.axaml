@@ -5,7 +5,7 @@
              x:DataType="settings:AiSettingsViewModel">
   <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Large}" IsEnabled="{Binding !IsBusy}">
     <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
-      <TextBlock Text="AI" FontSize="20" FontWeight="SemiBold"
+      <TextBlock Text="AI" FontSize="{DynamicResource Token.Typography.SurfaceHeading}" FontWeight="SemiBold"
                  Foreground="{DynamicResource PrimaryTextBrush}" />
       <TextBlock Text="Connect OpenRouter and choose application-wide text generation settings."
                  TextWrapping="Wrap"
@@ -53,12 +53,12 @@
         <TextBlock Text="Privacy and models" FontWeight="SemiBold" />
         <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
           <TextBlock Text="Model availability" FontWeight="SemiBold" />
-          <TextBlock Text="Search the models allowed by the privacy setting below. Requiring Zero Data Retention narrows the list to compatible models." TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <TextBlock Text="Search the models allowed by the privacy setting below. Requiring Zero Data Retention narrows the list to compatible models." TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
         </StackPanel>
         <ToggleSwitch Content="Require Zero Data Retention"
                       IsChecked="{Binding RequireZeroDataRetention, Mode=TwoWay}" />
         <TextBlock Text="When enabled, requests are restricted to endpoints OpenRouter marks as Zero Data Retention compatible."
-                   TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                   TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
         <Border IsVisible="{Binding ConfirmZdrOptOut}" Padding="{DynamicResource Token.Layout.Padding.Uniform.Group}"
                 Background="{DynamicResource WarningBackgroundBrush}" CornerRadius="4">
           <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
@@ -79,9 +79,9 @@
     <Border Padding="{DynamicResource Token.Layout.CardPadding}" Background="{DynamicResource ElevatedSurfaceBrush}"
             BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6">
       <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
-        <TextBlock Text="Artwork" FontWeight="SemiBold" FontSize="16" />
-        <TextBlock Text="{Binding ArtworkReadiness}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-        <TextBlock Text="Choose an image-capable model independently from General text generation." TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+        <TextBlock Text="Artwork" FontWeight="SemiBold" FontSize="{DynamicResource Token.Typography.SubsectionHeading}" />
+        <TextBlock Text="{Binding ArtworkReadiness}" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
+        <TextBlock Text="Choose an image-capable model independently from General text generation." TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
         <settings:AiProfileEditorView DataContext="{Binding Artwork}" />
       </StackPanel>
     </Border>
@@ -89,8 +89,8 @@
     <Border Padding="{DynamicResource Token.Layout.CardPadding}" Background="{DynamicResource ElevatedSurfaceBrush}"
             BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6">
       <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
-        <TextBlock Text="General" FontWeight="SemiBold" FontSize="16" />
-        <TextBlock Text="{Binding GeneralReadiness}" FontSize="12"
+        <TextBlock Text="General" FontWeight="SemiBold" FontSize="{DynamicResource Token.Typography.SubsectionHeading}" />
+        <TextBlock Text="{Binding GeneralReadiness}" FontSize="{DynamicResource Token.Typography.Caption}"
                    Foreground="{DynamicResource SecondaryTextBrush}" />
         <settings:AiProfileEditorView DataContext="{Binding General}" />
       </StackPanel>
@@ -105,8 +105,8 @@
       <Border Padding="{DynamicResource Token.Layout.CardPadding}" Background="{DynamicResource ElevatedSurfaceBrush}"
               BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6">
         <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
-          <TextBlock Text="Ideation" FontWeight="SemiBold" FontSize="16" />
-          <TextBlock Text="{Binding IdeationReadiness}" FontSize="12"
+          <TextBlock Text="Ideation" FontWeight="SemiBold" FontSize="{DynamicResource Token.Typography.SubsectionHeading}" />
+          <TextBlock Text="{Binding IdeationReadiness}" FontSize="{DynamicResource Token.Typography.Caption}"
                      Foreground="{DynamicResource SecondaryTextBrush}" />
           <ToggleSwitch Content="Use General settings" IsChecked="{Binding IdeationUseGeneral, Mode=TwoWay}" />
           <Panel IsVisible="{Binding !IdeationUseGeneral}">
@@ -117,8 +117,8 @@
       <Border Padding="{DynamicResource Token.Layout.CardPadding}" Background="{DynamicResource ElevatedSurfaceBrush}"
               BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6">
         <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
-          <TextBlock Text="Concept" FontWeight="SemiBold" FontSize="16" />
-          <TextBlock Text="{Binding ConceptReadiness}" FontSize="12"
+          <TextBlock Text="Concept" FontWeight="SemiBold" FontSize="{DynamicResource Token.Typography.SubsectionHeading}" />
+          <TextBlock Text="{Binding ConceptReadiness}" FontSize="{DynamicResource Token.Typography.Caption}"
                      Foreground="{DynamicResource SecondaryTextBrush}" />
           <ToggleSwitch Content="Use General settings" IsChecked="{Binding ConceptUseGeneral, Mode=TwoWay}" />
           <Panel IsVisible="{Binding !ConceptUseGeneral}">
@@ -129,8 +129,8 @@
       <Border Padding="{DynamicResource Token.Layout.CardPadding}" Background="{DynamicResource ElevatedSurfaceBrush}"
               BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6">
         <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
-          <TextBlock Text="SLL sketch" FontWeight="SemiBold" FontSize="16" />
-          <TextBlock Text="{Binding SllReadiness}" FontSize="12"
+          <TextBlock Text="SLL sketch" FontWeight="SemiBold" FontSize="{DynamicResource Token.Typography.SubsectionHeading}" />
+          <TextBlock Text="{Binding SllReadiness}" FontSize="{DynamicResource Token.Typography.Caption}"
                      Foreground="{DynamicResource SecondaryTextBrush}" />
           <ToggleSwitch Content="Use General settings" IsChecked="{Binding SllUseGeneral, Mode=TwoWay}" />
           <Panel IsVisible="{Binding !SllUseGeneral}">
