@@ -9,8 +9,8 @@
         CanResize="False"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ElevatedSurfaceBrush}">
-  <Grid RowDefinitions="Auto,Auto,Auto" Margin="24" RowSpacing="16">
-    <StackPanel Spacing="8">
+  <Grid RowDefinitions="Auto,Auto,Auto" Margin="{DynamicResource Token.Layout.PageInset}" RowSpacing="{DynamicResource Token.Spacing.Gap.SectionPlus}">
+    <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
       <TextBlock Text="Group selected entities"
                  FontSize="20"
                  FontWeight="SemiBold" />
@@ -18,7 +18,7 @@
                  TextWrapping="Wrap"
                  Foreground="{DynamicResource SecondaryTextBrush}" />
     </StackPanel>
-    <StackPanel Grid.Row="1" Spacing="10">
+    <StackPanel Grid.Row="1" Spacing="{DynamicResource Token.Spacing.GroupGap}">
       <TextBlock Text="Name" FontWeight="SemiBold" />
       <TextBox Name="NameBox"
                Text="{Binding Name, Mode=TwoWay}"
@@ -36,7 +36,7 @@
     <StackPanel Grid.Row="2"
                 Orientation="Horizontal"
                 HorizontalAlignment="Right"
-                Spacing="8">
+                Spacing="{DynamicResource Token.Spacing.ControlGap}">
       <Button Content="Cancel" MinWidth="90" Click="OnCancelClick" />
       <Button Content="Group" MinWidth="90" Click="OnConfirmClick" />
     </StackPanel>

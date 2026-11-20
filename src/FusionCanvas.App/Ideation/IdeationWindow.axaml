@@ -11,9 +11,9 @@
          WindowStartupLocation="CenterOwner"
          Background="{DynamicResource ElevatedSurfaceBrush}">
   <Grid RowDefinitions="Auto,Auto,Auto,*,Auto"
-        Margin="22"
-        RowSpacing="14">
-    <StackPanel Grid.Row="0" Spacing="4">
+        Margin="{DynamicResource Token.Layout.Margin.Uniform.WidePlus}"
+        RowSpacing="{DynamicResource Token.Spacing.SectionGap}">
+    <StackPanel Grid.Row="0" Spacing="{DynamicResource Token.Spacing.CompactGap}">
       <TextBlock Text="Ideation"
                  FontSize="24"
                  FontWeight="SemiBold"
@@ -25,7 +25,7 @@
     </StackPanel>
 
     <Border Grid.Row="1"
-            Padding="12"
+            Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}"
             Background="{DynamicResource PanelSurfaceBrush}"
             BorderBrush="{DynamicResource ControlBorderBrush}"
             BorderThickness="1"
@@ -39,8 +39,8 @@
     <Grid Grid.Row="2"
           RowDefinitions="Auto,Auto,Auto,Auto"
           ColumnDefinitions="*,160"
-          ColumnSpacing="12"
-          RowSpacing="6">
+          ColumnSpacing="{DynamicResource Token.Spacing.Gap.Panel}"
+          RowSpacing="{DynamicResource Token.Spacing.InlineGap}">
       <TextBlock Grid.Row="0"
                  Grid.Column="0"
                  Text="Idea input (optional)"
@@ -68,8 +68,8 @@
       <StackPanel Grid.Row="2"
                   Grid.ColumnSpan="2"
                   Orientation="Horizontal"
-                  Spacing="8"
-                  Margin="0,8,0,0">
+                  Spacing="{DynamicResource Token.Spacing.ControlGap}"
+                  Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}">
         <TextBlock Text="Number of ideas"
                    VerticalAlignment="Center"
                    Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -102,9 +102,9 @@
       </StackPanel>
       <StackPanel Grid.Row="3"
                   Grid.ColumnSpan="2"
-                  Spacing="3">
+                  Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
         <StackPanel Orientation="Horizontal"
-                    Spacing="8"
+                    Spacing="{DynamicResource Token.Spacing.ControlGap}"
                     IsVisible="{Binding IsSnowclonesMode}">
           <Button x:Name="ManageSnowclonesButton"
                   Content="Manage Snowclones…"
@@ -137,11 +137,11 @@
     </Grid>
 
     <Border Grid.Row="3"
-            Padding="12"
+            Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}"
             Background="{DynamicResource PanelSurfaceBrush}"
             BorderBrush="{DynamicResource ControlBorderBrush}"
             BorderThickness="1">
-      <Grid RowDefinitions="Auto,*" RowSpacing="8">
+      <Grid RowDefinitions="Auto,*" RowSpacing="{DynamicResource Token.Spacing.ControlGap}">
         <TextBlock Text="Ideas candidate list"
                    FontWeight="SemiBold"
                    Foreground="{DynamicResource StrongTextBrush}" />
@@ -156,14 +156,14 @@
           </ListBox.Styles>
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="ideation:IdeaCandidateViewModel">
-              <Border Padding="10"
-                      Margin="0,0,0,6"
+              <Border Padding="{DynamicResource Token.Layout.Padding.Uniform.Group}"
+                      Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Inline}"
                       Background="{DynamicResource ElevatedSurfaceBrush}"
                       BorderBrush="{DynamicResource ControlBorderBrush}"
                       BorderThickness="1">
                 <Grid ColumnDefinitions="*,Auto,Auto"
                       RowDefinitions="Auto,Auto,Auto"
-                      ColumnSpacing="8">
+                      ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
                   <TextBlock Text="{Binding Text}"
                              TextWrapping="Wrap"
                              VerticalAlignment="Center" />
@@ -197,7 +197,7 @@
       </Grid>
     </Border>
 
-    <Grid Grid.Row="4" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+    <Grid Grid.Row="4" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
       <Button Grid.Column="1"
               Content="Clear all"
               IsEnabled="{Binding CanDiscard}"

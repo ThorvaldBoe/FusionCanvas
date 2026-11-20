@@ -235,3 +235,12 @@ The user's desktop is available again. The live UI pass covered the Main workspa
 Source-level selected checks were completed across all 36 inventoried XAML surfaces. Rendered evidence is limited to the reachable states above; state-gated Design/Listing states, provider-dependent/empty workflows, and dialogs not safely opened without changing user data remain UNKNOWN. The existing sample workspace was not modified. Findings and issue links: UI-001 [#966](https://github.com/ThorvaldBoe/FusionCanvas/issues/966), UI-002/UI-005 [#969](https://github.com/ThorvaldBoe/FusionCanvas/issues/969), UI-003 [#970](https://github.com/ThorvaldBoe/FusionCanvas/issues/970), UI-004 [#968](https://github.com/ThorvaldBoe/FusionCanvas/issues/968).
 
 Review status: PROVISIONAL; selected review scope complete, not a clean certification. All four findings fail their cited criteria; remaining runtime unknowns are retained. FC-UI v1.4 and UI Source Extract Definition v1.4 are Draft, so final certification is unavailable. The audit owner can revalidate affected results after each fix.
+
+## Revalidation after fixes — 2026-11-20
+
+| Finding | Source revision | Revalidated criterion | Result | Evidence |
+|---|---|---|---|---|
+| UI-001 / #966 | `384eaa19290a9719b6cf926b7f640237ee952de1` | FC-UI-022, FC-UI-096 | PASS | Store Editor Basic info content now has the shared 14-DIP card inset while the tab boundary remains bounded. The full solution baseline passed after the change; visual evidence was originally observed in the reachable live tab. |
+| UI-004 / #968 | `b00ef43` | FC-UI-015 | PASS | Replaced the 745 audited literals across 33 surfaces plus three literals in the shared context header with centrally defined spacing/layout resources. A source rescan found zero remaining positive numeric Margin/Padding/Spacing/RowSpacing/ColumnSpacing literals outside DesignTokens.axaml. Full solution: 2,551 passed, 0 failed. |
+
+UI-002/UI-005 (#969) and UI-003 (#970) remain open pending their fixes. Runtime-only and state-gated observations remain UNKNOWN. Overall audit status remains PROVISIONAL because findings remain open and the standard/definition are Draft.

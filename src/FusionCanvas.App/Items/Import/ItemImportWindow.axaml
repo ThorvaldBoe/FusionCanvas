@@ -9,8 +9,8 @@
         MinWidth="680"
         MinHeight="460"
         Background="{DynamicResource ApplicationBackgroundBrush}">
-  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="20">
-    <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,14">
+  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="{DynamicResource Token.Layout.Margin.Uniform.Wide}">
+    <StackPanel Grid.Row="0" Spacing="{DynamicResource Token.Spacing.CompactGap}" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Section}">
       <TextBlock Text="Import Items"
                  FontSize="22"
                  FontWeight="SemiBold"
@@ -22,8 +22,8 @@
 
     <Grid Grid.Row="1"
           ColumnDefinitions="Auto,Auto"
-          ColumnSpacing="8"
-          Margin="0,0,0,14">
+          ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}"
+          Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Section}">
       <Button Grid.Column="0"
               Content="Pick CSV file…"
               Command="{Binding PickFileCommand}"
@@ -36,9 +36,9 @@
               Classes="secondary" />
     </Grid>
 
-    <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="16">
+    <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="{DynamicResource Token.Spacing.Gap.SectionPlus}">
       <Border Grid.Column="0"
-              Padding="12"
+              Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}"
               Background="{DynamicResource PanelSurfaceBrush}"
               BorderBrush="{DynamicResource ControlBorderBrush}"
               BorderThickness="1"
@@ -49,7 +49,7 @@
                      FontSize="13"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource StrongTextBrush}"
-                     Margin="0,0,0,10" />
+                     Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Group}" />
           <TextBox Grid.Row="1"
                    x:Name="RawSourceBox"
                    Text="{Binding RawSource}"
@@ -62,13 +62,13 @@
       </Border>
 
       <Border Grid.Column="1"
-              Padding="12"
+              Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}"
               Background="{DynamicResource ElevatedSurfaceBrush}"
               BorderBrush="{DynamicResource ControlBorderBrush}"
               BorderThickness="1"
               CornerRadius="6">
         <Grid RowDefinitions="Auto,*,Auto,Auto">
-          <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+          <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Group}">
             <TextBlock Grid.Column="0"
                        Text="Preview"
                        FontSize="13"
@@ -89,7 +89,7 @@
                   <TextBlock Text="{Binding}"
                              TextWrapping="Wrap"
                              Foreground="{DynamicResource StrongTextBrush}"
-                             Margin="0,0,0,6" />
+                             Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Inline}" />
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
@@ -100,17 +100,17 @@
                      IsVisible="{Binding HasLoadError}"
                      TextWrapping="Wrap"
                      Foreground="{DynamicResource DangerTextBrush}"
-                     Margin="0,10,0,0" />
+                     Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Group.Right_None.Bottom_None}" />
 
           <ItemsControl Grid.Row="3"
                         ItemsSource="{Binding ErrorMessages}"
                         IsVisible="{Binding HasErrors}"
-                        Margin="0,10,0,0">
+                        Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Group.Right_None.Bottom_None}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="x:String">
                 <TextBlock Text="{Binding}"
                            Foreground="{DynamicResource DangerTextBrush}"
-                           Margin="0,0,0,4" />
+                           Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Compact}" />
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
@@ -121,8 +121,8 @@
     <StackPanel Grid.Row="3"
                 Orientation="Horizontal"
                 HorizontalAlignment="Right"
-                Spacing="8"
-                Margin="0,14,0,0">
+                Spacing="{DynamicResource Token.Spacing.ControlGap}"
+                Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Section.Right_None.Bottom_None}">
       <ProgressBar Width="92"
                    Height="3"
                    IsVisible="{Binding IsBusy}"

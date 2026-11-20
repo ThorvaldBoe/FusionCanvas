@@ -5,7 +5,7 @@
         x:DataType="stores:PrintifyApiKeyViewModel"
         Title="{Binding Title}" Width="520" SizeToContent="Height" CanResize="False"
         WindowStartupLocation="CenterOwner" Background="{DynamicResource ApplicationBackgroundBrush}">
-  <StackPanel Margin="20" Spacing="12">
+  <StackPanel Margin="{DynamicResource Token.Layout.Margin.Uniform.Wide}" Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
     <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
     <TextBlock Text="Printify API key" />
     <TextBox x:Name="KeyInput" Text="{Binding Draft}" PasswordChar="●"
@@ -18,13 +18,13 @@
                  Height="4"
                  AutomationProperties.Name="Saving Printify API key" />
     <TextBlock Text="{Binding Error}" TextWrapping="Wrap" Foreground="{DynamicResource DangerStrongBrush}" />
-    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+    <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}" HorizontalAlignment="Right">
       <Button Content="Save" Command="{Binding SaveCommand}" IsEnabled="{Binding CanSave}" />
       <Button Content="Cancel" Command="{Binding CancelCommand}" IsEnabled="{Binding CanEdit}" />
     </StackPanel>
-    <StackPanel IsVisible="{Binding ShowDiscard}" Spacing="8">
+    <StackPanel IsVisible="{Binding ShowDiscard}" Spacing="{DynamicResource Token.Spacing.ControlGap}">
       <TextBlock Text="Discard the unsaved API key?" />
-      <StackPanel Orientation="Horizontal" Spacing="8">
+      <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
         <Button Content="Keep editing" Command="{Binding KeepEditingCommand}" />
         <Button Content="Discard" Command="{Binding DiscardCommand}" />
       </StackPanel>

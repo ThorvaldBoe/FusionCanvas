@@ -3,14 +3,14 @@
              xmlns:settings="clr-namespace:FusionCanvas.App.Settings"
              x:Class="FusionCanvas.App.Settings.AiProfileEditorView"
              x:DataType="settings:AiProfileEditorViewModel">
-  <StackPanel Spacing="10">
+  <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
     <TextBlock Text="Model" FontWeight="SemiBold" />
     <ComboBox ItemsSource="{Binding ModelIds}"
               SelectedItem="{Binding ModelId, Mode=TwoWay}"
               MinWidth="320"
               HorizontalAlignment="Stretch" />
     <Expander Header="Provider routing" IsVisible="{Binding HasSelectedModel}">
-      <StackPanel Spacing="7" Margin="0,8,0,0">
+      <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.InlinePlus}" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}">
         <TextBlock Text="Choose the model and the route separately."
                    FontSize="11"
                    Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -20,13 +20,13 @@
                    TextWrapping="Wrap"
                    FontSize="11"
                    Foreground="{DynamicResource SecondaryTextBrush}" />
-        <StackPanel IsVisible="{Binding IsProviderRouting}" Spacing="4">
+        <StackPanel IsVisible="{Binding IsProviderRouting}" Spacing="{DynamicResource Token.Spacing.CompactGap}">
           <TextBlock Text="Provider" FontSize="12" />
           <ComboBox ItemsSource="{Binding ProviderIds}"
                     SelectedItem="{Binding ProviderId, Mode=TwoWay}"
                     PlaceholderText="Load endpoint information first" />
         </StackPanel>
-        <StackPanel IsVisible="{Binding IsExactEndpointRouting}" Spacing="4">
+        <StackPanel IsVisible="{Binding IsExactEndpointRouting}" Spacing="{DynamicResource Token.Spacing.CompactGap}">
           <TextBlock Text="Exact endpoint" FontSize="12" />
           <ComboBox ItemsSource="{Binding EndpointIds}"
                     SelectedItem="{Binding EndpointId, Mode=TwoWay}"
@@ -45,14 +45,14 @@
                 HorizontalAlignment="Left" />
       </StackPanel>
     </Expander>
-    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-      <StackPanel Grid.Column="0" Spacing="4" IsVisible="{Binding SupportsMaxCompletionTokens}">
+    <Grid ColumnDefinitions="*,*" ColumnSpacing="{DynamicResource Token.Spacing.Gap.Panel}">
+      <StackPanel Grid.Column="0" Spacing="{DynamicResource Token.Spacing.CompactGap}" IsVisible="{Binding SupportsMaxCompletionTokens}">
         <TextBlock Text="Maximum output tokens" FontSize="12" />
         <NumericUpDown Value="{Binding MaxCompletionTokens, Mode=TwoWay}"
                        Minimum="1"
                        FormatString="0" />
       </StackPanel>
-      <StackPanel Grid.Column="1" Spacing="4" IsVisible="{Binding SupportsTemperature}">
+      <StackPanel Grid.Column="1" Spacing="{DynamicResource Token.Spacing.CompactGap}" IsVisible="{Binding SupportsTemperature}">
         <TextBlock Text="Temperature" FontSize="12" />
         <NumericUpDown Value="{Binding Temperature, Mode=TwoWay}"
                        Minimum="0"
@@ -61,7 +61,7 @@
                        FormatString="0.0#" />
       </StackPanel>
     </Grid>
-    <StackPanel IsVisible="{Binding SupportsReasoning}" Spacing="6">
+    <StackPanel IsVisible="{Binding SupportsReasoning}" Spacing="{DynamicResource Token.Spacing.InlineGap}">
       <TextBlock Text="Reasoning" FontWeight="SemiBold" />
       <ComboBox ItemsSource="{Binding ReasoningModes}"
                 SelectedItem="{Binding ReasoningMode, Mode=TwoWay}" />
@@ -75,48 +75,48 @@
                      FormatString="0" />
     </StackPanel>
     <Expander Header="Additional parameters" IsVisible="{Binding HasAdditionalParameters}">
-      <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="12" Margin="0,8,0,0">
-        <StackPanel Grid.Row="0" Grid.Column="0" IsVisible="{Binding SupportsTopP}" Spacing="3">
+      <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="{DynamicResource Token.Spacing.Gap.Panel}" RowSpacing="{DynamicResource Token.Spacing.Gap.Panel}" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}">
+        <StackPanel Grid.Row="0" Grid.Column="0" IsVisible="{Binding SupportsTopP}" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
           <TextBlock Text="Top P" FontSize="12" FontWeight="SemiBold" />
           <TextBlock Text="Narrow the pool of likely next tokens (0–1)." FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
           <TextBox Text="{Binding TopP, Mode=TwoWay}" PlaceholderText="0–1" />
         </StackPanel>
-        <StackPanel Grid.Row="0" Grid.Column="1" IsVisible="{Binding SupportsTopK}" Spacing="3">
+        <StackPanel Grid.Row="0" Grid.Column="1" IsVisible="{Binding SupportsTopK}" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
           <TextBlock Text="Top K" FontSize="12" FontWeight="SemiBold" />
           <TextBlock Text="Limit each choice to the K most likely tokens." FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
           <TextBox Text="{Binding TopK, Mode=TwoWay}" PlaceholderText="Number of tokens" />
         </StackPanel>
-        <StackPanel Grid.Row="1" Grid.Column="0" IsVisible="{Binding SupportsMinP}" Spacing="3">
+        <StackPanel Grid.Row="1" Grid.Column="0" IsVisible="{Binding SupportsMinP}" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
           <TextBlock Text="Min P" FontSize="12" FontWeight="SemiBold" />
           <TextBlock Text="Keep tokens above this probability threshold (0–1)." FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
           <TextBox Text="{Binding MinP, Mode=TwoWay}" PlaceholderText="0–1" />
         </StackPanel>
-        <StackPanel Grid.Row="1" Grid.Column="1" IsVisible="{Binding SupportsTopA}" Spacing="3">
+        <StackPanel Grid.Row="1" Grid.Column="1" IsVisible="{Binding SupportsTopA}" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
           <TextBlock Text="Top A" FontSize="12" FontWeight="SemiBold" />
           <TextBlock Text="Adapt the candidate pool to the strongest token." FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
           <TextBox Text="{Binding TopA, Mode=TwoWay}" PlaceholderText="0–1" />
         </StackPanel>
-        <StackPanel Grid.Row="2" Grid.Column="0" IsVisible="{Binding SupportsFrequencyPenalty}" Spacing="3">
+        <StackPanel Grid.Row="2" Grid.Column="0" IsVisible="{Binding SupportsFrequencyPenalty}" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
           <TextBlock Text="Frequency penalty" FontSize="12" FontWeight="SemiBold" />
           <TextBlock Text="Discourage tokens that have appeared often." FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
           <TextBox Text="{Binding FrequencyPenalty, Mode=TwoWay}" PlaceholderText="Usually −2 to 2" />
         </StackPanel>
-        <StackPanel Grid.Row="2" Grid.Column="1" IsVisible="{Binding SupportsPresencePenalty}" Spacing="3">
+        <StackPanel Grid.Row="2" Grid.Column="1" IsVisible="{Binding SupportsPresencePenalty}" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
           <TextBlock Text="Presence penalty" FontSize="12" FontWeight="SemiBold" />
           <TextBlock Text="Encourage introducing topics not used yet." FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
           <TextBox Text="{Binding PresencePenalty, Mode=TwoWay}" PlaceholderText="Usually −2 to 2" />
         </StackPanel>
-        <StackPanel Grid.Row="3" Grid.Column="0" IsVisible="{Binding SupportsRepetitionPenalty}" Spacing="3">
+        <StackPanel Grid.Row="3" Grid.Column="0" IsVisible="{Binding SupportsRepetitionPenalty}" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
           <TextBlock Text="Repetition penalty" FontSize="12" FontWeight="SemiBold" />
           <TextBlock Text="Reduce repeated phrases and tokens." FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
           <TextBox Text="{Binding RepetitionPenalty, Mode=TwoWay}" PlaceholderText="Provider-specific range" />
         </StackPanel>
-        <StackPanel Grid.Row="3" Grid.Column="1" IsVisible="{Binding SupportsSeed}" Spacing="3">
+        <StackPanel Grid.Row="3" Grid.Column="1" IsVisible="{Binding SupportsSeed}" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
           <TextBlock Text="Seed" FontSize="12" FontWeight="SemiBold" />
           <TextBlock Text="Use a repeatable random seed when supported." FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
           <TextBox Text="{Binding Seed, Mode=TwoWay}" PlaceholderText="Optional integer" />
         </StackPanel>
-        <StackPanel Grid.Row="4" Grid.ColumnSpan="2" IsVisible="{Binding SupportsStop}" Spacing="3">
+        <StackPanel Grid.Row="4" Grid.ColumnSpan="2" IsVisible="{Binding SupportsStop}" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
           <TextBlock Text="Stop sequences" FontSize="12" FontWeight="SemiBold" />
           <TextBlock Text="End generation when one of these sequences appears; enter up to four, one per line." FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
           <TextBox AcceptsReturn="True" MinHeight="56" PlaceholderText="One sequence per line" Text="{Binding StopSequences, Mode=TwoWay}" />

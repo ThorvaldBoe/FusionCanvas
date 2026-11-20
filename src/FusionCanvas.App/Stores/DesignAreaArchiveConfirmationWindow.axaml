@@ -9,8 +9,8 @@
         CanResize="False"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ElevatedSurfaceBrush}">
-  <Grid RowDefinitions="Auto,Auto" Margin="24" RowSpacing="22">
-    <StackPanel Spacing="10">
+  <Grid RowDefinitions="Auto,Auto" Margin="{DynamicResource Token.Layout.PageInset}" RowSpacing="{DynamicResource Token.Spacing.Gap.WidePlus}">
+    <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
       <TextBlock Text="Archive design area?"
                  FontSize="20"
                  FontWeight="SemiBold"
@@ -23,7 +23,7 @@
     <StackPanel Grid.Row="1"
                 Orientation="Horizontal"
                 HorizontalAlignment="Right"
-                Spacing="8">
+                Spacing="{DynamicResource Token.Spacing.ControlGap}">
       <Button x:Name="CancelButton"
               Content="Cancel"
               MinWidth="90"

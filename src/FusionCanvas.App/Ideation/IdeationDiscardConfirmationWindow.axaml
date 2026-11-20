@@ -9,14 +9,14 @@
         CanResize="False"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ElevatedSurfaceBrush}">
-  <Grid Margin="20" RowDefinitions="*,Auto" RowSpacing="16">
+  <Grid Margin="{DynamicResource Token.Layout.Margin.Uniform.Wide}" RowDefinitions="*,Auto" RowSpacing="{DynamicResource Token.Spacing.Gap.SectionPlus}">
     <TextBlock Text="{Binding DiscardConfirmationMessage}"
                TextWrapping="Wrap"
                VerticalAlignment="Center" />
     <StackPanel Grid.Row="1"
                 Orientation="Horizontal"
                 HorizontalAlignment="Right"
-                Spacing="8">
+                Spacing="{DynamicResource Token.Spacing.ControlGap}">
       <Button x:Name="CancelButton"
               Content="Cancel"
               Click="OnCancel"

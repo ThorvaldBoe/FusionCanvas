@@ -47,3 +47,11 @@ The user's desktop is available again. The live UI pass covered the Main workspa
 All 36 inventoried XAML surfaces received the recorded source-level selected-check review. The live render pass was targeted to reachable screens; state-gated Design/Listing states, provider-dependent/empty workflows and dialogs not safely opened without changing user data remain UNKNOWN for rendered-state evidence. The existing sample workspace was not modified. These limits remain explicit and do not count as passes. Per the user's workflow, issue creation is now complete for the four findings and remediation may begin.
 
 Current audit outcome: PROVISIONAL, with the selected review scope complete and four findings linked: UI-001 [#966](https://github.com/ThorvaldBoe/FusionCanvas/issues/966), UI-002/UI-005 [#969](https://github.com/ThorvaldBoe/FusionCanvas/issues/969), UI-003 [#970](https://github.com/ThorvaldBoe/FusionCanvas/issues/970), and UI-004 [#968](https://github.com/ThorvaldBoe/FusionCanvas/issues/968). This is not a clean UI certification: all four findings fail their cited criteria, some runtime evidence remains UNKNOWN, and both the standard and source-extract definition are Draft.
+
+## Remediation revalidation update — 2026-11-20
+
+- UI-001 / [#966](https://github.com/ThorvaldBoe/FusionCanvas/issues/966): PASS after merged fix at `384eaa19290a9719b6cf926b7f640237ee952de1`.
+- UI-004 / [#968](https://github.com/ThorvaldBoe/FusionCanvas/issues/968): PASS after shared spacing-token migration at `b00ef43`; static rescan found no remaining positive numeric spacing literals outside the central token file.
+- UI-002/UI-005 / [#969](https://github.com/ThorvaldBoe/FusionCanvas/issues/969) and UI-003 / [#970](https://github.com/ThorvaldBoe/FusionCanvas/issues/970) remain under remediation.
+
+The audit remains PROVISIONAL until the remaining findings are fixed and revalidated. Runtime unknowns and Draft baseline limitations are unchanged.

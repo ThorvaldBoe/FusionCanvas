@@ -9,24 +9,24 @@
         MinWidth="560"
         MinHeight="440"
         Background="{DynamicResource ApplicationBackgroundBrush}">
-  <Grid RowDefinitions="Auto,*,Auto" Margin="20">
-    <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,14">
+  <Grid RowDefinitions="Auto,*,Auto" Margin="{DynamicResource Token.Layout.Margin.Uniform.Wide}">
+    <StackPanel Grid.Row="0" Spacing="{DynamicResource Token.Spacing.CompactGap}" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Section}">
       <TextBlock Text="{Binding ContextKindLabel}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
       <TextBlock Text="{Binding ContextTitle}" FontSize="22" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
       <TextBlock Text="Import files to attach them to this context and preserve their managed workspace copy." TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" />
     </StackPanel>
 
-    <ScrollViewer Grid.Row="1" Margin="0,0,0,14" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-      <StackPanel Spacing="10">
+    <ScrollViewer Grid.Row="1" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Section}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
         <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource DangerTextBrush}" />
 
         <Border IsVisible="{Binding IsEmpty}"
-                Padding="18"
+                Padding="{DynamicResource Token.Layout.Padding.Uniform.Large}"
                 Background="{DynamicResource PanelSurfaceBrush}"
                 BorderBrush="{DynamicResource ControlBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="6">
-          <StackPanel Spacing="6">
+          <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
             <TextBlock Text="No assets yet" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource StrongTextBrush}" />
             <TextBlock Text="Import a design source, export, mockup, reference, texture, brush, or font to attach it here." TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
           </StackPanel>
@@ -43,8 +43,8 @@
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="assets:AssetRowViewModel">
-              <Border Padding="12" Background="{DynamicResource ElevatedSurfaceBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6" Margin="0,0,0,8">
-                <Grid ColumnDefinitions="72,*,180,Auto" ColumnSpacing="10">
+              <Border Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}" Background="{DynamicResource ElevatedSurfaceBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Control}">
+                <Grid ColumnDefinitions="72,*,180,Auto" ColumnSpacing="{DynamicResource Token.Spacing.GroupGap}">
                   <Button Grid.Column="0"
                           IsVisible="{Binding CanPreview}"
                           Click="OnPreviewClick"
@@ -56,7 +56,7 @@
                           AutomationProperties.AutomationId="Assets.Preview">
                     <Image Source="{Binding Thumbnail}" Width="64" Height="64" Stretch="UniformToFill" />
                   </Button>
-                  <StackPanel Grid.Column="1" Spacing="2">
+                  <StackPanel Grid.Column="1" Spacing="{DynamicResource Token.Spacing.Gap.Micro}">
                     <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" AutomationProperties.Name="{Binding Name}" AutomationProperties.HelpText="{Binding Name}" />
                     <TextBlock Text="{Binding ManagedFileName}" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ManagedFileName}" AutomationProperties.Name="{Binding ManagedFileName}" AutomationProperties.HelpText="{Binding ManagedFileName}" />
                     <TextBlock Text="Missing managed file" IsVisible="{Binding IsMissing}" FontSize="11" Foreground="{DynamicResource DangerTextBrush}" AutomationProperties.Name="Missing managed file" />
@@ -84,14 +84,14 @@
         </ItemsControl>
 
         <Border IsVisible="{Binding HasImportPending}"
-                Padding="14"
+                Padding="{DynamicResource Token.Layout.CardPadding}"
                 Background="{DynamicResource AccentSoftBackgroundBrush}"
                 BorderBrush="{DynamicResource AccentSoftBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="6">
-          <StackPanel Spacing="8">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-              <StackPanel Grid.Column="0" Spacing="2">
+          <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
+              <StackPanel Grid.Column="0" Spacing="{DynamicResource Token.Spacing.Gap.Micro}">
                 <TextBlock Text="Confirm import" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource AccentSoftForegroundBrush}" />
                 <TextBlock Text="{Binding PendingImportFileName}" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis" />
               </StackPanel>
@@ -104,7 +104,7 @@
                         MinHeight="32"
                         AutomationProperties.AutomationId="Assets.PendingPurpose" />
             </Grid>
-            <StackPanel Orientation="Horizontal" Spacing="8">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
               <Button Content="Confirm import" Command="{Binding ConfirmImportCommand}" IsEnabled="{Binding CanConfirmImport}" Classes="primary" AutomationProperties.AutomationId="Assets.ConfirmImport" />
               <Button Content="Cancel" Command="{Binding CancelImportCommand}" Classes="secondary" AutomationProperties.AutomationId="Assets.CancelImport" />
             </StackPanel>
@@ -112,14 +112,14 @@
         </Border>
 
         <Border IsVisible="{Binding RemovalConfirmationVisible}"
-                Padding="14"
+                Padding="{DynamicResource Token.Layout.CardPadding}"
                 Background="{DynamicResource DangerBackgroundBrush}"
                 BorderBrush="{DynamicResource DangerBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="6">
-          <StackPanel Spacing="8">
+          <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
             <TextBlock Text="{Binding RemovalPromptMessage}" TextWrapping="Wrap" FontSize="13" Foreground="{DynamicResource DangerTextBrush}" />
-            <StackPanel Orientation="Horizontal" Spacing="8">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
               <Button Content="Remove permanently" Command="{Binding ConfirmRemoveCommand}" Classes="danger" AutomationProperties.AutomationId="Assets.ConfirmRemove" />
               <Button Content="Cancel" Command="{Binding CancelRemoveCommand}" Classes="secondary" AutomationProperties.AutomationId="Assets.CancelRemove" />
             </StackPanel>
@@ -128,11 +128,11 @@
       </StackPanel>
     </ScrollViewer>
 
-    <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+    <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
       <Button Grid.Column="0" Content="Import…" Command="{Binding ImportCommand}" IsEnabled="{Binding CanImport}" ToolTip.Tip="Choose a file to import" Classes="primary" AutomationProperties.AutomationId="Assets.Import" />
       <StackPanel Grid.Column="1"
                   Orientation="Horizontal"
-                  Spacing="8"
+                  Spacing="{DynamicResource Token.Spacing.ControlGap}"
                   IsVisible="{Binding IsBusy}"
                   VerticalAlignment="Center">
         <ProgressBar Width="92"

@@ -29,8 +29,8 @@
             HorizontalAlignment="Stretch"
             IsVisible="{Binding IsBusy}"
             Background="{DynamicResource PanelSurfaceBrush}"
-            Padding="10,4">
-      <StackPanel Orientation="Horizontal" Spacing="8">
+            Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Group.Compact}">
+      <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
         <ProgressBar Width="120"
                      Height="4"
                      IsIndeterminate="True"
@@ -50,13 +50,13 @@
             Background="{DynamicResource ElevatedSurfaceBrush}"
             BorderBrush="{DynamicResource ControlBorderBrush}"
             BorderThickness="0,0,1,0"
-            Padding="18,18,18,0">
+            Padding="{DynamicResource Token.Layout.Padding.Sides.Left_Large.Top_Large.Right_Large.Bottom_None}">
       <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
         <Grid x:Name="NavigationHeader"
               Grid.Row="0"
               ColumnDefinitions="Auto,*,Auto,Auto"
-              ColumnSpacing="8"
-              Margin="0,0,0,18">
+              ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}"
+              Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Large}">
           <TextBlock Grid.Column="0"
                      Text="FusionCanvas"
                      FontSize="20"
@@ -68,7 +68,7 @@
                   MinWidth="0"
                   HorizontalAlignment="Stretch"
                   VerticalAlignment="Center">
-            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{DynamicResource Token.Spacing.InlineGap}">
               <PathIcon Data="M3,5 H10 L12,7 H21 V19 H3 Z"
                         Width="16" Height="16"
                         Foreground="{DynamicResource SecondaryTextBrush}"
@@ -100,10 +100,10 @@
         </Grid>
 
         <StackPanel Grid.Row="1"
-                    Spacing="8"
-                    Margin="0,0,0,18">
+                    Spacing="{DynamicResource Token.Spacing.ControlGap}"
+                    Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Large}">
           <Grid ColumnDefinitions="*,Auto,Auto"
-                ColumnSpacing="6">
+                ColumnSpacing="{DynamicResource Token.Spacing.InlineGap}">
             <TextBlock Text="Stores"
                        VerticalAlignment="Center"
                        FontSize="13"
@@ -136,7 +136,7 @@
                   Classes="storeSelector selected"
                   HorizontalContentAlignment="Left" />
           <StackPanel IsVisible="{Binding StoreManagement.IsSelectorExpanded}"
-                      Spacing="6">
+                      Spacing="{DynamicResource Token.Spacing.InlineGap}">
             <ScrollViewer MaxHeight="170"
                           VerticalScrollBarVisibility="Auto">
               <ItemsControl ItemsSource="{Binding StoreManagement.SelectorStores}">
@@ -155,8 +155,8 @@
           </StackPanel>
         </StackPanel>
 
-        <StackPanel Grid.Row="2" Spacing="8" Margin="0,0,0,12">
-          <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+        <StackPanel Grid.Row="2" Spacing="{DynamicResource Token.Spacing.ControlGap}" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Panel}">
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="{DynamicResource Token.Spacing.InlineGap}">
             <Button x:Name="GroupActionsButton"
                     Grid.Column="0"
                     Content="+ New group"
@@ -171,7 +171,7 @@
                     IsEnabled="{Binding CanCreateGroup}"
                     Classes="storeSecondary" />
           </Grid>
-          <StackPanel Spacing="6">
+          <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
             <TextBox x:Name="TreeSearchBox"
                      Text="{Binding WorkspaceTree.QueryText}"
                      PlaceholderText="Search names, ideas, notes, tags..."
@@ -183,7 +183,7 @@
                       ToolTip.Tip="Clear the active tag filter"
                       Classes="storeSecondary"
                       HorizontalAlignment="Left"
-                      Margin="0,0,6,6" />
+                      Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_Inline.Bottom_Inline}" />
               <ComboBox x:Name="StageFilter"
                         SelectedIndex="{Binding WorkspaceTree.StageFilterIndex}"
                         MinWidth="92"
@@ -191,7 +191,7 @@
                         HorizontalAlignment="Left"
                         ToolTip.Tip="Filter Items by workflow stage"
                         Classes="statusSelector"
-                        Margin="0,0,6,6">
+                        Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_Inline.Bottom_Inline}">
                 <ComboBoxItem Content="All stages" />
                 <ComboBoxItem Content="Idea" />
                 <ComboBoxItem Content="Concept" />
@@ -205,7 +205,7 @@
                         HorizontalAlignment="Left"
                         ToolTip.Tip="Filter Items by lifecycle status"
                         Classes="statusSelector"
-                        Margin="0,0,6,6">
+                        Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_Inline.Bottom_Inline}">
                 <ComboBoxItem Content="All statuses" />
                 <ComboBoxItem Content="Draft" />
                 <ComboBoxItem Content="Published" />
@@ -219,7 +219,7 @@
                         ToolTip.Tip="Filter Items by idea rating"
                         AutomationProperties.Name="Idea rating filter"
                         Classes="statusSelector"
-                        Margin="0,0,6,6">
+                        Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_Inline.Bottom_Inline}">
                 <ComboBoxItem Content="All ratings" />
                 <ComboBoxItem Content="Unrated" />
                 <ComboBoxItem Content="★ 1" />
@@ -242,13 +242,13 @@
                       Classes="storeSecondary"
                       Classes.active="{Binding WorkspaceTree.HasNonTextFilters}"
                       HorizontalAlignment="Left"
-                      Margin="0,0,0,6">
+                      Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Inline}">
                 <Button.Flyout>
                   <Flyout Placement="BottomEdgeAlignedRight"
                           ShowMode="Standard">
-                    <Border Width="260" Padding="12">
-                      <StackPanel Spacing="10">
-                        <StackPanel Spacing="6">
+                    <Border Width="260" Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}">
+                      <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
+                        <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
                           <TextBlock Text="Scope" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource StrongTextBrush}" />
                           <CheckBox Content="Current topic and below"
                                     IsChecked="{Binding WorkspaceTree.ScopeToCurrentTopic}"
@@ -258,8 +258,8 @@
                                      Text="{Binding WorkspaceTree.ScopedTopicName, StringFormat='Current: {0}'}"
                                      FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
-                        <Separator Margin="0,2" />
-                        <StackPanel Spacing="6">
+                        <Separator Margin="{DynamicResource Token.Layout.Margin.HorizontalVertical.None.Micro}" />
+                        <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
                           <TextBlock Text="Tags" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource StrongTextBrush}" />
                           <TextBlock Text="No tags yet in this store."
                                      IsVisible="{Binding !WorkspaceTree.AvailableTags.Count}"
@@ -270,16 +270,16 @@
                               <DataTemplate x:DataType="nav:TagFilterEntryViewModel">
                                 <CheckBox Content="{Binding Name}"
                                           IsChecked="{Binding IsSelected}"
-                                          Margin="0,1" />
+                                          Margin="{DynamicResource Token.Layout.Margin.HorizontalVertical.None.Hairline}" />
                               </DataTemplate>
                             </ItemsControl.ItemTemplate>
                           </ItemsControl>
                         </StackPanel>
-                        <Separator Margin="0,2" />
+                        <Separator Margin="{DynamicResource Token.Layout.Margin.HorizontalVertical.None.Micro}" />
                         <CheckBox Content="Include archived"
                                   IsChecked="{Binding WorkspaceTree.IncludeArchived}"
                                   ToolTip.Tip="Reveal archived topics and Items with inactive treatment" />
-                        <Separator Margin="0,2" />
+                        <Separator Margin="{DynamicResource Token.Layout.Margin.HorizontalVertical.None.Micro}" />
                         <Button Content="Clear all"
                                 HorizontalAlignment="Right"
                                 Command="{Binding WorkspaceTree.ClearFiltersCommand}"
@@ -310,8 +310,8 @@
 
         <Border x:Name="TreeActionsToolbar"
                 Grid.Row="3"
-                Margin="0,0,0,8">
-          <StackPanel Orientation="Horizontal" Spacing="6">
+                Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Control}">
+          <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.InlineGap}">
             <Button x:Name="ExpandCollapseAllButton"
                     Classes="iconButton"
                     Command="{Binding WorkspaceTree.ToggleExpandCollapseAllCommand}"
@@ -336,8 +336,8 @@
 
         <Border Grid.Row="5"
                 Classes="navigationStatusBar"
-                Margin="-18,8,-18,0"
-                Padding="8,6"
+                Margin="{DynamicResource Token.Layout.Margin.Sides.Left_Custom-18.Top_Control.Right_Custom-18.Bottom_None}"
+                Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Control.Inline}"
                 Background="{DynamicResource PanelSurfaceBrush}"
                 BorderBrush="{DynamicResource ControlBorderBrush}"
                 BorderThickness="1"
@@ -405,21 +405,21 @@
                   <Grid ColumnDefinitions="3,22,*,Auto" MinHeight="34">
                     <Border Grid.Column="0" Background="{DynamicResource AccentBrush}" CornerRadius="2" />
                     <TextBlock Grid.Column="1" Text="{Binding Icon}" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{DynamicResource TreeIconForegroundBrush}" />
-                    <Grid Grid.Column="2" Margin="4,0">
+                    <Grid Grid.Column="2" Margin="{DynamicResource Token.Layout.Margin.HorizontalVertical.Compact.None}">
                       <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                       </Grid.ColumnDefinitions>
-                      <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                      <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.InlineGap}" VerticalAlignment="Center">
                         <TextBlock Text="{Binding Name}"
                                    IsVisible="{Binding !IsEditing}"
                                    TextTrimming="CharacterEllipsis" />
                         <ItemsControl IsVisible="{Binding HasAppliedTags}"
                                       ItemsSource="{Binding VisibleTagColorSequence}"
-                                      Margin="6,0,0,0">
+                                      Margin="{DynamicResource Token.Layout.Margin.Sides.Left_Inline.Top_None.Right_None.Bottom_None}">
                           <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                              <StackPanel Orientation="Horizontal" Spacing="3" />
+                              <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.Gap.Tight}" />
                             </ItemsPanelTemplate>
                           </ItemsControl.ItemsPanel>
                           <ItemsControl.ItemTemplate>
@@ -434,7 +434,7 @@
                           </ItemsControl.ItemTemplate>
                         </ItemsControl>
                         <Border IsVisible="{Binding HasHiddenTags}"
-                                Padding="4,0"
+                                Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Compact.None}"
                                 CornerRadius="6"
                                 Background="{DynamicResource CountBadgeBackgroundBrush}">
                           <TextBlock Text="{Binding HiddenTagLabel}" FontSize="10" Foreground="{DynamicResource TreeIconForegroundBrush}" />
@@ -446,9 +446,9 @@
                                KeyDown="OnTreeEditorKeyDown"
                                LostFocus="OnTreeEditorLostFocus"
                                MinHeight="28"
-                               Padding="5,2" />
+                               Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.CompactPlus.Micro}" />
                     </Grid>
-                    <Border Grid.Column="3" IsVisible="{Binding HasChildren}" Padding="5,1" CornerRadius="8" Background="{DynamicResource CountBadgeBackgroundBrush}">
+                    <Border Grid.Column="3" IsVisible="{Binding HasChildren}" Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.CompactPlus.Hairline}" CornerRadius="8" Background="{DynamicResource CountBadgeBackgroundBrush}">
                       <TextBlock Text="{Binding CountLabel}" FontSize="10" Foreground="{DynamicResource TreeIconForegroundBrush}" />
                     </Border>
                   </Grid>
@@ -462,7 +462,7 @@
                   VerticalAlignment="Stretch">
             <StackPanel HorizontalAlignment="Center"
                         VerticalAlignment="Center"
-                        Spacing="8"
+                        Spacing="{DynamicResource Token.Spacing.ControlGap}"
                         MaxWidth="220">
               <TextBlock Text="Nothing matches the current filters."
                          TextWrapping="Wrap"
@@ -493,7 +493,7 @@
               BorderBrush="{DynamicResource ControlBorderBrush}"
               BorderThickness="0,0,0,1"
               Height="40"
-              Padding="6,5,6,0">
+              Padding="{DynamicResource Token.Layout.Padding.Sides.Left_Inline.Top_CompactPlus.Right_Inline.Bottom_None}">
         <ScrollViewer HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Disabled">
           <ItemsControl ItemsSource="{Binding DocumentWindow.Tabs}">
@@ -535,15 +535,15 @@
 
       <Border Grid.Row="1"
               IsVisible="{Binding WorkflowNavigator.HasActiveItem}"
-              Padding="20,14"
+              Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Wide.Section}"
               Background="{DynamicResource ElevatedSurfaceBrush}"
               BorderBrush="{DynamicResource ControlBorderBrush}"
               BorderThickness="0,0,0,1">
-        <StackPanel Spacing="10">
+        <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
           <ItemsControl ItemsSource="{Binding WorkflowNavigator.Stages}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
-                <StackPanel Orientation="Horizontal" Spacing="8" />
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}" />
               </ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
@@ -556,7 +556,7 @@
                         Classes.available="{Binding IsAvailable}"
                         Classes.unavailable="{Binding !IsAvailable}"
                         Classes.activeView="{Binding IsActiveView}"
-                        Padding="14,8"
+                        Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Section.Control}"
                         MinWidth="88" />
               </DataTemplate>
             </ItemsControl.ItemTemplate>
@@ -569,8 +569,8 @@
       </Border>
 
       <Border Grid.Row="2"
-              Margin="20"
-              Padding="24"
+              Margin="{DynamicResource Token.Layout.Margin.Uniform.Wide}"
+              Padding="{DynamicResource Token.Layout.PageInset}"
               Background="{DynamicResource ElevatedSurfaceBrush}"
               BorderBrush="{DynamicResource ControlBorderBrush}"
               BorderThickness="1">
@@ -579,11 +579,11 @@
                       IsVisible="{Binding ItemInspector.HasState}">
             <Grid IsVisible="{Binding DocumentWindow.HasMultipleStageTools}"
                   ColumnDefinitions="*,Auto"
-                  ColumnSpacing="12"
-                  Margin="0,0,0,12"
+                  ColumnSpacing="{DynamicResource Token.Spacing.Gap.Panel}"
+                  Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Panel}"
                   AutomationProperties.Name="Item stage tool selector"
                   AutomationProperties.AutomationId="Item.StageToolSelector">
-              <StackPanel Spacing="2">
+              <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Micro}">
                 <TextBlock Text="{Binding DocumentWindow.ActiveStageToolName}"
                            FontSize="14"
                            FontWeight="SemiBold"
@@ -598,7 +598,7 @@
                             AutomationProperties.Name="Available item stage tools">
                 <ItemsControl.ItemsPanel>
                   <ItemsPanelTemplate>
-                    <StackPanel Orientation="Horizontal" Spacing="6" />
+                    <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.InlineGap}" />
                   </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
@@ -616,11 +616,11 @@
           <ScrollViewer Grid.Row="1"
                         IsVisible="{Binding DocumentWindow.HasActiveDocument}"
                         VerticalScrollBarVisibility="Auto"
-                        Padding="0,0,16,0">
-            <StackPanel Spacing="12">
+                        Padding="{DynamicResource Token.Layout.Padding.Sides.Left_None.Top_None.Right_SectionPlus.Bottom_None}">
+            <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
             <views:DocumentContextHeader IsVisible="{Binding !ItemInspector.HasState}" />
             <Border MinHeight="360"
-                    Padding="22"
+                    Padding="{DynamicResource Token.Layout.Padding.Uniform.WidePlus}"
                     Background="{DynamicResource PanelSurfaceBrush}"
                     BorderBrush="{DynamicResource ControlBorderBrush}"
                     BorderThickness="1"
@@ -628,8 +628,8 @@
               <Grid RowDefinitions="Auto,*">
                 <Grid Grid.Row="0"
                       ColumnDefinitions="*,Auto"
-                      Margin="0,0,0,12">
-                  <StackPanel Spacing="3">
+                      Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Panel}">
+                  <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
                     <TextBlock Text="{Binding DocumentWindow.ActiveStageToolName}"
                                FontSize="16"
                                FontWeight="SemiBold"
@@ -643,7 +643,7 @@
                                 ItemsSource="{Binding DocumentWindow.AvailableStageTools}">
                     <ItemsControl.ItemsPanel>
                       <ItemsPanelTemplate>
-                        <StackPanel Orientation="Horizontal" Spacing="6" />
+                        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.InlineGap}" />
                       </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
@@ -658,7 +658,7 @@
                 </Grid>
 
                 <StackPanel Grid.Row="1"
-                            Spacing="8">
+                            Spacing="{DynamicResource Token.Spacing.ControlGap}">
                   <TextBlock Text="{Binding DocumentWindow.ActiveWorkflowStageLabel}"
                              FontSize="14"
                              FontWeight="SemiBold"
@@ -666,12 +666,12 @@
                   <TextBlock Text="{Binding ActiveStageToolContentKey}"
                              FontSize="13"
                              Foreground="{DynamicResource SecondaryTextBrush}" />
-                <Border Margin="0,10,0,0"
-                        Padding="12"
+                <Border Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Group.Right_None.Bottom_None}"
+                        Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}"
                         Background="{DynamicResource ElevatedSurfaceBrush}"
                         BorderBrush="{DynamicResource ControlBorderBrush}"
                         BorderThickness="1">
-                  <StackPanel Spacing="4">
+                  <StackPanel Spacing="{DynamicResource Token.Spacing.CompactGap}">
                     <TextBlock Text="{Binding DocumentWindow.ActiveToolScopeLabel}"
                                FontSize="13"
                                FontWeight="SemiBold"
@@ -701,11 +701,11 @@
                     AutomationProperties.Name="Item overview context"
                     IsVisible="{Binding ItemInspector.HasState}"
                     MinHeight="360"
-                    Padding="22"
+                    Padding="{DynamicResource Token.Layout.Padding.Uniform.WidePlus}"
                     Background="{DynamicResource PanelSurfaceBrush}"
                     BorderBrush="{DynamicResource ControlBorderBrush}"
                     BorderThickness="1">
-                <StackPanel Spacing="14">
+                <StackPanel Spacing="{DynamicResource Token.Spacing.SectionGap}">
                   <views:DocumentContextHeader />
                   <TextBlock IsVisible="{Binding ItemInspector.IsReadOnly}"
                              Text="{Binding ItemInspector.InactiveNotice}"
@@ -721,13 +721,13 @@
                                AutomationProperties.Name="Working with item" />
 
                   <Border IsVisible="{Binding ItemInspector.ShowsContentRiskWarning}"
-                          Padding="12"
+                          Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}"
                           Background="{DynamicResource Token.Color.SurfaceElevated}"
                           BorderBrush="{DynamicResource Token.Color.Border}"
                           BorderThickness="1"
                           CornerRadius="6"
                           AutomationProperties.Name="Content risk awareness">
-                    <StackPanel Spacing="6">
+                    <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
                       <TextBlock Text="Review content risk before publishing"
                                  FontWeight="SemiBold"
                                  Foreground="{DynamicResource Token.Color.TextStrong}" />
@@ -787,11 +787,11 @@
                           </Border>
                         </Grid>
                       </StackPanel>
-                      <StackPanel Spacing="4">
+                      <StackPanel Spacing="{DynamicResource Token.Spacing.CompactGap}">
                         <TextBlock Text="Idea potential"
                                    FontSize="11"
                                    Foreground="{DynamicResource SecondaryTextBrush}" />
-                        <StackPanel Orientation="Horizontal" Spacing="2"
+                        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.Gap.Micro}"
                                     AutomationProperties.Name="{Binding ItemInspector.IdeaRatingLabel}">
                           <TextBlock Text="★" Classes="ideaRatingStar" Classes.selected="{Binding ItemInspector.IsIdeaRatingStar1Selected}" />
                           <TextBlock Text="★" Classes="ideaRatingStar" Classes.selected="{Binding ItemInspector.IsIdeaRatingStar2Selected}" />
@@ -799,26 +799,26 @@
                           <TextBlock Text="★" Classes="ideaRatingStar" Classes.selected="{Binding ItemInspector.IsIdeaRatingStar4Selected}" />
                           <TextBlock Text="★" Classes="ideaRatingStar" Classes.selected="{Binding ItemInspector.IsIdeaRatingStar5Selected}" />
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="2">
+                        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.Gap.Micro}">
                           <Button Content="★" Command="{Binding ItemInspector.SetIdeaRatingCommand}" CommandParameter="1" IsEnabled="{Binding ItemInspector.CanEditShared}" ToolTip.Tip="Rate 1 star" AutomationProperties.Name="Rate 1 star" />
                           <Button Content="★" Command="{Binding ItemInspector.SetIdeaRatingCommand}" CommandParameter="2" IsEnabled="{Binding ItemInspector.CanEditShared}" ToolTip.Tip="Rate 2 stars" AutomationProperties.Name="Rate 2 stars" />
                           <Button Content="★" Command="{Binding ItemInspector.SetIdeaRatingCommand}" CommandParameter="3" IsEnabled="{Binding ItemInspector.CanEditShared}" ToolTip.Tip="Rate 3 stars" AutomationProperties.Name="Rate 3 stars" />
                           <Button Content="★" Command="{Binding ItemInspector.SetIdeaRatingCommand}" CommandParameter="4" IsEnabled="{Binding ItemInspector.CanEditShared}" ToolTip.Tip="Rate 4 stars" AutomationProperties.Name="Rate 4 stars" />
                           <Button Content="★" Command="{Binding ItemInspector.SetIdeaRatingCommand}" CommandParameter="5" IsEnabled="{Binding ItemInspector.CanEditShared}" ToolTip.Tip="Rate 5 stars" AutomationProperties.Name="Rate 5 stars" />
                           <Button Content="Clear" Command="{Binding ItemInspector.SetIdeaRatingCommand}" CommandParameter="0" IsEnabled="{Binding ItemInspector.CanEditShared}" ToolTip.Tip="Clear idea rating" AutomationProperties.Name="Clear idea rating" />
-                          <TextBlock Text="{Binding ItemInspector.IdeaRatingLabel}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource SecondaryTextBrush}" />
+                          <TextBlock Text="{Binding ItemInspector.IdeaRatingLabel}" VerticalAlignment="Center" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_Inline.Top_None.Right_None.Bottom_None}" Foreground="{DynamicResource SecondaryTextBrush}" />
                         </StackPanel>
                       </StackPanel>
                     </StackPanel>
                   </Border>
 
                   <Border IsVisible="{Binding ShowsManualListingDetailsStageTool}"
-                          Padding="14"
+                          Padding="{DynamicResource Token.Layout.CardPadding}"
                           Background="{DynamicResource ElevatedSurfaceBrush}"
                           BorderBrush="{DynamicResource ControlBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="6">
-                    <StackPanel Spacing="8">
+                    <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                       <TextBlock Text="Listing Details" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource StrongTextBrush}" />
                       <TextBlock Text="Record local listing copy, Variant pricing, and fulfillment terms. Tags remain on the Item." Foreground="{DynamicResource SecondaryTextBrush}" TextWrapping="Wrap" />
                       <TextBlock Text="Title" FontWeight="SemiBold" />
@@ -868,7 +868,7 @@
                       </virtualGrid:VirtualDataGrid>
                       <TextBlock Text="Shipping option" FontWeight="SemiBold" />
                       <TextBox Text="{Binding ManualListingDetailsTool.ShippingName, Mode=TwoWay}" PlaceholderText="Option name" IsEnabled="{Binding ManualListingDetailsTool.CanEditFulfillmentTerms}" />
-                      <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                      <Grid ColumnDefinitions="*,*" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
                         <TextBox Text="{Binding ManualListingDetailsTool.CustomerShippingCharge, Mode=TwoWay}" PlaceholderText="Customer shipping charge" IsEnabled="{Binding ManualListingDetailsTool.CanEditFulfillmentTerms}" />
                         <TextBox Grid.Column="1" Text="{Binding ManualListingDetailsTool.SellerShippingCost, Mode=TwoWay}" PlaceholderText="Expected seller shipping cost" IsEnabled="{Binding ManualListingDetailsTool.CanEditFulfillmentTerms}" />
                       </Grid>
@@ -887,19 +887,19 @@
                   </Border>
 
                   <Border IsVisible="{Binding ShowsPrintifyStageTool}"
-                          Padding="14"
+                          Padding="{DynamicResource Token.Layout.CardPadding}"
                           Background="{DynamicResource ElevatedSurfaceBrush}"
                           BorderBrush="{DynamicResource ControlBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="6">
-                    <StackPanel Spacing="8">
+                    <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                       <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Text="Printify listing"
                                    FontSize="14"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource StrongTextBrush}" />
                         <Border Grid.Column="1"
-                                Padding="7,2"
+                                Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.InlinePlus.Micro}"
                                 CornerRadius="8"
                                 Background="{DynamicResource SuccessBrush}"
                                 AutomationProperties.Name="Printify connection status">
@@ -918,7 +918,7 @@
                                AutomationProperties.Name="Linked Printify product ID"
                                AutomationProperties.AutomationId="Printify.CurrentProductId" />
                       <TextBlock Text="Link an existing product" FontWeight="SemiBold" />
-                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{DynamicResource Token.Spacing.InlineGap}">
                         <TextBox Text="{Binding PrintifyTool.CandidateProductId, Mode=TwoWay}"
                                  PlaceholderText="Printify product ID"
                                  IsEnabled="{Binding PrintifyTool.CanEditCandidateProductId}"
@@ -931,14 +931,14 @@
                                 AutomationProperties.AutomationId="Printify.VerifyProductLink" />
                       </Grid>
                       <Border IsVisible="{Binding PrintifyTool.IsLinkConfirmationVisible}"
-                              Padding="8"
+                              Padding="{DynamicResource Token.Layout.PreviewPadding}"
                               Background="{DynamicResource WarningSurfaceBrush}"
                               BorderBrush="{DynamicResource WarningTextBrush}"
                               BorderThickness="1"
                               AutomationProperties.Name="Printify product link confirmation">
-                        <StackPanel Spacing="6">
+                        <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
                           <TextBlock Text="{Binding PrintifyTool.LinkConfirmationText}" TextWrapping="Wrap" />
-                          <StackPanel Orientation="Horizontal" Spacing="8">
+                          <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                             <Button Content="Confirm link"
                                     Command="{Binding PrintifyTool.ConfirmProductLinkCommand}"
                                     AutomationProperties.AutomationId="Printify.ConfirmProductLink" />
@@ -972,28 +972,28 @@
                                  TextWrapping="Wrap"
                                  Foreground="{DynamicResource StrongTextBrush}" />
                       <Border IsVisible="{Binding PrintifyTool.HasConflict}"
-                              Padding="8"
+                              Padding="{DynamicResource Token.Layout.PreviewPadding}"
                               Background="{DynamicResource WarningSurfaceBrush}"
                               BorderBrush="{DynamicResource WarningTextBrush}"
                               BorderThickness="1">
-                        <StackPanel Spacing="5">
+                        <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.CompactPlus}">
                           <TextBlock Text="Printify changed values outside Fusion Canvas. Choose which values to keep." TextWrapping="Wrap" FontWeight="SemiBold" />
                           <TextBlock Text="{Binding PrintifyTool.ConflictSummary}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
-                          <StackPanel Orientation="Horizontal" Spacing="6">
+                          <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.InlineGap}">
                             <Button Content="Accept Printify changes" Command="{Binding PrintifyTool.AcceptRemoteCommand}" />
                             <Button Content="Keep Fusion Canvas values" Command="{Binding PrintifyTool.KeepLocalCommand}" />
                           </StackPanel>
                         </StackPanel>
                       </Border>
                       <Border IsVisible="{Binding PrintifyTool.IsUncertainCreateRetryConfirmationVisible}"
-                              Padding="8"
+                              Padding="{DynamicResource Token.Layout.PreviewPadding}"
                               Background="{DynamicResource WarningSurfaceBrush}"
                               BorderBrush="{DynamicResource WarningTextBrush}"
                               BorderThickness="1"
                               AutomationProperties.Name="Confirm retry after uncertain Printify create">
-                        <StackPanel Spacing="6">
+                        <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
                           <TextBlock Text="{Binding PrintifyTool.UncertainCreateRetryConfirmationText}" TextWrapping="Wrap" />
-                          <StackPanel Orientation="Horizontal" Spacing="6">
+                          <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.InlineGap}">
                             <Button Content="Retry create"
                                     Command="{Binding PrintifyTool.ConfirmUncertainCreateRetryCommand}"
                                     AutomationProperties.AutomationId="Printify.ConfirmUncertainCreateRetry" />
@@ -1003,7 +1003,7 @@
                           </StackPanel>
                         </StackPanel>
                       </Border>
-                      <StackPanel Orientation="Horizontal" Spacing="6">
+                      <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.InlineGap}">
                         <Button Content="Download variant setup"
                                 Command="{Binding PrintifyTool.DownloadVariantSetupCommand}"
                                 IsVisible="{Binding PrintifyTool.CanDownloadVariantSetup}"
@@ -1025,7 +1025,7 @@
                                  TextWrapping="Wrap"
                                  Foreground="{DynamicResource WarningTextBrush}"
                                  AutomationProperties.Name="Why Printify publishing is unavailable" />
-                      <StackPanel Orientation="Horizontal" Spacing="6">
+                      <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.InlineGap}">
                         <Button Content="Archive locally" Command="{Binding PrintifyTool.ArchiveCommand}" />
                         <Button Content="Delete remote draft"
                                 Command="{Binding PrintifyTool.DeleteCommand}"
@@ -1035,11 +1035,11 @@
                         <Border IsVisible="{Binding PrintifyTool.IsDeleteConfirmationVisible}"
                                 Background="{DynamicResource DangerBackgroundBrush}"
                                 CornerRadius="4"
-                                Padding="8"
+                                Padding="{DynamicResource Token.Layout.PreviewPadding}"
                                 AutomationProperties.Name="Printify delete confirmation">
-                          <StackPanel Spacing="6">
+                          <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
                             <TextBlock Text="{Binding PrintifyTool.DeleteConfirmationText}" TextWrapping="Wrap" />
-                            <StackPanel Orientation="Horizontal" Spacing="8">
+                            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                               <Button Content="Delete permanently"
                                       Command="{Binding PrintifyTool.ConfirmDeleteCommand}"
                                       Classes="danger"
@@ -1054,14 +1054,14 @@
                     </StackPanel>
                   </Border>
 
-                  <Border Padding="14"
+                  <Border Padding="{DynamicResource Token.Layout.CardPadding}"
                           Background="{DynamicResource ElevatedSurfaceBrush}"
                           BorderBrush="{DynamicResource ControlBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="6"
                           IsVisible="{Binding ShowsIdeaStageTool}"
                           Classes.emphasized="{Binding ItemInspector.EmphasizesIdea}">
-                    <StackPanel Spacing="10">
+                    <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
                       <TextBlock Text="Idea"
                                  FontSize="14"
                                  FontWeight="SemiBold"
@@ -1081,14 +1081,14 @@
                     </StackPanel>
                   </Border>
 
-                  <Border Padding="14"
+                  <Border Padding="{DynamicResource Token.Layout.CardPadding}"
                           Background="{DynamicResource ElevatedSurfaceBrush}"
                           BorderBrush="{DynamicResource ControlBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="6"
                           IsVisible="{Binding ShowsConceptStageTool}"
                           Classes.emphasized="{Binding ItemInspector.EmphasizesConcept}">
-                    <StackPanel Spacing="10">
+                    <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
                       <TextBlock Text="Concept"
                                  FontSize="14"
                                  FontWeight="SemiBold"
@@ -1140,8 +1140,8 @@
                       <!-- Per-corner action rows -->
       <Grid RowDefinitions="Auto,Auto,Auto"
             ColumnDefinitions="Auto,*,Auto,Auto"
-            RowSpacing="6"
-            ColumnSpacing="4"
+            RowSpacing="{DynamicResource Token.Spacing.InlineGap}"
+            ColumnSpacing="{DynamicResource Token.Spacing.CompactGap}"
             IsVisible="{Binding ShowsConceptStageTool}">
                         <TextBlock Grid.Row="0"
                                    Grid.Column="0"
@@ -1311,14 +1311,14 @@
                       </ListBox>
 
                       <!-- SLL generation section -->
-                      <Separator Margin="0,4"
+                      <Separator Margin="{DynamicResource Token.Layout.Margin.HorizontalVertical.None.Compact}"
                                  IsVisible="{Binding ShowsConceptStageTool}" />
                       <TextBlock Text="Generate SLL sketch"
                                  FontSize="13"
                                  FontWeight="SemiBold"
                                  Foreground="{DynamicResource StrongTextBrush}"
                                  IsVisible="{Binding ShowsConceptStageTool}" />
-                      <Border Padding="8"
+                      <Border Padding="{DynamicResource Token.Layout.PreviewPadding}"
                               Background="{DynamicResource AccentSoftBackgroundBrush}"
                               BorderBrush="{DynamicResource AccentSoftBorderBrush}"
                               BorderThickness="1"
@@ -1327,7 +1327,7 @@
                               IsVisible="{Binding ShowsConceptStageTool}"
                               AutomationProperties.Name="SLL explanation"
                               AutomationProperties.HelpText="SLL stands for Symbolic Layout Languate. It's a rough visual sketch of the proposed design.">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                           <TextBlock Text="ⓘ"
                                      FontSize="16"
                                      FontWeight="SemiBold"
@@ -1384,7 +1384,7 @@
                                  FontSize="11"
                                  Foreground="{DynamicResource WarningTextBrush}" />
 
-                      <StackPanel Orientation="Horizontal" Spacing="6"
+                      <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.InlineGap}"
                                   IsVisible="{Binding SllGeneration.IsStale}">
                         <Button Content="Reset SLL"
                                 Command="{Binding SllGeneration.ResetSllCommand}"
@@ -1407,12 +1407,12 @@
                      </StackPanel>
                   </Border>
 
-                  <Border Padding="14"
+                  <Border Padding="{DynamicResource Token.Layout.CardPadding}"
                           Background="{DynamicResource ElevatedSurfaceBrush}"
                           BorderBrush="{DynamicResource ControlBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="6">
-                    <StackPanel Spacing="10">
+                    <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
                       <TextBlock Text="Notes"
                                  FontSize="14"
                                  FontWeight="SemiBold"
@@ -1427,12 +1427,12 @@
                     </StackPanel>
                   </Border>
 
-                  <Border Padding="14"
+                  <Border Padding="{DynamicResource Token.Layout.CardPadding}"
                           Background="{DynamicResource ElevatedSurfaceBrush}"
                           BorderBrush="{DynamicResource ControlBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="6">
-                    <StackPanel Spacing="10">
+                    <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
                       <TextBlock Text="Tags"
                                  FontSize="14"
                                  FontWeight="SemiBold"
@@ -1450,14 +1450,14 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                           <DataTemplate x:DataType="x:String">
-                            <Border Padding="8,3"
+                            <Border Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Control.Tight}"
                                     CornerRadius="10"
                                     Background="{DynamicResource AccentSoftBackgroundBrush}"
                                     BorderBrush="{DynamicResource AccentSoftBorderBrush}"
                                     BorderThickness="1"
-                                    Margin="0,0,6,6"
+                                    Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_Inline.Bottom_Inline}"
                                     HorizontalAlignment="Left">
-                              <StackPanel Orientation="Horizontal" Spacing="6">
+                              <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.InlineGap}">
                                 <TextBlock Text="{Binding}"
                                            FontSize="12"
                                            Foreground="{DynamicResource AccentSoftForegroundBrush}"
@@ -1482,7 +1482,7 @@
                                  Text="No tags yet."
                                  FontSize="12"
                                  Foreground="{DynamicResource MutedTextBrush}" />
-                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{DynamicResource Token.Spacing.InlineGap}">
                         <TextBox Text="{Binding ItemInspector.TagInput}"
                                  IsEnabled="{Binding ItemInspector.CanEditShared}"
                                  MinHeight="32"
@@ -1497,13 +1497,13 @@
                   </Border>
 
                   <Border IsVisible="{Binding ShowsDesignStageTool}"
-                          Padding="14"
+                          Padding="{DynamicResource Token.Layout.CardPadding}"
                           Background="{DynamicResource ElevatedSurfaceBrush}"
                           BorderBrush="{DynamicResource ControlBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="6"
                           Classes.emphasized="{Binding ItemInspector.EmphasizesDesign}">
-                    <StackPanel Spacing="10">
+                    <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
                       <TextBlock Text="Design"
                                  FontSize="14"
                                  FontWeight="SemiBold"
@@ -1521,7 +1521,7 @@
                                  FontSize="13" FontWeight="SemiBold"
                                  Foreground="{DynamicResource StrongTextBrush}" />
 
-                      <StackPanel IsVisible="{Binding DesignTool.ShowsUnconfiguredState}" Spacing="8">
+                      <StackPanel IsVisible="{Binding DesignTool.ShowsUnconfiguredState}" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                         <TextBlock Text="Select a listing configuration to show the design slot grid."
                                    TextWrapping="Wrap" FontSize="12"
                                    Foreground="{DynamicResource MutedTextBrush}" />
@@ -1532,7 +1532,7 @@
                                   AutomationProperties.Name="Select configuration" />
                       </StackPanel>
 
-                      <StackPanel IsVisible="{Binding DesignTool.ShowsConfiguredState}" Spacing="4">
+                      <StackPanel IsVisible="{Binding DesignTool.ShowsConfiguredState}" Spacing="{DynamicResource Token.Spacing.CompactGap}">
                         <ComboBox x:Name="DesignConfigurationComboBox"
                                   ItemsSource="{Binding DesignTool.AvailableOfferings}"
                                   DisplayMemberBinding="{Binding Name}"
@@ -1556,13 +1556,13 @@
                                    TextWrapping="Wrap"
                                    FontSize="11" Foreground="{DynamicResource WarningTextBrush}" />
                         <Border IsVisible="{Binding DesignTool.HasOfferingReadiness}"
-                                Padding="10"
+                                Padding="{DynamicResource Token.Layout.Padding.Uniform.Group}"
                                 Background="{DynamicResource SubtleSurfaceBrush}"
                                 BorderBrush="{DynamicResource SubtleBorderBrush}"
                                 BorderThickness="1"
                                 CornerRadius="6"
                                 AutomationProperties.AutomationId="Design.OfferingReadiness">
-                          <StackPanel Spacing="4">
+                          <StackPanel Spacing="{DynamicResource Token.Spacing.CompactGap}">
                             <TextBlock Text="Catalog and mockup setup" FontWeight="SemiBold" />
                             <TextBlock Text="{Binding DesignTool.OfferingReadinessSummary}"
                                        TextWrapping="Wrap"
@@ -1588,7 +1588,7 @@
                       </StackPanel>
 
                       <StackPanel IsVisible="{Binding DesignTool.HasStaleConfiguration}"
-                                  Spacing="8"
+                                  Spacing="{DynamicResource Token.Spacing.ControlGap}"
                                   KeyDown="OnRecoveryConfirmationKeyDown">
                         <TextBlock Text="{Binding DesignTool.StaleConfigurationDisplayName, StringFormat='Unavailable configuration: {0}'}"
                                    TextWrapping="Wrap"
@@ -1607,17 +1607,17 @@
                                   PlaceholderText="Choose an active replacement"
                                   AutomationProperties.Name="Replacement listing configuration" />
                         <Border IsVisible="{Binding DesignTool.IsRecoveryConfirmationVisible}"
-                                Padding="12"
+                                Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}"
                                 Background="{DynamicResource SubtleSurfaceBrush}"
                                 BorderBrush="{DynamicResource WarningTextBrush}"
                                 BorderThickness="1"
                                 CornerRadius="6">
-                          <StackPanel Spacing="8">
+                          <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                             <TextBlock Text="{Binding DesignTool.RecoveryConfirmationMessage}"
                                        TextWrapping="Wrap"
                                        FontSize="12"
                                        Foreground="{DynamicResource PrimaryTextBrush}" />
-                            <StackPanel Orientation="Horizontal" Spacing="8">
+                            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                               <Button x:Name="ConfirmConfigurationRecoveryButton"
                                       Content="Replace configuration"
                                       Classes="danger"
@@ -1635,7 +1635,7 @@
                       </StackPanel>
 
                       <!-- Color Working Set -->
-                      <StackPanel IsVisible="{Binding DesignTool.ShowsConfiguredState}" Spacing="6">
+                      <StackPanel IsVisible="{Binding DesignTool.ShowsConfiguredState}" Spacing="{DynamicResource Token.Spacing.InlineGap}">
                          <TextBlock Text="Color Working Set" FontSize="{DynamicResource Token.Typography.SectionHeading}" FontWeight="SemiBold"
                                    Foreground="{DynamicResource StrongTextBrush}" />
                          <TextBlock Text="Select the colors this design will use." TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Helper}"
@@ -1666,7 +1666,7 @@
                            </ItemsControl.ItemsPanel>
                            <ItemsControl.ItemTemplate>
                              <DataTemplate x:DataType="stageTools:DesignColorViewModel">
-                               <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="6">
+                               <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="{DynamicResource Token.Spacing.InlineGap}">
                                  <TextBlock Text="{Binding ColorValue}"
                                             Width="{DynamicResource Token.Control.SelectedColorLabelWidth}"
                                             Foreground="{DynamicResource PrimaryTextBrush}" />
@@ -1683,18 +1683,18 @@
                       </StackPanel>
 
                       <!-- Row x Area Slot Grid -->
-                      <StackPanel IsVisible="{Binding DesignTool.ShowsConfiguredState}" Spacing="6">
+                      <StackPanel IsVisible="{Binding DesignTool.ShowsConfiguredState}" Spacing="{DynamicResource Token.Spacing.InlineGap}">
                          <TextBlock Text="Design Slot Grid" FontSize="{DynamicResource Token.Typography.SectionHeading}" FontWeight="SemiBold"
                                    Foreground="{DynamicResource StrongTextBrush}" />
                         <ItemsControl ItemsSource="{Binding DesignTool.Rows}">
                           <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="stageTools:DesignRowViewModel">
-                              <Border Padding="8" Margin="0,4"
+                              <Border Padding="{DynamicResource Token.Layout.PreviewPadding}" Margin="{DynamicResource Token.Layout.Margin.HorizontalVertical.None.Compact}"
                                       Background="{DynamicResource PanelSurfaceBrush}"
                                       BorderBrush="{DynamicResource SubtleBorderBrush}"
                                       BorderThickness="1" CornerRadius="6">
-                                <StackPanel Spacing="6">
-                                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+                                <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
+                                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{DynamicResource Token.Spacing.CompactGap}">
                                      <TextBlock Text="{Binding ColorChips}" FontSize="{DynamicResource Token.Typography.Label}" FontWeight="SemiBold"
                                                Foreground="{DynamicResource PrimaryTextBrush}" />
                                     <Button Grid.Column="1" Content="Remove row"
@@ -1706,12 +1706,12 @@
                                   <ItemsControl ItemsSource="{Binding Slots}">
                                     <ItemsControl.ItemsPanel>
                                       <ItemsPanelTemplate>
-                                        <StackPanel Orientation="Horizontal" Spacing="4" />
+                                        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.CompactGap}" />
                                       </ItemsPanelTemplate>
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                       <DataTemplate x:DataType="stageTools:DesignSlotViewModel">
-                                        <Border Padding="4"
+                                        <Border Padding="{DynamicResource Token.Layout.CompactPadding}"
                                                 Background="{DynamicResource SubtleSurfaceBrush}"
                                                 BorderBrush="{DynamicResource SubtleBorderBrush}"
                                                 BorderThickness="1" CornerRadius="4"
@@ -1720,7 +1720,7 @@
                                                 DragDrop.DragOver="OnSlotDragOver"
                                                 DragDrop.Drop="OnSlotDrop"
                                                 AutomationProperties.Name="{Binding AreaName, StringFormat='Final design artwork slot: {0}'}">
-                                          <StackPanel Spacing="4">
+                                          <StackPanel Spacing="{DynamicResource Token.Spacing.CompactGap}">
                                              <TextBlock Text="Final design artwork" FontSize="{DynamicResource Token.Typography.Label}" FontWeight="SemiBold"
                                                        Foreground="{DynamicResource AccentBrush}" />
                                              <TextBlock Text="{Binding AreaName}" FontSize="{DynamicResource Token.Typography.Label}" FontWeight="SemiBold"
@@ -1729,11 +1729,11 @@
                                                        TextWrapping="Wrap"
                                                        Foreground="{DynamicResource MutedTextBrush}" />
                                             <Border IsVisible="{Binding ShowsContentRiskWarning}"
-                                                    Padding="5"
+                                                    Padding="{DynamicResource Token.Layout.Padding.Uniform.CompactPlus}"
                                                     Background="{DynamicResource PanelSurfaceBrush}"
                                                     BorderBrush="{DynamicResource ControlBorderBrush}"
                                                     BorderThickness="1">
-                                              <StackPanel Spacing="3">
+                                              <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
                                                 <TextBlock Text="Content risk review"
                                                             FontSize="{DynamicResource Token.Typography.Label}"
                                                            FontWeight="SemiBold"
@@ -1763,8 +1763,8 @@
                                                         VerticalAlignment="Bottom"
                                                         Width="28"
                                                         Height="28"
-                                                        Padding="4"
-                                                        Margin="2"
+                                                        Padding="{DynamicResource Token.Layout.CompactPadding}"
+                                                        Margin="{DynamicResource Token.Layout.Margin.Uniform.Micro}"
                                                         Click="OnViewSlotImage"
                                                         Tag="{Binding .}"
                                                         IsEnabled="{Binding CanPreview}"
@@ -1785,7 +1785,7 @@
                                                      Height="{DynamicResource Token.Media.DesignStageThumbnailHeight}"
                                                     Background="{DynamicResource SubtleSurfaceBrush}" CornerRadius="4"
                                                     BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1">
-                                              <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="2">
+                                              <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="{DynamicResource Token.Spacing.Gap.Micro}">
                                                  <TextBlock Text="Drop artwork here" FontSize="{DynamicResource Token.Typography.Label}"
                                                            Foreground="{DynamicResource MutedTextBrush}"
                                                            HorizontalAlignment="Center" />
@@ -1802,7 +1802,7 @@
                                                     ToolTip.Tip="Browse for a PNG final design artwork or replace the current artwork"
                                                     AutomationProperties.Name="{Binding ArtworkUploadAccessibleName}" />
                                             <StackPanel IsVisible="{Binding HasImage}"
-                                                          Orientation="Horizontal" Spacing="2"
+                                                          Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.Gap.Micro}"
                                                           HorizontalAlignment="Center">
                                               <Button Content="Download" Click="OnExportSlotImage"
                                                       Tag="{Binding .}"
@@ -1840,7 +1840,7 @@
                       </StackPanel>
 
                       <!-- Supporting Images -->
-                      <StackPanel Spacing="6">
+                      <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
                          <TextBlock Text="Supporting Images" FontSize="{DynamicResource Token.Typography.SectionHeading}" FontWeight="SemiBold"
                                    Foreground="{DynamicResource StrongTextBrush}" />
                          <TextBlock Text="Sketches, references, and existing artwork." TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Helper}"
@@ -1857,12 +1857,12 @@
                           </ItemsControl.ItemsPanel>
                           <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="stageTools:DesignSlotViewModel">
-                              <Border Padding="4" Margin="2"
+                              <Border Padding="{DynamicResource Token.Layout.CompactPadding}" Margin="{DynamicResource Token.Layout.Margin.Uniform.Micro}"
                                       Background="{DynamicResource SubtleSurfaceBrush}"
                                       BorderBrush="{DynamicResource SubtleBorderBrush}"
                                        BorderThickness="1" CornerRadius="4"
                                        Width="{DynamicResource Token.Control.DesignStageSupportingCardWidth}">
-                                <StackPanel Spacing="2">
+                                <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Micro}">
                                   <Border Width="{DynamicResource Token.Media.DesignStageThumbnailWidth}"
                                           Height="{DynamicResource Token.Media.DesignStageThumbnailHeight}"
                                           Background="{DynamicResource PanelSurfaceBrush}" CornerRadius="4">
@@ -1877,11 +1877,11 @@
                                               TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Helper}"
                                              Foreground="{DynamicResource WarningTextBrush}" />
                                   <Border IsVisible="{Binding ShowsContentRiskWarning}"
-                                          Padding="5"
+                                          Padding="{DynamicResource Token.Layout.Padding.Uniform.CompactPlus}"
                                           Background="{DynamicResource PanelSurfaceBrush}"
                                           BorderBrush="{DynamicResource ControlBorderBrush}"
                                           BorderThickness="1">
-                                    <StackPanel Spacing="3">
+                                    <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
                                       <TextBlock Text="Content risk review"
                                                   FontSize="{DynamicResource Token.Typography.Label}"
                                                  FontWeight="SemiBold"
@@ -1901,7 +1901,7 @@
                                                  Foreground="{DynamicResource SecondaryTextBrush}" />
                                     </StackPanel>
                                   </Border>
-                                  <StackPanel Orientation="Horizontal" Spacing="2">
+                                  <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.Gap.Micro}">
                                     <Button Content="View" Click="OnViewSupportingImage"
                                             Tag="{Binding .}"
                                             IsEnabled="{Binding CanPreview}"
@@ -1930,14 +1930,14 @@
                       </StackPanel>
 
                       <!-- Artwork generation target -->
-                      <StackPanel Spacing="6">
+                      <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
                         <TextBlock Text="Generate Artwork" FontSize="13" FontWeight="SemiBold"
                                    Foreground="{DynamicResource StrongTextBrush}" />
                         <TextBlock Text="{Binding DesignTool.ArtworkGenerationGuidance}"
                                    TextWrapping="Wrap" FontSize="11"
                                    Foreground="{DynamicResource SecondaryTextBrush}" />
                         <Expander Header="Image prompt and contrast" IsExpanded="False">
-                          <StackPanel Spacing="6" Margin="0,6,0,0">
+                          <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Inline.Right_None.Bottom_None}">
                             <TextBlock Text="Contrast" FontSize="11"
                                        Foreground="{DynamicResource SecondaryTextBrush}" />
                             <ComboBox ItemsSource="{Binding DesignTool.ArtworkContrastOptions}"
@@ -1988,7 +1988,7 @@
                                   IsEnabled="{Binding DesignTool.CanUseTransparentBackground}"
                                   AutomationProperties.Name="Transparent Background"
                                   AutomationProperties.AutomationId="Design.TransparentBackground" />
-                        <StackPanel Orientation="Horizontal" Spacing="6">
+                        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.InlineGap}">
                           <Button Content="Generate"
                                   Command="{Binding DesignTool.GenerateArtworkCommand}"
                                   IsEnabled="{Binding DesignTool.CanGenerateArtwork}"
@@ -2026,17 +2026,17 @@
 
                       <!-- Removal confirmation -->
                       <Border IsVisible="{Binding DesignTool.IsRemovalConfirmationVisible}"
-                              Padding="12"
+                              Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}"
                               Background="{DynamicResource SubtleSurfaceBrush}"
                               BorderBrush="{DynamicResource ControlBorderBrush}"
                               BorderThickness="1"
                               CornerRadius="6">
-                        <StackPanel Spacing="8">
+                        <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                           <TextBlock Text="{Binding DesignTool.RemovalConfirmationMessage}"
                                      TextWrapping="Wrap"
                                      FontSize="12"
                                      Foreground="{DynamicResource PrimaryTextBrush}" />
-                          <StackPanel Orientation="Horizontal" Spacing="8">
+                          <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                             <Button Content="Confirm remove"
                                     Classes="danger"
                                     Click="OnConfirmRemoval"
@@ -2052,12 +2052,12 @@
                   </Border>
 
                   <Border IsVisible="{Binding ShowsListingStageTool}"
-                          Padding="14"
+                          Padding="{DynamicResource Token.Layout.CardPadding}"
                           Background="{DynamicResource ElevatedSurfaceBrush}"
                           BorderBrush="{DynamicResource ControlBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="6">
-                    <StackPanel Spacing="8">
+                    <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                       <TextBlock Text="Listing"
                                  FontSize="14"
                                  FontWeight="SemiBold"
@@ -2085,7 +2085,7 @@
                                     AutomationProperties.AutomationId="Listing.TemplateDiagnostics">
                         <ItemsControl.ItemTemplate>
                           <DataTemplate>
-                            <StackPanel Spacing="2" Margin="0,2,0,0">
+                            <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Micro}" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Micro.Right_None.Bottom_None}">
                               <TextBlock Text="{Binding TemplateName, StringFormat='{}{0}'}" FontWeight="SemiBold" />
                               <TextBlock Text="{Binding Guidance}" TextWrapping="Wrap" Foreground="{DynamicResource WarningTextBrush}" />
                               <TextBlock Text="{Binding CoverageSummary}" IsVisible="{Binding HasCoverageSummary}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -2116,7 +2116,7 @@
                                  AutomationProperties.Name="Mockup freshness notice"
                                  AutomationProperties.AutomationId="Listing.MockupStaleNotice" />
                       <StackPanel Orientation="Horizontal"
-                                  Spacing="8"
+                                  Spacing="{DynamicResource Token.Spacing.ControlGap}"
                                   IsVisible="{Binding ListingTool.IsBusy}">
                         <ProgressBar Width="120"
                                      Height="3"
@@ -2146,8 +2146,8 @@
                                     AutomationProperties.AutomationId="Listing.MockupOutputs">
                         <ItemsControl.ItemTemplate>
                           <DataTemplate x:DataType="stageTools:MockupOutputViewModel">
-                            <Border Margin="0,4,0,0"
-                                    Padding="8"
+                            <Border Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Compact.Right_None.Bottom_None}"
+                                    Padding="{DynamicResource Token.Layout.PreviewPadding}"
                                     Background="{DynamicResource ElevatedSurfaceBrush}"
                                     BorderBrush="{DynamicResource ControlBorderBrush}"
                                     BorderThickness="1"
@@ -2162,7 +2162,7 @@
                                   <Image Source="{Binding Thumbnail}"
                                          IsVisible="{Binding !IsMissing}"
                                          Stretch="Uniform"
-                                         Margin="4" />
+                                         Margin="{DynamicResource Token.Layout.CompactPadding}" />
                                 </Border>
                                 <TextBlock Grid.Column="1"
                                            Text="{Binding Name}"
@@ -2184,7 +2184,7 @@
                                 <StackPanel Grid.Column="2" Grid.RowSpan="3"
                                             Orientation="Horizontal"
                                             VerticalAlignment="Center"
-                                            Spacing="4">
+                                            Spacing="{DynamicResource Token.Spacing.CompactGap}">
                                   <Button Content="View"
                                           Command="{Binding PreviewCommand}"
                                           AutomationProperties.Name="View mockup"
@@ -2199,13 +2199,13 @@
                                           AutomationProperties.AutomationId="Listing.MockupRemove" />
                                 </StackPanel>
                                 <Border Grid.Column="1" Grid.ColumnSpan="2" Grid.Row="3"
-                                        Margin="0,8,0,0"
+                                        Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}"
                                         IsVisible="{Binding IsRemovalConfirmationVisible}"
                                         Background="{DynamicResource ElevatedSurfaceBrush}"
-                                        Padding="6">
-                                  <StackPanel Spacing="5">
+                                        Padding="{DynamicResource Token.Layout.Padding.Uniform.Inline}">
+                                  <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.CompactPlus}">
                                     <TextBlock Text="{Binding RemovalPromptMessage}" TextWrapping="Wrap" />
-                                    <StackPanel Orientation="Horizontal" Spacing="5">
+                                    <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.Gap.CompactPlus}">
                                       <Button Content="Confirm delete" Command="{Binding ConfirmRemoveCommand}" />
                                       <Button Content="Cancel" Command="{Binding CancelRemoveCommand}" />
                                     </StackPanel>
@@ -2219,12 +2219,12 @@
                     </StackPanel>
                   </Border>
 
-                  <Border Padding="14"
+                  <Border Padding="{DynamicResource Token.Layout.CardPadding}"
                           Background="{DynamicResource ElevatedSurfaceBrush}"
                           BorderBrush="{DynamicResource ControlBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="6">
-                    <StackPanel Spacing="10">
+                    <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
                       <TextBlock Text="Related assets"
                                  FontSize="14"
                                  FontWeight="SemiBold"
@@ -2232,7 +2232,7 @@
                       <ItemsControl ItemsSource="{Binding ItemInspector.Assets}">
                         <ItemsControl.ItemTemplate>
                           <DataTemplate x:DataType="appItems:ItemInspectorAssetEntry">
-                            <StackPanel Margin="0,0,0,4" Spacing="2">
+                            <StackPanel Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Compact}" Spacing="{DynamicResource Token.Spacing.Gap.Micro}">
                               <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{DynamicResource StrongTextBrush}" />
                               <TextBlock Text="{Binding Kind}" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" />
                               <TextBlock IsVisible="{Binding IsMissing}"
@@ -2250,18 +2250,18 @@
                     </StackPanel>
                   </Border>
 
-                  <Border Padding="14"
+                  <Border Padding="{DynamicResource Token.Layout.CardPadding}"
                           Background="{DynamicResource ElevatedSurfaceBrush}"
                           BorderBrush="{DynamicResource ControlBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="6">
-                    <StackPanel Spacing="10">
+                    <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
                       <TextBlock Text="Lifecycle"
                                  FontSize="14"
                                  FontWeight="SemiBold"
                                  Foreground="{DynamicResource StrongTextBrush}" />
                       <StackPanel Orientation="Horizontal"
-                                  Spacing="8"
+                                  Spacing="{DynamicResource Token.Spacing.ControlGap}"
                                   HorizontalAlignment="Left">
                         <Button Content="Archive"
                                 IsVisible="{Binding ItemInspector.CanArchive}"
@@ -2281,16 +2281,16 @@
                                 Classes="storeSecondary" />
                       </StackPanel>
                       <Border IsVisible="{Binding ItemInspector.ArchiveConfirmationVisible}"
-                              Padding="10"
+                              Padding="{DynamicResource Token.Layout.Padding.Uniform.Group}"
                               Background="{DynamicResource WarningBackgroundBrush}"
                               CornerRadius="6">
-                        <StackPanel Spacing="8">
+                        <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                           <TextBlock Text="Archive this Item? It leaves active navigation but stays recoverable."
                                      TextWrapping="Wrap"
                                      FontSize="12"
                                      Foreground="{DynamicResource StrongTextBrush}" />
                           <StackPanel Orientation="Horizontal"
-                                      Spacing="8"
+                                      Spacing="{DynamicResource Token.Spacing.ControlGap}"
                                       HorizontalAlignment="Left">
                             <Button Content="Archive"
                                     Command="{Binding ItemInspector.ConfirmArchiveCommand}"
@@ -2302,16 +2302,16 @@
                         </StackPanel>
                       </Border>
                       <Border IsVisible="{Binding ItemInspector.DeleteConfirmationVisible}"
-                              Padding="10"
+                              Padding="{DynamicResource Token.Layout.Padding.Uniform.Group}"
                               Background="{DynamicResource DangerBackgroundBrush}"
                               CornerRadius="6">
-                        <StackPanel Spacing="8">
+                        <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                           <TextBlock Text="Permanently delete this Item? Connected creative records will block deletion."
                                      TextWrapping="Wrap"
                                      FontSize="12"
                                      Foreground="{DynamicResource StrongTextBrush}" />
                           <StackPanel Orientation="Horizontal"
-                                      Spacing="8"
+                                      Spacing="{DynamicResource Token.Spacing.ControlGap}"
                                       HorizontalAlignment="Left">
                             <Button Content="Delete permanently"
                                     Command="{Binding ItemInspector.ConfirmDeleteCommand}"
@@ -2334,33 +2334,33 @@
             </Border>
 
             <Border IsVisible="{Binding IsStatusConfirmationVisible}"
-                    Padding="12"
+                    Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}"
                     Background="{DynamicResource WarningBackgroundBrush}"
                     BorderBrush="{DynamicResource WarningBorderBrush}"
                     BorderThickness="1"
                     CornerRadius="6">
-              <StackPanel Spacing="8">
+              <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                 <TextBlock Text="Confirm lifecycle change"
                            FontWeight="SemiBold" />
                 <TextBlock Text="{Binding StatusConfirmationMessage}"
                                    TextWrapping="Wrap" />
                         <Border IsVisible="{Binding DesignTool.IsListingMigrationReviewVisible}"
-                                Padding="10"
+                                Padding="{DynamicResource Token.Layout.Padding.Uniform.Group}"
                                 Background="{DynamicResource WarningSurfaceBrush}"
                                 BorderBrush="{DynamicResource WarningTextBrush}"
                                 BorderThickness="1"
                                 CornerRadius="4"
                                 AutomationProperties.Name="Offering migration review">
-                          <StackPanel Spacing="8">
+                          <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                             <TextBlock Text="Review fulfillment migration" FontWeight="SemiBold" />
                             <TextBlock Text="{Binding DesignTool.ListingMigrationReviewSummary}" TextWrapping="Wrap" />
-                            <StackPanel Orientation="Horizontal" Spacing="8">
+                            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                               <Button Content="Confirm migration" Command="{Binding DesignTool.ConfirmListingMigrationCommand}" AutomationProperties.AutomationId="Design.ConfirmListingMigration" />
                               <Button Content="Cancel" Command="{Binding DesignTool.CancelListingMigrationCommand}" AutomationProperties.AutomationId="Design.CancelListingMigration" />
                             </StackPanel>
                           </StackPanel>
                         </Border>
-                <StackPanel Orientation="Horizontal" Spacing="8">
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
                   <Button Content="Confirm"
                           Command="{Binding ConfirmStatusChangeCommand}"
                           Classes="storeAction" />
@@ -2374,11 +2374,11 @@
 
             <Border IsVisible="{Binding GroupDetails.HasState}"
                     MinHeight="360"
-                    Padding="22"
+                    Padding="{DynamicResource Token.Layout.Padding.Uniform.WidePlus}"
                     Background="{DynamicResource PanelSurfaceBrush}"
                     BorderBrush="{DynamicResource ControlBorderBrush}"
                     BorderThickness="1">
-                <StackPanel Spacing="14">
+                <StackPanel Spacing="{DynamicResource Token.Spacing.SectionGap}">
                   <ProgressBar IsVisible="{Binding GroupDetails.IsBusy}"
                                IsIndeterminate="True"
                                Height="4"
@@ -2392,17 +2392,17 @@
                              FontSize="12"
                              Foreground="{DynamicResource SecondaryTextBrush}" />
 
-                  <Border Padding="14"
+                  <Border Padding="{DynamicResource Token.Layout.CardPadding}"
                           Background="{DynamicResource ElevatedSurfaceBrush}"
                           BorderBrush="{DynamicResource ControlBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="6">
-                    <StackPanel Spacing="10">
+                    <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
                       <TextBlock Text="Group details"
                                  FontSize="14"
                                  FontWeight="SemiBold"
                                  Foreground="{DynamicResource StrongTextBrush}" />
-                      <StackPanel Spacing="6">
+                      <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
                         <TextBlock Text="Group name"
                                    FontSize="11"
                                    Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -2432,12 +2432,12 @@
                     </StackPanel>
                   </Border>
 
-                  <Border Padding="14"
+                  <Border Padding="{DynamicResource Token.Layout.CardPadding}"
                           Background="{DynamicResource ElevatedSurfaceBrush}"
                           BorderBrush="{DynamicResource ControlBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="6">
-                    <StackPanel Spacing="10">
+                    <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
                       <TextBlock Text="Location"
                                  FontSize="14"
                                  FontWeight="SemiBold"
@@ -2452,7 +2452,7 @@
                         </ComboBox.ItemTemplate>
                       </ComboBox>
                       <StackPanel Orientation="Horizontal"
-                                  Spacing="8"
+                                  Spacing="{DynamicResource Token.Spacing.ControlGap}"
                                   HorizontalAlignment="Left">
                         <Button Content="Move"
                                 IsEnabled="{Binding GroupDetails.CanMove}"
@@ -2463,18 +2463,18 @@
                     </StackPanel>
                   </Border>
 
-                  <Border Padding="14"
+                  <Border Padding="{DynamicResource Token.Layout.CardPadding}"
                           Background="{DynamicResource ElevatedSurfaceBrush}"
                           BorderBrush="{DynamicResource ControlBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="6">
-                    <StackPanel Spacing="10">
+                    <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
                       <TextBlock Text="Lifecycle"
                                  FontSize="14"
                                  FontWeight="SemiBold"
                                  Foreground="{DynamicResource StrongTextBrush}" />
                       <StackPanel Orientation="Horizontal"
-                                  Spacing="8"
+                                  Spacing="{DynamicResource Token.Spacing.ControlGap}"
                                   HorizontalAlignment="Left">
                         <Button Content="Archive"
                                 IsVisible="{Binding GroupDetails.CanArchive}"
@@ -2488,16 +2488,16 @@
                                 Classes="storeSecondary" />
                       </StackPanel>
                       <Border IsVisible="{Binding GroupDetails.ArchiveConfirmationVisible}"
-                              Padding="10"
+                              Padding="{DynamicResource Token.Layout.Padding.Uniform.Group}"
                               Background="{DynamicResource WarningBackgroundBrush}"
                               CornerRadius="6">
-                        <StackPanel Spacing="8">
+                        <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                           <TextBlock Text="Archive this group? The group and its subtree leave active navigation, but all child work and context remain preserved."
                                      TextWrapping="Wrap"
                                      FontSize="12"
                                      Foreground="{DynamicResource StrongTextBrush}" />
                           <StackPanel Orientation="Horizontal"
-                                      Spacing="8"
+                                      Spacing="{DynamicResource Token.Spacing.ControlGap}"
                                       HorizontalAlignment="Left">
                             <Button Content="Archive"
                                     Command="{Binding GroupDetails.ConfirmArchiveCommand}"
@@ -2521,7 +2521,7 @@
 
             <Grid ColumnDefinitions="*,Auto,Auto"
                   IsVisible="{Binding HasActiveItem}"
-                  Margin="0,4,0,0">
+                  Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Compact.Right_None.Bottom_None}">
               <TextBlock Grid.Column="0"
                          Text="{Binding StageMoveError}"
                          IsVisible="{Binding StageMoveError}"
@@ -2534,7 +2534,7 @@
                       IsEnabled="{Binding CanMoveStageBack}"
                       Command="{Binding MoveStageBackCommand}"
                       Classes="stageMove"
-                      Margin="0,0,6,0" />
+                      Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_Inline.Bottom_None}" />
               <Button Grid.Column="2"
                       Content="{Binding StageMoveForwardLabel}"
                       IsEnabled="{Binding CanMoveStageForward}"
@@ -2548,7 +2548,7 @@
                       IsVisible="{Binding !DocumentWindow.HasActiveDocument}"
                       HorizontalAlignment="Center"
                       VerticalAlignment="Center"
-                      Spacing="8">
+                      Spacing="{DynamicResource Token.Spacing.ControlGap}">
             <TextBlock Text="{Binding DocumentWindow.EmptyStateTitle}"
                        HorizontalAlignment="Center"
                        FontSize="28"
@@ -2563,15 +2563,15 @@
           <Border Grid.Row="1"
                   IsVisible="{Binding ShowSelectionSummary}"
                   Background="{DynamicResource ElevatedSurfaceBrush}"
-                  Padding="4">
-            <StackPanel Spacing="14">
-              <StackPanel Spacing="4">
+                  Padding="{DynamicResource Token.Layout.CompactPadding}">
+            <StackPanel Spacing="{DynamicResource Token.Spacing.SectionGap}">
+              <StackPanel Spacing="{DynamicResource Token.Spacing.CompactGap}">
                 <TextBlock Text="{Binding WorkspaceTree.InspectorKind}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
                 <TextBlock Text="{Binding WorkspaceTree.InspectorTitle}" FontSize="26" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
                 <TextBlock Text="{Binding WorkspaceTree.InspectorPath}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
               </StackPanel>
-              <Border Padding="18" Background="{DynamicResource PanelSurfaceBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1">
-                <StackPanel Spacing="8">
+              <Border Padding="{DynamicResource Token.Layout.Padding.Uniform.Large}" Background="{DynamicResource PanelSurfaceBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1">
+                <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
                   <TextBlock Text="Properties" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource StrongTextBrush}" />
                   <TextBlock Text="{Binding WorkspaceTree.InspectorDescription}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
                   <TextBlock Text="Selection updates this inspector without opening a tab. Ctrl-click the tree node to keep it in a tab."
@@ -2589,11 +2589,11 @@
       <Border Width="420"
               HorizontalAlignment="Center"
               VerticalAlignment="Center"
-              Padding="20"
+              Padding="{DynamicResource Token.Layout.Padding.Uniform.Wide}"
               Background="{DynamicResource ElevatedSurfaceBrush}"
               BorderBrush="{DynamicResource ControlBorderBrush}"
               BorderThickness="1">
-        <StackPanel Spacing="12">
+        <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
           <TextBlock Text="Create your first workspace?"
                      FontSize="22"
                      FontWeight="SemiBold"
@@ -2604,7 +2604,7 @@
                      Foreground="{DynamicResource SecondaryTextBrush}" />
           <StackPanel Orientation="Horizontal"
                       HorizontalAlignment="Right"
-                      Spacing="8">
+                      Spacing="{DynamicResource Token.Spacing.ControlGap}">
             <Button x:Name="NoWorkspaceImportButton"
                     Content="Import workspace…"
                     IsEnabled="{Binding WorkspaceManagement.CanImportWorkspace}"
@@ -2624,11 +2624,11 @@
       <Border Width="420"
               HorizontalAlignment="Center"
               VerticalAlignment="Center"
-              Padding="20"
+              Padding="{DynamicResource Token.Layout.Padding.Uniform.Wide}"
               Background="{DynamicResource ElevatedSurfaceBrush}"
               BorderBrush="{DynamicResource ControlBorderBrush}"
               BorderThickness="1">
-        <StackPanel Spacing="12">
+        <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
           <TextBlock Text="Create your first store?"
                      FontSize="22"
                      FontWeight="SemiBold"
@@ -2639,7 +2639,7 @@
                      Foreground="{DynamicResource SecondaryTextBrush}" />
           <StackPanel Orientation="Horizontal"
                       HorizontalAlignment="Right"
-                      Spacing="8">
+                      Spacing="{DynamicResource Token.Spacing.ControlGap}">
             <Button Content="Create store"
                     Command="{Binding StoreManagement.AcceptFirstStorePromptCommand}"
                     Classes="storeAction fixedDialog" />

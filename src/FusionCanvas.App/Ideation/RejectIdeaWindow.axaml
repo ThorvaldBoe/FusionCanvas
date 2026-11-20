@@ -9,7 +9,7 @@
          CanResize="False"
          WindowStartupLocation="CenterOwner"
          Background="{DynamicResource ElevatedSurfaceBrush}">
-  <Grid Margin="20" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="10">
+  <Grid Margin="{DynamicResource Token.Layout.Margin.Uniform.Wide}" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="{DynamicResource Token.Spacing.GroupGap}">
     <TextBlock Text="Reject idea candidate?"
                FontSize="18"
                FontWeight="SemiBold" />
@@ -17,7 +17,7 @@
                Text="{Binding RejectionCandidate.Text}"
                TextWrapping="Wrap"
                Foreground="{DynamicResource SecondaryTextBrush}" />
-    <Grid Grid.Row="2" RowDefinitions="Auto,*" RowSpacing="5">
+    <Grid Grid.Row="2" RowDefinitions="Auto,*" RowSpacing="{DynamicResource Token.Spacing.Gap.CompactPlus}">
       <TextBlock Text="Reason (optional)"
                  Foreground="{DynamicResource SecondaryTextBrush}" />
       <TextBox x:Name="ReasonTextBox"
@@ -32,7 +32,7 @@
     <StackPanel Grid.Row="3"
                 Orientation="Horizontal"
                 HorizontalAlignment="Right"
-                Spacing="8">
+                Spacing="{DynamicResource Token.Spacing.ControlGap}">
       <Button x:Name="CancelButton"
               Content="Cancel"
               Click="OnCancel"

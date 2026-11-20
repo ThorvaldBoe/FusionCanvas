@@ -7,8 +7,8 @@
         Width="1100" Height="760" MinWidth="440" MinHeight="360"
         CanResize="True" WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ApplicationBackgroundBrush}">
-  <Grid Margin="16" RowDefinitions="Auto,*,Auto" RowSpacing="12">
-    <StackPanel Grid.Row="0" Spacing="3">
+  <Grid Margin="{DynamicResource Token.Layout.Margin.Uniform.SectionPlus}" RowDefinitions="Auto,*,Auto" RowSpacing="{DynamicResource Token.Spacing.Gap.Panel}">
+    <StackPanel Grid.Row="0" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
       <TextBlock Text="Enlarged image placement" FontSize="18" FontWeight="SemiBold" />
       <TextBlock Text="Drag the design area to position it. Drag the lower-right handle to resize." TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
       <TextBlock Text="{Binding SelectedLocalSource.DisplayName}" Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -26,7 +26,7 @@
                                   ImageHeight="{Binding MappingImageHeight}"
                                   ImagePath="{Binding SelectedImagePreviewPath}"
                                   AutomationProperties.Name="Enlarged selected image placement" />
-    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="{DynamicResource Token.Spacing.ControlGap}">
       <CheckBox Content="Keep aspect ratio" IsChecked="{Binding KeepAspectRatio, Mode=TwoWay}" IsEnabled="{Binding CanKeepAspectRatio}"
                 VerticalAlignment="Center" ToolTip.Tip="Preserve the selected Design Area width-to-height ratio."
                 AutomationProperties.Name="Keep aspect ratio"

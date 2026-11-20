@@ -11,8 +11,8 @@
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ApplicationBackgroundBrush}"
         AutomationProperties.AutomationId="Catalog.AddVariantDialog">
-  <Grid RowDefinitions="*,Auto" Margin="20" RowSpacing="16">
-    <StackPanel Grid.Row="0" Spacing="8" AutomationProperties.AutomationId="Catalog.AddVariantEditor">
+  <Grid RowDefinitions="*,Auto" Margin="{DynamicResource Token.Layout.Margin.Uniform.Wide}" RowSpacing="{DynamicResource Token.Spacing.Gap.SectionPlus}">
+    <StackPanel Grid.Row="0" Spacing="{DynamicResource Token.Spacing.ControlGap}" AutomationProperties.AutomationId="Catalog.AddVariantEditor">
       <Grid ColumnDefinitions="*,Auto">
         <TextBlock Grid.Column="0" Text="Add Variant" FontWeight="SemiBold" />
         <Button x:Name="AddVariantCancelButton" Grid.Column="1" Content="Cancel" Click="OnCancelClick" Classes="secondary" />
