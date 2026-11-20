@@ -973,3 +973,18 @@ extensions:
         criteria: [FC-UI-015]
         result: PASS
         evidence: Zero positive numeric spacing literals remain in app XAML outside DesignTokens.axaml; migrated 745 audited surface values and 3 shared-header values.
+  - extension_revision: 7
+    repository_revision: 6a3cced
+    working_tree_state: audit-artifacts-only-changed; application source committed
+    generated_at: 2026-11-20T19:17:00+01:00
+    standard_version: "1.4"
+    extract_definition_version: "1.4"
+    change_summary: Revalidated FC-UI-024 and FC-UI-097 after the semantic typography migration.
+    current_total_surfaces: 36
+    counts_by_kind: {window: 33, user_control: 3}
+    revalidation:
+      UI-002_UI-005:
+        source_revision: 6a3cced
+        criteria: [FC-UI-024, FC-UI-097]
+        result: PASS
+        evidence: Zero numeric TextBlock FontSize literals remain outside DesignTokens.axaml; three labels formerly set to 10 DIPs now use the 11-DIP Label token.

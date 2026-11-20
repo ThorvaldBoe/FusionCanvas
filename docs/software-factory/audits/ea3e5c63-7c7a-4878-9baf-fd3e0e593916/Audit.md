@@ -55,3 +55,6 @@ Current audit outcome: PROVISIONAL, with the selected review scope complete and 
 - UI-002/UI-005 / [#969](https://github.com/ThorvaldBoe/FusionCanvas/issues/969) and UI-003 / [#970](https://github.com/ThorvaldBoe/FusionCanvas/issues/970) remain under remediation.
 
 The audit remains PROVISIONAL until the remaining findings are fixed and revalidated. Runtime unknowns and Draft baseline limitations are unchanged.
+
+- UI-002/UI-005 / [#969](https://github.com/ThorvaldBoe/FusionCanvas/issues/969): PASS after semantic typography migration at `6a3cced`; all three former 10-DIP labels now render at the 11-DIP Label token. Static scan found zero numeric TextBlock font-size literals outside the token dictionary.
+- UI-003 / [#970](https://github.com/ThorvaldBoe/FusionCanvas/issues/970) remains under remediation.
