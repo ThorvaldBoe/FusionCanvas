@@ -57,6 +57,22 @@ public class MainWindowConstructionTests
     }
 
     [AvaloniaFact]
+    public void ItemInspectorTagRemovalButton_HasCompactTargetAndAccessibleName()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.ViewModel.ItemInspector.TagDraft.Add("Target check");
+        fixture.PumpLayout();
+
+        var removeTagButton = fixture.FindControl<Button>(button =>
+            AutomationProperties.GetAutomationId(button) == "Workspace.ItemInspector.RemoveTag");
+
+        Assert.Equal("Remove tag", AutomationProperties.GetName(removeTagButton));
+        Assert.Equal(28, removeTagButton.Bounds.Width);
+        Assert.Equal(28, removeTagButton.Bounds.Height);
+    }
+
+    [AvaloniaFact]
     public void ListingDiagnosticsRegionHasStableAccessibleIdentity()
     {
         using var fixture = new MainWindowFixture();
