@@ -71,7 +71,8 @@ public static class AppServicesFactory
             telemetry,
             telemetryContext,
             new TermsConsentService(settingsStore));
-        var updateHttpClient = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false })
+        var updateHttpClient = new HttpClient(new GitHubReleaseAssetRedirectHandler(
+            new HttpClientHandler { AllowAutoRedirect = false }))
         {
             Timeout = TimeSpan.FromSeconds(30)
         };
@@ -119,3 +120,4 @@ public static class AppServicesFactory
             UpdatePlatform.WindowsX64);
     }
 }
+

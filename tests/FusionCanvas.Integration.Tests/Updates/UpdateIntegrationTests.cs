@@ -63,6 +63,57 @@ public sealed class UpdateIntegrationTests
     }
 
     [Fact]
+    public async Task GitHubUpdateSource_FollowsGitHubReleaseAssetRedirect()
+    {
+        const string json = """{"schemaVersion":3,"productVersion":"0.3.0","platform":"win-x64","track":"stable","tagName":"v0.3.0","sourceCommit":"CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC","installerUri":"https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-0.3.0-win-x64-Setup.exe","sha256":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","releaseUri":"https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.3.0","bundleUri":"https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-0.3.0-win-x64-Setup.exe.sigstore.json"}""";
+        using var client = CreateRedirectClient(_ => new StringContent(json, Encoding.UTF8, "application/json"));
+        var release = new UpdateRelease("v0.3.0", "0.3.0", UpdateTrack.Stable,
+            new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.3.0"), new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-0.3.0.json"));
+
+        var manifest = await new GitHubUpdateSource(client).GetManifestAsync(release);
+
+        Assert.NotNull(manifest);
+        Assert.Equal("0.3.0", manifest.ProductVersion);
+    }
+
+    [Fact]
+    public async Task GitHubReleaseAssetRedirectHandler_DoesNotFollowUntrustedRedirects()
+    {
+        using var client = new HttpClient(new GitHubReleaseAssetRedirectHandler(new DelegateHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.Redirect)
+            {
+                Headers = { Location = new Uri("https://example.test/asset") }
+            })));
+
+        using var response = await client.GetAsync("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/asset.exe");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Downloader_FollowsReleaseAssetRedirectsForInstallerAndBundle()
+    {
+        var installer = Encoding.UTF8.GetBytes("installer bytes");
+        var hash = Convert.ToHexString(SHA256.HashData(installer));
+        var manifest = Manifest(hash);
+        using var client = CreateRedirectClient(request => request.RequestUri!.AbsolutePath.EndsWith(".sigstore.json", StringComparison.Ordinal)
+            ? new ByteArrayContent(Encoding.UTF8.GetBytes("{}"))
+            : new ByteArrayContent(installer));
+        var directory = Path.Combine(Path.GetTempPath(), "FusionCanvasUpdateTests", Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            var package = await new UpdatePackageDownloader(client, new AcceptingAuthenticityVerifier(), directory).DownloadAndVerifyAsync(manifest);
+
+            Assert.Equal(installer, await File.ReadAllBytesAsync(package.InstallerPath));
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task GitHubUpdateSource_RejectsNoncanonicalManifestAssetBeforeRequest()
     {
         using var client = CreateClient(_ => throw new InvalidOperationException("The source must not request an untrusted URL."));
@@ -262,6 +313,24 @@ public sealed class UpdateIntegrationTests
     private static HttpClient CreateClient(Func<HttpRequestMessage, HttpResponseMessage> handler) =>
         new(new DelegateHandler(handler));
 
+    private static HttpClient CreateRedirectClient(Func<HttpRequestMessage, HttpContent> finalContent)
+    {
+        var inner = new DelegateHandler(request =>
+        {
+            if (request.RequestUri!.IdnHost.Equals("github.com", StringComparison.OrdinalIgnoreCase))
+            {
+                return new HttpResponseMessage(HttpStatusCode.Redirect)
+                {
+                    Headers = { Location = new Uri("https://release-assets.githubusercontent.com/test-asset") }
+                };
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = finalContent(request) };
+        });
+
+        return new HttpClient(new GitHubReleaseAssetRedirectHandler(inner));
+    }
+
     private static async Task WaitForPartialFileAsync(string directory)
     {
         for (var attempt = 0; attempt < 100; attempt++)
@@ -376,3 +445,4 @@ public sealed class UpdateIntegrationTests
             Task.FromException(new InvalidOperationException("signature rejected"));
     }
 }
+
