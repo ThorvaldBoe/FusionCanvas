@@ -12,11 +12,11 @@
   <Grid RowDefinitions="Auto,Auto" Margin="{DynamicResource Token.Layout.PageInset}" RowSpacing="{DynamicResource Token.Spacing.Gap.WidePlus}">
     <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
       <TextBlock Text="{Binding Title}"
-                 FontSize="20"
+                 FontSize="{DynamicResource Token.Typography.SurfaceHeading}"
                  FontWeight="SemiBold" />
       <TextBlock Text="{Binding Message}"
                  TextWrapping="Wrap"
-                 FontSize="14" />
+                 FontSize="{DynamicResource Token.Typography.SectionHeading}" />
     </StackPanel>
     <StackPanel Grid.Row="1"
                 Orientation="Horizontal"

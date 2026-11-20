@@ -11,14 +11,14 @@
         Background="{DynamicResource ApplicationBackgroundBrush}">
   <Grid RowDefinitions="Auto,*,Auto" Margin="{DynamicResource Token.Layout.Margin.Uniform.Wide}">
     <StackPanel Grid.Row="0" Spacing="{DynamicResource Token.Spacing.CompactGap}" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Section}">
-      <TextBlock Text="{Binding ContextKindLabel}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
-      <TextBlock Text="{Binding ContextTitle}" FontSize="22" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
-      <TextBlock Text="Import files to attach them to this context and preserve their managed workspace copy." TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" />
+      <TextBlock Text="{Binding ContextKindLabel}" FontSize="{DynamicResource Token.Typography.Caption}" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
+      <TextBlock Text="{Binding ContextTitle}" FontSize="{DynamicResource Token.Typography.PageHeading}" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+      <TextBlock Text="Import files to attach them to this context and preserve their managed workspace copy." TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Label}" Foreground="{DynamicResource SecondaryTextBrush}" />
     </StackPanel>
 
     <ScrollViewer Grid.Row="1" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Section}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
       <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
-        <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource DangerTextBrush}" />
+        <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource DangerTextBrush}" />
 
         <Border IsVisible="{Binding IsEmpty}"
                 Padding="{DynamicResource Token.Layout.Padding.Uniform.Large}"
@@ -27,8 +27,8 @@
                 BorderThickness="1"
                 CornerRadius="6">
           <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
-            <TextBlock Text="No assets yet" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource StrongTextBrush}" />
-            <TextBlock Text="Import a design source, export, mockup, reference, texture, brush, or font to attach it here." TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+            <TextBlock Text="No assets yet" FontSize="{DynamicResource Token.Typography.SectionHeading}" FontWeight="SemiBold" Foreground="{DynamicResource StrongTextBrush}" />
+            <TextBlock Text="Import a design source, export, mockup, reference, texture, brush, or font to attach it here." TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Caption}" Foreground="{DynamicResource SecondaryTextBrush}" />
           </StackPanel>
         </Border>
 
@@ -57,10 +57,10 @@
                     <Image Source="{Binding Thumbnail}" Width="64" Height="64" Stretch="UniformToFill" />
                   </Button>
                   <StackPanel Grid.Column="1" Spacing="{DynamicResource Token.Spacing.Gap.Micro}">
-                    <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" AutomationProperties.Name="{Binding Name}" AutomationProperties.HelpText="{Binding Name}" />
-                    <TextBlock Text="{Binding ManagedFileName}" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ManagedFileName}" AutomationProperties.Name="{Binding ManagedFileName}" AutomationProperties.HelpText="{Binding ManagedFileName}" />
-                    <TextBlock Text="Missing managed file" IsVisible="{Binding IsMissing}" FontSize="11" Foreground="{DynamicResource DangerTextBrush}" AutomationProperties.Name="Missing managed file" />
-                    <TextBlock Text="{Binding ContextLabel}" IsVisible="{Binding ContextLabel, Converter={x:Static ObjectConverters.IsNotNull}}" FontSize="11" Foreground="{DynamicResource AccentBrush}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ContextLabel}" AutomationProperties.Name="{Binding ContextLabel}" AutomationProperties.HelpText="{Binding ContextLabel}" />
+                    <TextBlock Text="{Binding Name}" FontSize="{DynamicResource Token.Typography.SectionHeading}" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" AutomationProperties.Name="{Binding Name}" AutomationProperties.HelpText="{Binding Name}" />
+                    <TextBlock Text="{Binding ManagedFileName}" FontSize="{DynamicResource Token.Typography.Label}" Foreground="{DynamicResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ManagedFileName}" AutomationProperties.Name="{Binding ManagedFileName}" AutomationProperties.HelpText="{Binding ManagedFileName}" />
+                    <TextBlock Text="Missing managed file" IsVisible="{Binding IsMissing}" FontSize="{DynamicResource Token.Typography.Label}" Foreground="{DynamicResource DangerTextBrush}" AutomationProperties.Name="Missing managed file" />
+                    <TextBlock Text="{Binding ContextLabel}" IsVisible="{Binding ContextLabel, Converter={x:Static ObjectConverters.IsNotNull}}" FontSize="{DynamicResource Token.Typography.Label}" Foreground="{DynamicResource AccentBrush}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ContextLabel}" AutomationProperties.Name="{Binding ContextLabel}" AutomationProperties.HelpText="{Binding ContextLabel}" />
                   </StackPanel>
                   <ComboBox Grid.Column="2"
                             ItemsSource="{Binding Parent.AvailablePurposes}"
@@ -92,8 +92,8 @@
           <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
               <StackPanel Grid.Column="0" Spacing="{DynamicResource Token.Spacing.Gap.Micro}">
-                <TextBlock Text="Confirm import" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource AccentSoftForegroundBrush}" />
-                <TextBlock Text="{Binding PendingImportFileName}" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="Confirm import" FontSize="{DynamicResource Token.Typography.Body}" FontWeight="SemiBold" Foreground="{DynamicResource AccentSoftForegroundBrush}" />
+                <TextBlock Text="{Binding PendingImportFileName}" FontSize="{DynamicResource Token.Typography.Label}" Foreground="{DynamicResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis" />
               </StackPanel>
               <ComboBox Grid.Column="1"
                         ItemsSource="{Binding AvailablePurposes}"
@@ -118,7 +118,7 @@
                 BorderThickness="1"
                 CornerRadius="6">
           <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
-            <TextBlock Text="{Binding RemovalPromptMessage}" TextWrapping="Wrap" FontSize="13" Foreground="{DynamicResource DangerTextBrush}" />
+            <TextBlock Text="{Binding RemovalPromptMessage}" TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Body}" Foreground="{DynamicResource DangerTextBrush}" />
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
               <Button Content="Remove permanently" Command="{Binding ConfirmRemoveCommand}" Classes="danger" AutomationProperties.AutomationId="Assets.ConfirmRemove" />
               <Button Content="Cancel" Command="{Binding CancelRemoveCommand}" Classes="secondary" AutomationProperties.AutomationId="Assets.CancelRemove" />
@@ -140,7 +140,7 @@
                      IsIndeterminate="True"
                      AutomationProperties.Name="Loading assets" />
         <TextBlock Text="Loading…"
-                   FontSize="12"
+                   FontSize="{DynamicResource Token.Typography.Caption}"
                    Foreground="{DynamicResource SecondaryTextBrush}"
                    VerticalAlignment="Center" />
       </StackPanel>

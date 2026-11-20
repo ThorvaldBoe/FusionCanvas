@@ -11,7 +11,7 @@
          Background="{DynamicResource ElevatedSurfaceBrush}">
   <Grid Margin="{DynamicResource Token.Layout.Margin.Uniform.Wide}" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="{DynamicResource Token.Spacing.GroupGap}">
     <TextBlock Text="Reject idea candidate?"
-               FontSize="18"
+               FontSize="{DynamicResource Token.Typography.ToolTitle}"
                FontWeight="SemiBold" />
     <TextBlock Grid.Row="1"
                Text="{Binding RejectionCandidate.Text}"

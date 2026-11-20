@@ -13,18 +13,18 @@
   <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Margin="{DynamicResource Token.Layout.Margin.Uniform.Wide}">
     <StackPanel Grid.Row="0" Spacing="{DynamicResource Token.Spacing.CompactGap}" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Section}">
       <TextBlock Text="Rejected Phrases"
-                 FontSize="22"
+                 FontSize="{DynamicResource Token.Typography.PageHeading}"
                  FontWeight="SemiBold"
                  Foreground="{DynamicResource StrongTextBrush}" />
       <TextBlock Text="Review and curate rejected ideation phrases used as negative guidance for future generation."
-                 FontSize="12"
+                 FontSize="{DynamicResource Token.Typography.Caption}"
                  Foreground="{DynamicResource SecondaryTextBrush}" />
     </StackPanel>
 
     <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Group}" IsVisible="{Binding HasScopeOptions}">
       <TextBlock Text="Scope:"
                  VerticalAlignment="Center"
-                 FontSize="12"
+                 FontSize="{DynamicResource Token.Typography.Caption}"
                  FontWeight="SemiBold"
                  Foreground="{DynamicResource SecondaryTextBrush}" />
       <ComboBox x:Name="ScopeSelector"
@@ -51,7 +51,7 @@
         <Grid RowDefinitions="Auto,*,Auto">
           <TextBlock Grid.Row="0"
                      Text="Rejected phrases"
-                     FontSize="13"
+                     FontSize="{DynamicResource Token.Typography.Body}"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource StrongTextBrush}"
                      Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Group}" />
@@ -80,7 +80,7 @@
                          FontWeight="SemiBold"
                          Foreground="{DynamicResource StrongTextBrush}" />
               <TextBlock Text="Create one to capture guidance."
-                         FontSize="11"
+                         FontSize="{DynamicResource Token.Typography.Label}"
                          Foreground="{DynamicResource SecondaryTextBrush}" />
             </StackPanel>
 
@@ -116,7 +116,7 @@
         <ScrollViewer>
           <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
             <TextBlock Text="Rejected phrase details"
-                       FontSize="16"
+                       FontSize="{DynamicResource Token.Typography.SubsectionHeading}"
                        FontWeight="SemiBold"
                        Foreground="{DynamicResource StrongTextBrush}" />
 
@@ -126,7 +126,7 @@
 
             <StackPanel IsVisible="{Binding HasSelection}" Spacing="{DynamicResource Token.Spacing.InlineGap}">
               <TextBlock Text="Phrase"
-                         FontSize="12"
+                         FontSize="{DynamicResource Token.Typography.Caption}"
                          FontWeight="SemiBold"
                          Foreground="{DynamicResource SecondaryTextBrush}" />
               <TextBox x:Name="PhraseBox"
@@ -137,7 +137,7 @@
 
             <StackPanel IsVisible="{Binding HasSelection}" Spacing="{DynamicResource Token.Spacing.InlineGap}">
               <TextBlock Text="Reason"
-                         FontSize="12"
+                         FontSize="{DynamicResource Token.Typography.Caption}"
                          FontWeight="SemiBold"
                          Foreground="{DynamicResource SecondaryTextBrush}" />
               <TextBox x:Name="ReasonBox"

@@ -21,7 +21,7 @@
                     Spacing="{DynamicResource Token.Spacing.ControlGap}"
                     Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_SectionPlus}">
           <TextBlock Text="Workspaces"
-                     FontSize="18"
+                     FontSize="{DynamicResource Token.Typography.ToolTitle}"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource PrimaryTextBrush}" />
           <Button Content="New workspace"
@@ -38,7 +38,7 @@
         <ScrollViewer VerticalScrollBarVisibility="Auto">
           <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
             <TextBlock Text="Active"
-                       FontSize="12"
+                       FontSize="{DynamicResource Token.Typography.Caption}"
                        FontWeight="SemiBold"
                        Foreground="{DynamicResource SecondaryTextBrush}" />
             <ItemsControl ItemsSource="{Binding ActiveWorkspaces}">
@@ -55,7 +55,7 @@
 
             <TextBlock IsVisible="{Binding HasArchivedWorkspaces}"
                        Text="Archived"
-                       FontSize="12"
+                       FontSize="{DynamicResource Token.Typography.Caption}"
                        FontWeight="SemiBold"
                        Foreground="{DynamicResource SecondaryTextBrush}"
                        Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}" />
@@ -85,12 +85,12 @@
       <ScrollViewer>
         <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
           <TextBlock Text="Workspace Management"
-                     FontSize="22"
+                     FontSize="{DynamicResource Token.Typography.PageHeading}"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource PrimaryTextBrush}" />
           <TextBlock Text="{Binding ErrorMessage}"
                      IsVisible="{Binding HasError}"
-                     FontSize="12"
+                     FontSize="{DynamicResource Token.Typography.Caption}"
                      Foreground="{DynamicResource DangerTextBrush}" />
           <ProgressBar IsVisible="{Binding IsBusy}"
                        IsIndeterminate="True"
@@ -104,7 +104,7 @@
                   Padding="{DynamicResource Token.Layout.Padding.Uniform.Group}">
             <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
               <TextBlock Text="{Binding TransferPhase}"
-                         FontSize="12"
+                         FontSize="{DynamicResource Token.Typography.Caption}"
                          Foreground="{DynamicResource SecondaryTextBrush}" />
               <ProgressBar Minimum="0"
                            Maximum="1"
@@ -124,7 +124,7 @@
                   Padding="{DynamicResource Token.Layout.Padding.Uniform.Group}">
             <TextBlock Text="{Binding TransferSummary}"
                        TextWrapping="Wrap"
-                       FontSize="12"
+                       FontSize="{DynamicResource Token.Typography.Caption}"
                        Foreground="{DynamicResource SecondaryTextBrush}" />
           </Border>
 
@@ -178,7 +178,7 @@
 
           <TextBlock IsVisible="{Binding HasArchivedWorkspaces}"
                      Text="Select an archived workspace in the list to restore it."
-                     FontSize="12"
+                     FontSize="{DynamicResource Token.Typography.Caption}"
                      Foreground="{DynamicResource SecondaryTextBrush}" />
 
           <Border IsVisible="{Binding DeleteWarningVisible}"
@@ -190,7 +190,7 @@
             <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
               <TextBlock Text="{Binding DeleteWarningMessage}"
                          TextWrapping="Wrap"
-                         FontSize="13"
+                         FontSize="{DynamicResource Token.Typography.Body}"
                          Foreground="{DynamicResource DangerTextBrush}" />
               <TextBox Text="{Binding DeleteConfirmationName}"
                         PlaceholderText="Type workspace name"

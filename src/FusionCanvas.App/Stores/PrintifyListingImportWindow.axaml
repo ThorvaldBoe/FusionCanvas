@@ -9,7 +9,7 @@
         Background="{DynamicResource ApplicationBackgroundBrush}">
   <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="{DynamicResource Token.Layout.Margin.Uniform.Wide}" RowSpacing="{DynamicResource Token.Spacing.Gap.Panel}">
     <StackPanel Spacing="{DynamicResource Token.Spacing.CompactGap}">
-      <TextBlock Text="Import from Printify" FontSize="22" FontWeight="SemiBold" Foreground="{DynamicResource StrongTextBrush}" />
+      <TextBlock Text="Import from Printify" FontSize="{DynamicResource Token.Typography.PageHeading}" FontWeight="SemiBold" Foreground="{DynamicResource StrongTextBrush}" />
       <TextBlock Text="Choose existing shop listings to add to this Niche. Imported Printify products are read only." Foreground="{DynamicResource SecondaryTextBrush}" />
     </StackPanel>
     <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
@@ -29,12 +29,12 @@
                   <CheckBox IsChecked="{Binding IsSelected}" IsEnabled="{Binding !IsLinked}" VerticalAlignment="Center" AutomationProperties.AutomationId="Printify.ProductSelection" />
                   <StackPanel Grid.Column="1" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
                     <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                    <TextBlock Text="{Binding ProductId}" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" />
-                    <TextBlock Text="{Binding ImportOutcome}" IsVisible="{Binding HasImportOutcome}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBlock Text="{Binding ProductId}" FontSize="{DynamicResource Token.Typography.Label}" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBlock Text="{Binding ImportOutcome}" IsVisible="{Binding HasImportOutcome}" FontSize="{DynamicResource Token.Typography.Label}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
                   </StackPanel>
                   <TextBlock Grid.Column="2" Text="{Binding Visibility}" VerticalAlignment="Center" />
                   <StackPanel Grid.Column="3" Spacing="{DynamicResource Token.Spacing.CompactGap}">
-                    <TextBlock Text="{Binding CandidateSummary}" IsVisible="{Binding HasCandidates}" FontSize="11" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding CandidateSummary}" IsVisible="{Binding HasCandidates}" FontSize="{DynamicResource Token.Typography.Label}" TextWrapping="Wrap" />
                     <ComboBox ItemsSource="{Binding ConnectableCandidates}" SelectedItem="{Binding SelectedCandidate}" PlaceholderText="Import as new">
                       <ComboBox.ItemTemplate>
                         <DataTemplate x:DataType="printify:PrintifyListingImportCandidate">

@@ -244,3 +244,5 @@ Review status: PROVISIONAL; selected review scope complete, not a clean certific
 | UI-004 / #968 | `b00ef43` | FC-UI-015 | PASS | Replaced the 745 audited literals across 33 surfaces plus three literals in the shared context header with centrally defined spacing/layout resources. A source rescan found zero remaining positive numeric Margin/Padding/Spacing/RowSpacing/ColumnSpacing literals outside DesignTokens.axaml. Full solution: 2,551 passed, 0 failed. |
 
 UI-002/UI-005 (#969) and UI-003 (#970) remain open pending their fixes. Runtime-only and state-gated observations remain UNKNOWN. Overall audit status remains PROVISIONAL because findings remain open and the standard/definition are Draft.
+
+| UI-002/UI-005 / #969 | `6a3cced` | FC-UI-024, FC-UI-097 | PASS | Replaced 334 audited literal TextBlock font sizes across 26 surfaces and four more in the shared context header with semantic typography resources. The three 10-DIP labels now use the 11-DIP Label resource. Static scan finds zero numeric TextBlock FontSize literals outside DesignTokens.axaml. Full solution: 2,551 passed, 0 failed. |

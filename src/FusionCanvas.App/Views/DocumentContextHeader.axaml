@@ -7,7 +7,7 @@
         ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
     <StackPanel Grid.Column="0" Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
       <TextBlock Text="{Binding DocumentWindow.ActiveDetailTitle}"
-                 FontSize="24"
+                 FontSize="{DynamicResource Token.Typography.Title}"
                  FontWeight="SemiBold"
                  Foreground="{DynamicResource PrimaryTextBrush}" />
       <TextBlock x:Name="ActiveNavigationPathText"
@@ -15,12 +15,12 @@
                  TextTrimming="CharacterEllipsis"
                  ToolTip.Tip="{Binding DocumentWindow.ActiveNavigationPath}"
                  AutomationProperties.Name="{Binding DocumentWindow.ActiveNavigationPath}"
-                 FontSize="12"
+                 FontSize="{DynamicResource Token.Typography.Caption}"
                  Foreground="{DynamicResource SecondaryTextBrush}" />
       <TextBlock Text="{Binding IdeationUnavailableMessage}"
                  IsVisible="{Binding IdeationUnavailableMessage, Converter={x:Static ObjectConverters.IsNotNull}}"
                  TextWrapping="Wrap"
-                 FontSize="11"
+                 FontSize="{DynamicResource Token.Typography.Label}"
                  Foreground="{DynamicResource DangerTextBrush}" />
     </StackPanel>
     <Button x:Name="IdeationButton"
@@ -36,7 +36,7 @@
     <TextBlock Grid.Column="1"
                IsVisible="{Binding ItemInspector.HasState}"
                Text="{Binding ItemInspector.StageLabel}"
-               FontSize="11"
+               FontSize="{DynamicResource Token.Typography.Label}"
                FontWeight="SemiBold"
                Foreground="{DynamicResource AccentBrush}"
                VerticalAlignment="Center" />
