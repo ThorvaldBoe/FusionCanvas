@@ -113,7 +113,7 @@ public class StoreEditorHeadlessTests
         Assert.True(IsEffectivelyVisible(panel!));
         Assert.NotNull(window.FindControl<VirtualDataGrid>("PrintifyBlueprintGrid"));
         Assert.Contains(panel!.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "Gildan 64000");
-        Assert.Contains(panel.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "Loading Spinner T-shirt | Minimal Tech Graphic");
+        Assert.Contains(panel.GetVisualDescendants().OfType<TextBlock>(), text => text.Text!.Contains("Loading Spinner T-shirt | Minimal Tech Graphic", StringComparison.Ordinal));
         Assert.Empty(panel!.GetVisualDescendants().OfType<Image>());
         panel.Focus();
         Assert.True(panel.IsFocused);
@@ -130,14 +130,16 @@ public class StoreEditorHeadlessTests
     public async Task PrintifyCatalogGridVirtualizesRowsAndPreservesAccessibleSelectionAcrossScrolling()
     {
         const string longBlueprintName = "Gildan 64000 extra long Blueprint name for accessibility";
+        const string longProviderName = "SwiftPOD Provider with a deliberately long name";
         const string longProductTitle = "Loading Spinner T-shirt | Minimal Tech Graphic with a deliberately long shop product title";
-        var products = Enumerable.Range(0, 120)
-            .Select(index => new PrintifyShopProductSummary($"product-{index}", longProductTitle, null, 68 + index, 9, longBlueprintName))
+        var blueprints = Enumerable.Range(0, 120)
+            .Select(index => new PrintifyShopBlueprintSummary(68 + index, longBlueprintName, index == 0 ? 2 : 1,
+                [new(9, longProviderName)], index == 0 ? [longProductTitle, "Second product using this Blueprint"] : [longProductTitle]))
             .ToArray();
         var store = new Store(Guid.NewGuid(), "Printify Store", null, false, Now, Now, "{\"printifyShopId\":\"42\"}", null, FulfillmentStrategy.ShopifyPrintify);
         var window = CreateEditorWindow(includeNormalizedCatalog: false, customStore: store);
         var viewModel = (StoreManagementViewModel)window.DataContext!;
-        var client = new HeadlessCatalogClient { ShopProducts = products };
+        var client = new HeadlessCatalogClient { ShopBlueprints = blueprints };
         viewModel.ConfigurePrintify(new HeadlessCredentialStore(), new HeadlessCredentialVerifier(), client);
         viewModel.SelectProductsTabCommand.Execute(null);
 
@@ -155,7 +157,7 @@ public class StoreEditorHeadlessTests
             Assert.Equal(4, grid!.Columns.Count);
             Assert.Equal(72, grid.RowHeight);
             Assert.Equal("None", grid.SelectionMode.ToString());
-            Assert.Equal(new[] { 48d, 170d, 280d, 210d }, grid.Columns.Select(column => column.Width));
+            Assert.Equal(new[] { 48d, 170d, 220d, 360d }, grid.Columns.Select(column => column.Width));
             Assert.All(grid.Columns, column =>
             {
                 Assert.False(column.IsSortable);
@@ -164,7 +166,7 @@ public class StoreEditorHeadlessTests
 
             await HeadlessUiWait.UntilAsync(
                 () => grid.Template is not null && grid.GetVisualDescendants().OfType<VirtualDataRow>().Any(),
-                "the Printify product grid realizes visible rows");
+                "the Printify Blueprint grid realizes visible rows");
             var scroll = Assert.Single(grid.GetVisualDescendants().OfType<ScrollViewer>());
             Assert.Equal(ScrollBarVisibility.Auto, scroll.HorizontalScrollBarVisibility);
             var rows = grid.GetVisualDescendants().OfType<VirtualDataRow>().OrderBy(row => row.Index).ToArray();
@@ -172,60 +174,62 @@ public class StoreEditorHeadlessTests
             Assert.True(scroll.Extent.Height > scroll.Viewport.Height);
             Assert.True(rows.Length < session.Blueprints.Count);
 
-            var firstRow = Assert.Single(rows, row => ((PrintifyCatalogImportItemViewModel)row.DataContext!).Id == "product-0");
+            var firstRow = Assert.Single(rows, row => ((PrintifyCatalogImportItemViewModel)row.DataContext!).BlueprintId == 68);
             var firstCheckbox = Assert.Single(firstRow.Cells[0].GetVisualDescendants().OfType<CheckBox>());
             Assert.Equal(session.Blueprints[0].SelectionAccessibleName, AutomationProperties.GetName(firstCheckbox));
             Assert.Contains(longBlueprintName, AutomationProperties.GetName(firstCheckbox));
+            Assert.Contains(longProviderName, AutomationProperties.GetName(firstCheckbox));
             Assert.Contains(longProductTitle, AutomationProperties.GetName(firstCheckbox));
             Assert.True(firstCheckbox.IsTabStop);
             var blueprintText = Assert.Single(firstRow.Cells[1].GetVisualDescendants().OfType<TextBlock>());
-            var titleText = Assert.Single(firstRow.Cells[2].GetVisualDescendants().OfType<TextBlock>());
-            var identityText = Assert.Single(firstRow.Cells[3].GetVisualDescendants().OfType<TextBlock>());
+            var providerText = Assert.Single(firstRow.Cells[2].GetVisualDescendants().OfType<TextBlock>());
+            var shopProductsText = Assert.Single(firstRow.Cells[3].GetVisualDescendants().OfType<TextBlock>());
             Assert.Equal(TextTrimming.CharacterEllipsis, blueprintText.TextTrimming);
-            Assert.Equal(TextTrimming.CharacterEllipsis, titleText.TextTrimming);
-            Assert.Equal(longBlueprintName, ToolTip.GetTip(blueprintText));
+            Assert.Equal(TextTrimming.CharacterEllipsis, providerText.TextTrimming);
+            Assert.Equal(TextTrimming.CharacterEllipsis, shopProductsText.TextTrimming);
+            Assert.Equal(longBlueprintName, ToolTip.GetTip(blueprintText)?.ToString());
             Assert.Equal(longBlueprintName, AutomationProperties.GetHelpText(blueprintText));
-            Assert.Equal(longProductTitle, ToolTip.GetTip(titleText));
-            Assert.Equal(longProductTitle, AutomationProperties.GetHelpText(titleText));
-            Assert.Equal(session.Blueprints[0].Subtitle, ToolTip.GetTip(identityText));
-            Assert.Equal(session.Blueprints[0].Subtitle, AutomationProperties.GetHelpText(identityText));
+            Assert.Equal(longProviderName, ToolTip.GetTip(providerText)?.ToString());
+            Assert.Equal(longProviderName, AutomationProperties.GetHelpText(providerText));
+            Assert.Contains(longProductTitle, ToolTip.GetTip(shopProductsText)?.ToString());
+            Assert.Contains(longProductTitle, AutomationProperties.GetHelpText(shopProductsText)?.ToString());
 
             Assert.True(firstCheckbox.Focus());
             window.KeyPress(Key.Space, RawInputModifiers.None, PhysicalKey.Space, " ");
             window.KeyRelease(Key.Space, RawInputModifiers.None, PhysicalKey.Space, " ");
-            await HeadlessUiWait.UntilAsync(() => session.Blueprints[0].IsSelected, "keyboard input selects the first product checkbox");
-            Assert.Empty(client.SelectedProductIds);
+            await HeadlessUiWait.UntilAsync(() => session.Blueprints[0].IsSelected, "keyboard input selects the first Blueprint checkbox");
+            Assert.Empty(client.SelectedBlueprintIds);
 
             scroll.Offset = new Vector(0, 72 * 70);
             await HeadlessUiWait.UntilAsync(
-                () => grid.GetVisualDescendants().OfType<VirtualDataRow>().Any(row => ((PrintifyCatalogImportItemViewModel)row.DataContext!).Id == "product-70"),
-                "a later Printify product is realized after scrolling");
+                () => grid.GetVisualDescendants().OfType<VirtualDataRow>().Any(row => ((PrintifyCatalogImportItemViewModel)row.DataContext!).BlueprintId == 138),
+                "a later Printify Blueprint is realized after scrolling");
             window.UpdateLayout();
             rows = grid.GetVisualDescendants().OfType<VirtualDataRow>().OrderBy(row => row.Index).ToArray();
-            Assert.DoesNotContain(rows, row => ((PrintifyCatalogImportItemViewModel)row.DataContext!).Id == "product-0");
-            var laterRow = Assert.Single(rows, row => ((PrintifyCatalogImportItemViewModel)row.DataContext!).Id == "product-70");
+            Assert.DoesNotContain(rows, row => ((PrintifyCatalogImportItemViewModel)row.DataContext!).BlueprintId == 68);
+            var laterRow = Assert.Single(rows, row => ((PrintifyCatalogImportItemViewModel)row.DataContext!).BlueprintId == 138);
             var laterCheckbox = Assert.Single(laterRow.Cells[0].GetVisualDescendants().OfType<CheckBox>());
             ClickControl(window, laterCheckbox);
-            await HeadlessUiWait.UntilAsync(() => session.Blueprints[70].IsSelected, "a later product checkbox selects its stable product");
-            Assert.Empty(client.SelectedProductIds);
+            await HeadlessUiWait.UntilAsync(() => session.Blueprints[70].IsSelected, "a later Blueprint checkbox selects its stable identity");
+            Assert.Empty(client.SelectedBlueprintIds);
 
             scroll.ScrollToHome();
             await HeadlessUiWait.UntilAsync(
-                () => grid.GetVisualDescendants().OfType<VirtualDataRow>().Any(row => ((PrintifyCatalogImportItemViewModel)row.DataContext!).Id == "product-0"),
-                "the first Printify products are realized after scrolling back");
+                () => grid.GetVisualDescendants().OfType<VirtualDataRow>().Any(row => ((PrintifyCatalogImportItemViewModel)row.DataContext!).BlueprintId == 68),
+                "the first Printify Blueprint is realized after scrolling back");
             window.UpdateLayout();
-            firstRow = Assert.Single(grid.GetVisualDescendants().OfType<VirtualDataRow>(), row => ((PrintifyCatalogImportItemViewModel)row.DataContext!).Id == "product-0");
+            firstRow = Assert.Single(grid.GetVisualDescendants().OfType<VirtualDataRow>(), row => ((PrintifyCatalogImportItemViewModel)row.DataContext!).BlueprintId == 68);
             firstCheckbox = Assert.Single(firstRow.Cells[0].GetVisualDescendants().OfType<CheckBox>());
             Assert.True(firstCheckbox.IsChecked);
             Assert.True(session.Blueprints[70].IsSelected);
-            Assert.Empty(client.SelectedProductIds);
+            Assert.Empty(client.SelectedBlueprintIds);
 
             var confirm = FindButton(window, "Load selected");
             Assert.NotNull(confirm);
             confirm!.Command!.Execute(confirm.CommandParameter);
-            await WaitForAsync(() => !session.IsOpen && client.SelectedProductIds.Count > 0);
+            await WaitForAsync(() => !session.IsOpen && client.SelectedBlueprintIds.Count > 0);
 
-            Assert.Equal(new[] { "product-0", "product-70" }, client.SelectedProductIds);
+            Assert.Equal(new[] { 68, 138 }, client.SelectedBlueprintIds);
         }
         finally
         {
@@ -257,7 +261,7 @@ public class StoreEditorHeadlessTests
         loadSelected!.Command!.Execute(null);
 
         await WaitForAsync(() => !viewModel.PrintifyCatalogImportSession!.IsOpen && viewModel.HasProducts);
-        Assert.Contains(viewModel.Products, product => product.Name == "Gildan 5000");
+        Assert.Contains(viewModel.Products, product => product.Name == "Gildan 64000");
         window.Close();
     }
 
@@ -4918,7 +4922,18 @@ public class StoreEditorHeadlessTests
     {
         public int SelectedCalls { get; private set; }
         public IReadOnlyList<PrintifyShopProductSummary> ShopProducts { get; init; } = [new("product-a", "Loading Spinner T-shirt | Minimal Tech Graphic", null, 68, 9, "Gildan 64000")];
+        public IReadOnlyList<PrintifyShopBlueprintSummary> ShopBlueprints { get; init; } = [new(68, "Gildan 64000", 1, [new(9, "SwiftPOD")], ["Loading Spinner T-shirt | Minimal Tech Graphic"])];
         public List<string> SelectedProductIds { get; } = [];
+        public List<int> SelectedBlueprintIds { get; } = [];
+
+        public Task<PrintifyCatalogResult> LoadShopBlueprintsAsync(string key, int shopId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Succeeded, "loaded", ShopBlueprints: ShopBlueprints));
+
+        public Task<PrintifyCatalogResult> LoadSelectedBlueprintsAsync(string key, int shopId, IReadOnlyCollection<int> blueprintIds, CancellationToken cancellationToken = default)
+        {
+            SelectedBlueprintIds.AddRange(blueprintIds);
+            return LoadSelectedAsync(key, blueprintIds, cancellationToken);
+        }
 
         public Task<PrintifyCatalogResult> LoadShopProductsAsync(string key, int shopId, CancellationToken cancellationToken = default) =>
             Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Succeeded, "loaded", Products: ShopProducts));
@@ -4937,10 +4952,7 @@ public class StoreEditorHeadlessTests
         {
             SelectedCalls++;
             return Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Succeeded, "imported", SelectedCatalog:
-            [new(new(68, "Tee", null, "Gildan", "5000"), [new(9, "Gildan", [], [])])
-            {
-                ProductId = "product-a"
-            }]));
+            [new(new(68, "Tee", null, "Gildan", "5000"), [new(9, "SwiftPOD", [], [])])]));
         }
     }
 

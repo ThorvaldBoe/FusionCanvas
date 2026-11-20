@@ -113,11 +113,9 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged, IDi
             var result = await _service.LoadBlueprintsAsync(currentScope, cancellationToken).ConfigureAwait(true);
             if (!CanPublish(operationVersion, currentScope)) return;
             if (!result.Succeeded) { ErrorMessage = result.Message; return; }
-            var products = result.Products ?? result.Blueprints?.Select(blueprint =>
-                new PrintifyShopProductSummary(blueprint.Id.ToString(), blueprint.Title, blueprint.Description, blueprint.Id, 1)) ?? [];
-            foreach (var product in products)
+            foreach (var blueprint in result.ShopBlueprints ?? [])
             {
-                var item = new PrintifyCatalogImportItemViewModel(product);
+                var item = new PrintifyCatalogImportItemViewModel(blueprint);
                 item.PropertyChanged += OnItemPropertyChanged;
                 Blueprints.Add(item);
             }
@@ -157,7 +155,7 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged, IDi
         ErrorMessage = null;
         try
         {
-            var result = await _service.LoadSelectedAsync(scope, Blueprints.Where(item => item.IsSelected).Select(item => item.Id).ToArray(), cancellationToken).ConfigureAwait(true);
+            var result = await _service.LoadSelectedAsync(scope, Blueprints.Where(item => item.IsSelected).Select(item => item.BlueprintId).ToArray(), cancellationToken).ConfigureAwait(true);
             if (!CanPublish(operationVersion, scope)) return;
             if (!result.Succeeded) { ErrorMessage = result.Message; return; }
             if (_onImported is not null && CanPublish(operationVersion, scope))

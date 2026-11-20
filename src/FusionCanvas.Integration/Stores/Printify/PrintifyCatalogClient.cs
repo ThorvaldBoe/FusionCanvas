@@ -53,6 +53,148 @@ public sealed class PrintifyCatalogClient : IPrintifyCatalogClient
             : new(PrintifyCatalogResultKind.Succeeded, "Printify shop products loaded.", Products: products);
     }
 
+    public async Task<PrintifyCatalogResult> LoadShopBlueprintsAsync(string key, int shopId, CancellationToken cancellationToken = default)
+    {
+        if (!PrintifyToken.IsValid(key)) return new(PrintifyCatalogResultKind.InvalidKey, "Enter a valid Printify key before loading shop products.");
+        if (shopId <= 0) return new(PrintifyCatalogResultKind.InvalidRequest, "Select a valid Printify shop before loading products.");
+
+        var products = await LoadShopProductSummariesAsync(key, shopId, cancellationToken).ConfigureAwait(false);
+        if (!products.Succeeded) return products;
+        var summaries = products.Products!.ToList();
+        await EnrichBlueprintNamesAsync(summaries, key, cancellationToken).ConfigureAwait(false);
+
+        var groups = summaries.GroupBy(product => product.BlueprintId).ToArray();
+        var blueprints = new List<PrintifyShopBlueprintSummary>(groups.Length);
+        foreach (var group in groups)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var providers = await LoadShopProviderSummariesAsync(key, group.Key, group.Select(product => product.ProviderId).Distinct().ToArray(), cancellationToken).ConfigureAwait(false);
+            if (providers is null) return Unexpected();
+            var name = group.Select(product => product.BlueprintName).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? $"Blueprint {group.Key}";
+            blueprints.Add(new(group.Key, name, group.Count(), providers,
+                group.Select(product => product.Title).Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.Ordinal).ToArray()));
+        }
+
+        var ordered = blueprints.OrderBy(value => value.BlueprintName, StringComparer.OrdinalIgnoreCase).ThenBy(value => value.BlueprintId).ToArray();
+        return ordered.Length == 0
+            ? new(PrintifyCatalogResultKind.Empty, "The selected Printify shop has no products from which to discover Blueprints.", Products: summaries, ShopBlueprints: ordered)
+            : new(PrintifyCatalogResultKind.Succeeded, "Printify shop Blueprints loaded.", Products: summaries, ShopBlueprints: ordered);
+    }
+
+    private async Task<IReadOnlyList<PrintifyShopProviderSummary>?> LoadShopProviderSummariesAsync(
+        string key,
+        int blueprintId,
+        IReadOnlyCollection<int> usedProviderIds,
+        CancellationToken cancellationToken)
+    {
+        var response = await SendJsonAsync($"{CatalogBaseUri}blueprints/{blueprintId}/print_providers.json", key, cancellationToken).ConfigureAwait(false);
+        if (response.Error is not null) return null;
+        using var document = response.Json!;
+        try
+        {
+            var byId = ParseProviders(document).ToDictionary(provider => provider.Id);
+            if (usedProviderIds.Any(id => !byId.ContainsKey(id))) return null;
+            return usedProviderIds.Distinct().Order()
+                .Select(id => new PrintifyShopProviderSummary(id, byId[id].Title))
+                .ToArray();
+        }
+        catch (JsonException) { return null; }
+        catch (InvalidOperationException) { return null; }
+        catch (ArgumentException) { return null; }
+    }
+
+    public async Task<PrintifyCatalogResult> LoadSelectedBlueprintsAsync(string key, int shopId, IReadOnlyCollection<int> blueprintIds, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await LoadSelectedBlueprintsCoreAsync(key, shopId, blueprintIds, cancellationToken).ConfigureAwait(false);
+        }
+        catch (JsonException) { return Unexpected(); }
+        catch (InvalidOperationException) { return Unexpected(); }
+        catch (ArgumentException) { return Unexpected(); }
+    }
+
+    private async Task<PrintifyCatalogResult> LoadSelectedBlueprintsCoreAsync(string key, int shopId, IReadOnlyCollection<int> blueprintIds, CancellationToken cancellationToken)
+    {
+        if (!PrintifyToken.IsValid(key)) return new(PrintifyCatalogResultKind.InvalidKey, "Enter a valid Printify key before loading shop Blueprints.");
+        if (shopId <= 0) return new(PrintifyCatalogResultKind.InvalidRequest, "Select a valid Printify shop before loading Blueprints.");
+        if (blueprintIds is null || blueprintIds.Count == 0 || blueprintIds.Any(id => id <= 0))
+            return new(PrintifyCatalogResultKind.InvalidRequest, "Select at least one valid Blueprint.");
+
+        var shop = await LoadShopProductSummariesAsync(key, shopId, cancellationToken).ConfigureAwait(false);
+        if (!shop.Succeeded) return shop;
+        var selectedIds = blueprintIds.Distinct().ToHashSet();
+        var selectedGroups = shop.Products!.Where(product => selectedIds.Contains(product.BlueprintId)).GroupBy(product => product.BlueprintId).ToArray();
+        if (selectedGroups.Length != selectedIds.Count)
+            return new(PrintifyCatalogResultKind.InvalidRequest, "One or more selected Blueprints is no longer used by the selected Printify shop.");
+
+        var selectedCatalog = new List<PrintifyCatalogBlueprint>(selectedGroups.Length);
+        foreach (var group in selectedGroups.OrderBy(value => value.Key))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var blueprintResult = await LoadCatalogBlueprintSummaryAsync(key, group.Key, cancellationToken).ConfigureAwait(false);
+            if (!blueprintResult.Succeeded) return blueprintResult;
+            var blueprintSummary = blueprintResult.Blueprints!.Single();
+            var providers = new List<PrintifyCatalogProvider>();
+            foreach (var providerGroup in group.GroupBy(product => product.ProviderId).OrderBy(value => value.Key))
+            {
+                var catalogProviderResult = await LoadCatalogProviderAsync(key, group.Key, providerGroup.Key, cancellationToken).ConfigureAwait(false);
+                if (!catalogProviderResult.Succeeded) return catalogProviderResult;
+                var catalogProvider = catalogProviderResult.SelectedCatalog!.Single().Providers.Single();
+
+                var optionSets = new List<PrintifyCatalogOption>();
+                foreach (var product in providerGroup.OrderBy(value => value.ProductId, StringComparer.Ordinal))
+                {
+                    var detailResult = await LoadShopProductDetailAsync(key, shopId, product.ProductId, cancellationToken).ConfigureAwait(false);
+                    if (!detailResult.Succeeded) return detailResult;
+                    var detail = detailResult.SelectedProducts!.Single();
+                    if (detail.ProductId != product.ProductId || detail.Summary.Id != group.Key || detail.Providers.Count != 1 || detail.Providers[0].Id != providerGroup.Key)
+                        return Unexpected();
+                    optionSets.AddRange(detail.Providers[0].Options);
+                }
+
+                var options = MergeOptionDefinitions(optionSets);
+                var optionValueIds = options.SelectMany(option => option.Values).Select(value => value.Id).ToHashSet();
+                var sellableVariants = catalogProvider.Variants.Where(variant => variant.IsEnabled && variant.IsAvailable).ToArray();
+                if (sellableVariants.Any(variant => variant.OptionValueIds.Any(id => !optionValueIds.Contains(id))))
+                    return new(PrintifyCatalogResultKind.UnexpectedResponse, "Printify catalog option data does not cover every sellable Variant.");
+                providers.Add(catalogProvider with { Options = options, Variants = sellableVariants });
+            }
+
+            selectedCatalog.Add(new(blueprintSummary, providers));
+        }
+
+        return new(PrintifyCatalogResultKind.Succeeded, "Selected Printify Blueprints loaded.", SelectedCatalog: selectedCatalog, SelectedProducts: selectedCatalog);
+    }
+
+    private static IReadOnlyList<PrintifyCatalogOption> MergeOptionDefinitions(IEnumerable<PrintifyCatalogOption> source)
+    {
+        var merged = new Dictionary<(string Name, string Type), Dictionary<int, string>>();
+        var display = new Dictionary<(string Name, string Type), (string Name, string Type)>();
+        foreach (var option in source)
+        {
+            var key = (option.Name.Trim().ToUpperInvariant(), option.Type.Trim().ToUpperInvariant());
+            if (!merged.TryGetValue(key, out var values))
+            {
+                values = [];
+                merged.Add(key, values);
+                display.Add(key, (option.Name.Trim(), option.Type.Trim()));
+            }
+
+            foreach (var value in option.Values)
+            {
+                if (values.TryGetValue(value.Id, out var existing) && !string.Equals(existing, value.Title.Trim(), StringComparison.Ordinal))
+                    throw new JsonException();
+                values[value.Id] = value.Title.Trim();
+            }
+        }
+
+        return merged.Select(pair => new PrintifyCatalogOption(display[pair.Key].Name, display[pair.Key].Type,
+                pair.Value.OrderBy(value => value.Key).Select(value => new PrintifyCatalogOptionValue(value.Key, value.Value)).ToArray()))
+            .OrderBy(option => option.Name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
     public async Task<PrintifyCatalogResult> LoadSelectedProductsAsync(string key, int shopId, IReadOnlyCollection<string> productIds, CancellationToken cancellationToken = default)
     {
         try

@@ -24,18 +24,21 @@ public sealed class PrintifyCatalogImportService(
         new(PrintifyCatalogResultKind.InvalidRequest, "Save an active Printify Store with a selected Printify shop first.");
 
     public Task<PrintifyCatalogResult> LoadBlueprintsAsync(StoreCredentialScope scope, CancellationToken cancellationToken = default) =>
-        ExecuteAsync(scope, (key, shopId, token) => client.LoadShopProductsAsync(key, shopId, token), cancellationToken);
+        ExecuteAsync(scope, (key, shopId, token) => client.LoadShopBlueprintsAsync(key, shopId, token), cancellationToken, blueprintScoped: true);
 
     public Task<PrintifyCatalogResult> LoadSelectedAsync(StoreCredentialScope scope, IReadOnlyCollection<string> productIds, CancellationToken cancellationToken = default) =>
-        ExecuteAsync(scope, (key, shopId, token) => client.LoadSelectedProductsAsync(key, shopId, productIds, token), cancellationToken);
+        productIds is null || productIds.Count == 0 || productIds.Any(string.IsNullOrWhiteSpace)
+            ? Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.InvalidRequest, "Select at least one valid product."))
+            : ExecuteAsync(scope, (key, shopId, token) => client.LoadSelectedProductsAsync(key, shopId, productIds, token), cancellationToken, blueprintScoped: false);
 
     public Task<PrintifyCatalogResult> LoadSelectedAsync(StoreCredentialScope scope, IReadOnlyCollection<int> blueprintIds, CancellationToken cancellationToken = default) =>
-        LoadSelectedAsync(scope, blueprintIds.Select(value => value.ToString()).ToArray(), cancellationToken);
+        ExecuteAsync(scope, (key, shopId, token) => client.LoadSelectedBlueprintsAsync(key, shopId, blueprintIds, token), cancellationToken, blueprintScoped: true);
 
     private async Task<PrintifyCatalogResult> ExecuteAsync(
         StoreCredentialScope scope,
         Func<string, int, CancellationToken, Task<PrintifyCatalogResult>> operation,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool blueprintScoped)
     {
         var store = await stores.ResolveActiveStoreAsync(scope.WorkspaceId, scope.StoreId, cancellationToken).ConfigureAwait(false);
         if (store is null || store.IsArchived || !FulfillmentStrategyPolicy.RequiresPrintifyKey(store.FulfillmentStrategy) || store.Context.PrintifyShopId is null)
@@ -58,9 +61,17 @@ public sealed class PrintifyCatalogImportService(
                 || currentStore.Context.PrintifyShopId != store.Context.PrintifyShopId)
                 return InvalidContext;
             var snapshot = await repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-            var synchronized = ApplySelectedCatalog(snapshot, scope.StoreId, result.SelectedProducts, _clock, _newId);
+            var synchronized = blueprintScoped
+                ? ApplySelectedBlueprintCatalog(snapshot, scope.StoreId, result.SelectedProducts, _clock, _newId)
+                : ApplySelectedCatalog(snapshot, scope.StoreId, result.SelectedProducts, _clock, _newId);
+            var (created, updated) = CountChanges(snapshot, synchronized);
             await repository.SaveAsync(synchronized, cancellationToken).ConfigureAwait(false);
-            return result with { Message = "Selected Printify catalog imported." };
+            return result with
+            {
+                Message = $"Printify catalog imported: {created} record{(created == 1 ? string.Empty : "s")} created, {updated} updated.",
+                CreatedRecordCount = created,
+                UpdatedRecordCount = updated
+            };
         }
         catch (InvalidOperationException exception)
         {
@@ -78,12 +89,52 @@ public sealed class PrintifyCatalogImportService(
         }
     }
 
+    private static (int Created, int Updated) CountChanges(WorkspaceSnapshot before, WorkspaceSnapshot after)
+    {
+        var created = 0;
+        var updated = 0;
+        Count(before.Blueprints, after.Blueprints, item => item.Id);
+        Count(before.PrintProviders, after.PrintProviders, item => item.Id);
+        Count(before.BlueprintOfferings, after.BlueprintOfferings, item => item.Id);
+        Count(before.OfferingOptions, after.OfferingOptions, item => item.Id);
+        Count(before.OfferingOptionValues, after.OfferingOptionValues, item => item.Id);
+        Count(before.OfferingVariants, after.OfferingVariants, item => item.Id);
+        Count(before.OfferingPlaceholders, after.OfferingPlaceholders, item => item.Id);
+        return (created, updated);
+
+        void Count<T>(IReadOnlyCollection<T> oldItems, IReadOnlyCollection<T> newItems, Func<T, Guid> getId) where T : notnull
+        {
+            var oldById = oldItems.ToDictionary(getId);
+            foreach (var item in newItems)
+            {
+                var id = getId(item);
+                if (!oldById.TryGetValue(id, out var previous)) created++;
+                else if (!EqualityComparer<T>.Default.Equals(previous, item)) updated++;
+            }
+        }
+    }
+
     public static WorkspaceSnapshot ApplySelectedCatalog(
         WorkspaceSnapshot snapshot,
         Guid storeId,
         IReadOnlyList<PrintifyCatalogBlueprint> catalog,
         Func<DateTimeOffset> clock,
-        Func<Guid> newId)
+        Func<Guid> newId) => ApplyCatalog(snapshot, storeId, catalog, clock, newId, productScoped: true);
+
+    public static WorkspaceSnapshot ApplySelectedBlueprintCatalog(
+        WorkspaceSnapshot snapshot,
+        Guid storeId,
+        IReadOnlyList<PrintifyCatalogBlueprint> catalog,
+        Func<DateTimeOffset> clock,
+        Func<Guid> newId) => ApplyCatalog(snapshot, storeId, catalog, clock, newId, productScoped: false);
+
+    private static WorkspaceSnapshot ApplyCatalog(
+        WorkspaceSnapshot snapshot,
+        Guid storeId,
+        IReadOnlyList<PrintifyCatalogBlueprint> catalog,
+        Func<DateTimeOffset> clock,
+        Func<Guid> newId,
+        bool productScoped)
     {
         ValidateCatalog(catalog);
         var now = clock();
@@ -99,8 +150,8 @@ public sealed class PrintifyCatalogImportService(
 
         foreach (var importedBlueprint in catalog)
         {
-            var productId = importedBlueprint.ProductId;
-            var blueprint = productId is not null
+            var productId = productScoped ? importedBlueprint.ProductId : null;
+            var blueprint = productScoped && productId is not null
                 ? blueprints.FirstOrDefault(value => value.StoreId == storeId && MetadataHasProductId(value.MetadataJson, productId))
                     ?? blueprints.FirstOrDefault(value => value.StoreId == storeId
                         && MetadataKindIs(value.MetadataJson, "blueprint")
@@ -145,7 +196,7 @@ public sealed class PrintifyCatalogImportService(
                     Replace(providers, value => value.Id == provider.Id, provider);
                 }
 
-                var externalProductId = importedBlueprint.ProductId ?? importedBlueprint.Summary.Id.ToString();
+                var externalProductId = productScoped ? importedBlueprint.ProductId ?? importedBlueprint.Summary.Id.ToString() : importedBlueprint.Summary.Id.ToString();
                 var externalOfferingId = $"{externalProductId}:{importedProvider.Id}";
                 var offering = offerings.SingleOrDefault(value => value.StoreId == storeId && value.ExternalOfferingId == externalOfferingId)
                     // Before shop-product imports, the same stable relationship was stored

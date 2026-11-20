@@ -98,6 +98,51 @@ public sealed class PrintifyCatalogImportServiceTests
     }
 
     [Fact]
+    public async Task BlueprintImportUsesCanonicalIdentityAndAllUsedProviderVariantsWhilePreservingLegacyBlueprints()
+    {
+        var store = TestStore();
+        var repository = TestRepository(store);
+        var legacyBlueprint = new Blueprint(Guid.NewGuid(), store.Id, "Earlier product import", null, false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow,
+            "{\"source\":\"printify\",\"kind\":\"product\",\"blueprintId\":68,\"productId\":\"legacy-product\"}");
+        repository.SetSnapshot(repository.Snapshot with { Blueprints = [legacyBlueprint] });
+        var catalogBlueprint = new PrintifyCatalogBlueprint(new(68, "Tee", null, "Gildan", "64000"),
+        [
+            new(9, "SwiftPOD", [new("Color", "color", [new(1, "Black"), new(2, "White")]), new("Size", "size", [new(3, "S"), new(4, "M")])],
+                [new(101, "Black / S", true, true, [1, 3], []), new(102, "White / M", true, true, [2, 4], [])]),
+            new(10, "Gooten", [new("Color", "color", [new(5, "Navy")])], [new(201, "Navy", true, true, [5], [])])
+        ]);
+        var client = new ClientStub
+        {
+            SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [catalogBlueprint])
+        };
+        var service = TestService(store, repository, client);
+
+        var first = await service.LoadSelectedAsync(new(store.WorkspaceId, store.Id), [68], TestContext.Current.CancellationToken);
+        var second = await service.LoadSelectedAsync(new(store.WorkspaceId, store.Id), [68], TestContext.Current.CancellationToken);
+
+        Assert.True(first.Succeeded, first.Message);
+        Assert.True(second.Succeeded, second.Message);
+        Assert.True(first.CreatedRecordCount > 0);
+        Assert.Equal(0, first.UpdatedRecordCount);
+        Assert.Equal(0, second.CreatedRecordCount);
+        Assert.True(second.UpdatedRecordCount > 0);
+        Assert.Equal(2, repository.Snapshot.Blueprints.Count);
+        Assert.Contains(repository.Snapshot.Blueprints, value => value.Id == legacyBlueprint.Id && value.Name == "Earlier product import");
+        var canonical = repository.Snapshot.Blueprints.Single(value => value.Id != legacyBlueprint.Id);
+        Assert.Equal("Gildan 64000", canonical.Name);
+        Assert.Contains("\"kind\":\"blueprint\"", canonical.MetadataJson);
+        Assert.Equal(2, repository.Snapshot.BlueprintOfferings.Count);
+        Assert.Equal(["68:10", "68:9"], repository.Snapshot.BlueprintOfferings.Select(value => value.ExternalOfferingId).Order(StringComparer.Ordinal));
+        Assert.Equal(3, repository.Snapshot.OfferingVariants.Count);
+        var swiftOfferingId = repository.Snapshot.BlueprintOfferings.Single(value => value.ExternalOfferingId == "68:9").Id;
+        var gootenOfferingId = repository.Snapshot.BlueprintOfferings.Single(value => value.ExternalOfferingId == "68:10").Id;
+        Assert.Equal(2, repository.Snapshot.OfferingOptions.Count(value => value.OfferingId == swiftOfferingId));
+        Assert.Equal(4, repository.Snapshot.OfferingOptionValues.Count(value => value.OfferingId == swiftOfferingId));
+        Assert.Equal(2, repository.Snapshot.OfferingVariants.Count(value => value.OfferingId == swiftOfferingId));
+        Assert.Single(repository.Snapshot.OfferingVariants.Where(value => value.OfferingId == gootenOfferingId));
+    }
+
+    [Fact]
     public async Task ReturnsSafeFailureWhenRepositoryLoadFails()
     {
         var store = TestStore();
