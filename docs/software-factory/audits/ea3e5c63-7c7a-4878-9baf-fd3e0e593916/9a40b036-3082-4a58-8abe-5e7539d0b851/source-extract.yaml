@@ -1,0 +1,955 @@
+extract:
+  identity: UI-EXTRACT-001
+  audit_id: ea3e5c63-7c7a-4878-9baf-fd3e0e593916
+  audit_run_id: 9a40b036-3082-4a58-8abe-5e7539d0b851
+  standard: FC-UI
+  standard_version: "1.4"
+  standard_status: Draft normative baseline
+  extract_definition_version: "1.4"
+  extract_definition_status: Draft
+  extract_revision: 1
+  repository_revision: 783ad061aacbd0e438bf72846be4c56fce57eae5
+  working_tree_state: clean-at-audit-start
+  extracted_at: 2026-11-20T17:02:00+01:00
+  included_projects: [src/FusionCanvas.App]
+  exclusions: [test-only windows and harness surfaces]
+  discovery_limits: [initial entry is the user-reported Store Editor surface; repository-wide reconciliation is in progress]
+  total_surfaces: 1
+  counts_by_kind: {view: 1}
+items:
+  - item_id: UI-SURF-STORE-EDITOR
+    extract_entry_id: UI-SURF-STORE-EDITOR@1
+    extract_revision: 1
+    change_type: ADDED
+    name: Store Editor
+    kind: view
+    owner: FusionCanvas.App / Stores
+    source_locations:
+      - src/FusionCanvas.App/Stores/StoreEditorWindow.axaml
+      - src/FusionCanvas.App/Stores/StoreEditorWindow.axaml.cs
+      - src/FusionCanvas.App/Stores/StoreManagementViewModel.cs
+    auditable_patterns:
+      - kind: tabs
+        source_locations: [src/FusionCanvas.App/Stores/StoreEditorWindow.axaml]
+        capabilities: [Basic info, Niches, Tags, Catalog & mockups]
+      - kind: tab_content_boundary
+        source_locations: [src/FusionCanvas.App/Stores/StoreEditorWindow.axaml]
+        capabilities: [bounded active-tab surface]
+      - kind: master_detail
+        source_locations: [src/FusionCanvas.App/Stores/StoreEditorWindow.axaml]
+        capabilities: [active stores list, selected store editor]
+    shared_dependencies:
+      themes: [Avalonia FluentTheme, FusionCanvas light/dark resources]
+      resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml]
+      components: [TextBox.field, Button.tabButton, Button.primary, Button.secondary]
+      patterns: [form, entity list, tab navigation, bordered tab content]
+      tokens: [UNKNOWN; spacing token registry and approved values require inventory]
+    discovery: [src/FusionCanvas.App/Stores/StoreEditorWindow.axaml, StoreEditorWindow registration]
+    notes:
+      - User-provided screenshot shows the Basic info heading and controls nearly touching the bordered active-tab region.
+      - Source line 136 sets the active-tab content Border Padding to 0.
+
+extensions:
+  - extension_revision: 2
+    repository_revision: 783ad061aacbd0e438bf72846be4c56fce57eae5
+    working_tree_state: audit-artifacts-only-changed; application source unchanged
+    generated_at: 2026-11-20T17:10:00+01:00
+    standard_version: "1.4"
+    extract_definition_version: "1.4"
+    change_summary: Reconciled all remaining XAML surfaces and registered controls; dynamic/runtime-only contributions remain to be checked.
+    current_total_surfaces: 37
+    counts_by_kind: {window: 34, user_control: 3}
+    discovery_limits:
+      - Runtime/plugin-provided surfaces are not statically enumerable; no enabled plugin surface registry was found in the inspected application source.
+      - Tab contents and major panels embedded in MainWindow and StoreEditorWindow are recorded as patterns/state variants within their owning surface.
+    entries:
+      - item_id: UI-SURF-ASSETPREVIEWWINDOW
+        extract_entry_id: UI-SURF-ASSETPREVIEWWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "AssetPreviewWindow"
+        kind: "window"
+        owner: "Assets"
+        source_locations:
+          - "src/FusionCanvas.App/Assets/AssetPreviewWindow.axaml"
+          - "src/FusionCanvas.App/Assets/AssetPreviewWindow.axaml.cs"
+        state_owner: "assets:AssetRowViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Assets/AssetsWindow.axaml.cs"
+        auditable_patterns:
+          - "image/canvas preview"
+          - "grouped surface/cards"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["image/canvas preview", "grouped surface/cards"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Assets/AssetPreviewWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-ASSETSWINDOW
+        extract_entry_id: UI-SURF-ASSETSWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "AssetsWindow"
+        kind: "window"
+        owner: "Assets"
+        source_locations:
+          - "src/FusionCanvas.App/Assets/AssetsWindow.axaml"
+          - "src/FusionCanvas.App/Assets/AssetsWindow.axaml.cs"
+        state_owner: "assets:AssetsViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Views/MainWindow.axaml.cs; src/FusionCanvas.App/Views/MainWindowWindowCoordinator.cs"
+        auditable_patterns:
+          - "form"
+          - "list/repeater"
+          - "image/canvas preview"
+          - "grouped surface/cards"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form", "list/repeater", "image/canvas preview", "grouped surface/cards"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Assets/AssetsWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-DESIGNSYSTEMGALLERYWINDOW
+        extract_entry_id: UI-SURF-DESIGNSYSTEMGALLERYWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "DesignSystemGalleryWindow"
+        kind: "window"
+        owner: "DesignSystem"
+        source_locations:
+          - "src/FusionCanvas.App/DesignSystem/DesignSystemGalleryWindow.axaml"
+          - "src/FusionCanvas.App/DesignSystem/DesignSystemGalleryWindow.axaml.cs"
+        state_owner: "UNKNOWN; resolve DataContext owner from registration/code-behind"
+        entry_points:
+          - "src/FusionCanvas.App/Settings/SettingsWindow.axaml.cs"
+        auditable_patterns:
+          - "form"
+          - "grouped surface/cards"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form", "grouped surface/cards"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/DesignSystem/DesignSystemGalleryWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-GROUPACTIONCONFIRMATIONWINDOW
+        extract_entry_id: UI-SURF-GROUPACTIONCONFIRMATIONWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "GroupActionConfirmationWindow"
+        kind: "window"
+        owner: "Groups"
+        source_locations:
+          - "src/FusionCanvas.App/Groups/GroupActionConfirmationWindow.axaml"
+          - "src/FusionCanvas.App/Groups/GroupActionConfirmationWindow.axaml.cs"
+        state_owner: "groups:GroupActionConfirmationViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Views/MainWindow.axaml.cs"
+        auditable_patterns:
+          - "focused content and action group"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["focused content and action group"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Groups/GroupActionConfirmationWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-GROUPDELETECONFIRMATIONWINDOW
+        extract_entry_id: UI-SURF-GROUPDELETECONFIRMATIONWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "GroupDeleteConfirmationWindow"
+        kind: "window"
+        owner: "Groups"
+        source_locations:
+          - "src/FusionCanvas.App/Groups/GroupDeleteConfirmationWindow.axaml"
+          - "src/FusionCanvas.App/Groups/GroupDeleteConfirmationWindow.axaml.cs"
+        state_owner: "groups:GroupDeleteConfirmationViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Views/MainWindow.axaml.cs"
+        auditable_patterns:
+          - "grouped surface/cards"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["grouped surface/cards"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Groups/GroupDeleteConfirmationWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-GROUPSELECTIONWINDOW
+        extract_entry_id: UI-SURF-GROUPSELECTIONWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "GroupSelectionWindow"
+        kind: "window"
+        owner: "Groups"
+        source_locations:
+          - "src/FusionCanvas.App/Groups/GroupSelectionWindow.axaml"
+          - "src/FusionCanvas.App/Groups/GroupSelectionWindow.axaml.cs"
+        state_owner: "groups:GroupSelectionViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Views/MainWindow.axaml.cs"
+        auditable_patterns:
+          - "form"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Groups/GroupSelectionWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-IDEATIONDISCARDCONFIRMATIONWINDOW
+        extract_entry_id: UI-SURF-IDEATIONDISCARDCONFIRMATIONWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "IdeationDiscardConfirmationWindow"
+        kind: "window"
+        owner: "Ideation"
+        source_locations:
+          - "src/FusionCanvas.App/Ideation/IdeationDiscardConfirmationWindow.axaml"
+          - "src/FusionCanvas.App/Ideation/IdeationDiscardConfirmationWindow.axaml.cs"
+        state_owner: "ideation:IdeationViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Ideation/IdeationWindow.axaml.cs"
+        auditable_patterns:
+          - "focused content and action group"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["focused content and action group"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Ideation/IdeationDiscardConfirmationWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-IDEATIONWINDOW
+        extract_entry_id: UI-SURF-IDEATIONWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "IdeationWindow"
+        kind: "window"
+        owner: "Ideation"
+        source_locations:
+          - "src/FusionCanvas.App/Ideation/IdeationWindow.axaml"
+          - "src/FusionCanvas.App/Ideation/IdeationWindow.axaml.cs"
+        state_owner: "ideation:IdeationViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Views/MainWindow.axaml.cs; src/FusionCanvas.App/Views/MainWindowWindowCoordinator.cs"
+        auditable_patterns:
+          - "form"
+          - "list/repeater"
+          - "grouped surface/cards"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form", "list/repeater", "grouped surface/cards"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Ideation/IdeationWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-REJECTIDEAWINDOW
+        extract_entry_id: UI-SURF-REJECTIDEAWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "RejectIdeaWindow"
+        kind: "window"
+        owner: "Ideation"
+        source_locations:
+          - "src/FusionCanvas.App/Ideation/RejectIdeaWindow.axaml"
+          - "src/FusionCanvas.App/Ideation/RejectIdeaWindow.axaml.cs"
+        state_owner: "ideation:IdeationViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Ideation/IdeationWindow.axaml.cs"
+        auditable_patterns:
+          - "form"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Ideation/RejectIdeaWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-ITEMIMPORTWINDOW
+        extract_entry_id: UI-SURF-ITEMIMPORTWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "ItemImportWindow"
+        kind: "window"
+        owner: "Items/Import"
+        source_locations:
+          - "src/FusionCanvas.App/Items/Import/ItemImportWindow.axaml"
+          - "src/FusionCanvas.App/Items/Import/ItemImportWindow.axaml.cs"
+        state_owner: "items:ItemImportViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Views/MainWindow.axaml.cs"
+        auditable_patterns:
+          - "form"
+          - "list/repeater"
+          - "grouped surface/cards"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form", "list/repeater", "grouped surface/cards"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Items/Import/ItemImportWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-REJECTEDPHRASESWINDOW
+        extract_entry_id: UI-SURF-REJECTEDPHRASESWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "RejectedPhrasesWindow"
+        kind: "window"
+        owner: "RejectedPhrases"
+        source_locations:
+          - "src/FusionCanvas.App/RejectedPhrases/RejectedPhrasesWindow.axaml"
+          - "src/FusionCanvas.App/RejectedPhrases/RejectedPhrasesWindow.axaml.cs"
+        state_owner: "rejected:RejectedPhrasesViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Ideation/IdeationWindow.axaml.cs"
+        auditable_patterns:
+          - "form"
+          - "list/repeater"
+          - "grouped surface/cards"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form", "list/repeater", "grouped surface/cards"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/RejectedPhrases/RejectedPhrasesWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-AIPROFILEEDITORVIEW
+        extract_entry_id: UI-SURF-AIPROFILEEDITORVIEW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "AiProfileEditorView"
+        kind: "view"
+        owner: "Settings"
+        source_locations:
+          - "src/FusionCanvas.App/Settings/AiProfileEditorView.axaml"
+          - "src/FusionCanvas.App/Settings/AiProfileEditorView.axaml.cs"
+        state_owner: "settings:AiProfileEditorViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Settings/AiProfileEditorViewModel.cs; src/FusionCanvas.App/Settings/AiSettingsViewModel.cs"
+        auditable_patterns:
+          - "form"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Settings/AiProfileEditorView.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-AISETTINGSVIEW
+        extract_entry_id: UI-SURF-AISETTINGSVIEW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "AiSettingsView"
+        kind: "view"
+        owner: "Settings"
+        source_locations:
+          - "src/FusionCanvas.App/Settings/AiSettingsView.axaml"
+          - "src/FusionCanvas.App/Settings/AiSettingsView.axaml.cs"
+        state_owner: "settings:AiSettingsViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/AppServicesFactory.cs; src/FusionCanvas.App/Settings/AiSettingsViewModel.cs; src/FusionCanvas.App/Settings/SettingsViewModel.cs"
+        auditable_patterns:
+          - "form"
+          - "grouped surface/cards"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form", "grouped surface/cards"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Settings/AiSettingsView.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-SETTINGSWINDOW
+        extract_entry_id: UI-SURF-SETTINGSWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "SettingsWindow"
+        kind: "window"
+        owner: "Settings"
+        source_locations:
+          - "src/FusionCanvas.App/Settings/SettingsWindow.axaml"
+          - "src/FusionCanvas.App/Settings/SettingsWindow.axaml.cs"
+        state_owner: "settings:SettingsViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Views/MainWindow.axaml.cs; src/FusionCanvas.App/Views/MainWindowWindowCoordinator.cs"
+        auditable_patterns:
+          - "form"
+          - "list/repeater"
+          - "grouped surface/cards"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form", "list/repeater", "grouped surface/cards"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Settings/SettingsWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-TELEMETRYDEBUGWINDOW
+        extract_entry_id: UI-SURF-TELEMETRYDEBUGWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "TelemetryDebugWindow"
+        kind: "window"
+        owner: "Settings"
+        source_locations:
+          - "src/FusionCanvas.App/Settings/TelemetryDebugWindow.axaml"
+          - "src/FusionCanvas.App/Settings/TelemetryDebugWindow.axaml.cs"
+        state_owner: "settings:WorkspaceTelemetrySettingsViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Views/MainWindow.axaml.cs; src/FusionCanvas.App/Views/MainWindowWindowCoordinator.cs"
+        auditable_patterns:
+          - "form"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Settings/TelemetryDebugWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-WORKSPACETELEMETRYSETTINGSVIEW
+        extract_entry_id: UI-SURF-WORKSPACETELEMETRYSETTINGSVIEW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "WorkspaceTelemetrySettingsView"
+        kind: "view"
+        owner: "Settings"
+        source_locations:
+          - "src/FusionCanvas.App/Settings/WorkspaceTelemetrySettingsView.axaml"
+          - "src/FusionCanvas.App/Settings/WorkspaceTelemetrySettingsView.axaml.cs"
+        state_owner: "settings:WorkspaceTelemetrySettingsViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Settings/SettingsViewModel.cs; src/FusionCanvas.App/Settings/WorkspaceTelemetrySettingsViewModel.cs; src/FusionCanvas.App/Views/MainWindow.axaml.cs; src/FusionCanvas.App/Views/MainWindowWindowCoordinator.cs"
+        auditable_patterns:
+          - "form"
+          - "grouped surface/cards"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form", "grouped surface/cards"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Settings/WorkspaceTelemetrySettingsView.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-SNOWCLONELIBRARYWINDOW
+        extract_entry_id: UI-SURF-SNOWCLONELIBRARYWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "SnowcloneLibraryWindow"
+        kind: "window"
+        owner: "Snowclones"
+        source_locations:
+          - "src/FusionCanvas.App/Snowclones/SnowcloneLibraryWindow.axaml"
+          - "src/FusionCanvas.App/Snowclones/SnowcloneLibraryWindow.axaml.cs"
+        state_owner: "snowclones:SnowcloneLibraryViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Ideation/IdeationWindow.axaml.cs"
+        auditable_patterns:
+          - "form"
+          - "list/repeater"
+          - "grouped surface/cards"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form", "list/repeater", "grouped surface/cards"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Snowclones/SnowcloneLibraryWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-SPLASHWINDOW
+        extract_entry_id: UI-SURF-SPLASHWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "SplashWindow"
+        kind: "window"
+        owner: "Application shell"
+        source_locations:
+          - "src/FusionCanvas.App/SplashWindow.axaml"
+          - "src/FusionCanvas.App/SplashWindow.axaml.cs"
+        state_owner: "versioning:ApplicationVersionInfo"
+        entry_points:
+          - "src/FusionCanvas.App/App.axaml.cs"
+        auditable_patterns:
+          - "image/canvas preview"
+          - "grouped surface/cards"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["image/canvas preview", "grouped surface/cards"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/SplashWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-ARTWORKADJUSTMENTDISCARDWINDOW
+        extract_entry_id: UI-SURF-ARTWORKADJUSTMENTDISCARDWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "ArtworkAdjustmentDiscardWindow"
+        kind: "window"
+        owner: "StageTools"
+        source_locations:
+          - "src/FusionCanvas.App/StageTools/ArtworkAdjustmentDiscardWindow.axaml"
+          - "src/FusionCanvas.App/StageTools/ArtworkAdjustmentDiscardWindow.axaml.cs"
+        state_owner: "UNKNOWN; resolve DataContext owner from registration/code-behind"
+        entry_points:
+          - "src/FusionCanvas.App/StageTools/DesignPreviewWindow.axaml.cs"
+        auditable_patterns:
+          - "focused content and action group"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["focused content and action group"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/StageTools/ArtworkAdjustmentDiscardWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-DESIGNPREVIEWWINDOW
+        extract_entry_id: UI-SURF-DESIGNPREVIEWWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "DesignPreviewWindow"
+        kind: "window"
+        owner: "StageTools"
+        source_locations:
+          - "src/FusionCanvas.App/StageTools/DesignPreviewWindow.axaml"
+          - "src/FusionCanvas.App/StageTools/DesignPreviewWindow.axaml.cs"
+        state_owner: "stageTools:DesignStageToolViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Views/MainWindow.axaml.cs; src/FusionCanvas.App/Views/MainWindowWindowCoordinator.cs"
+        auditable_patterns:
+          - "image/canvas preview"
+          - "grouped surface/cards"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["image/canvas preview", "grouped surface/cards"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/StageTools/DesignPreviewWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-GLOBALCOLORREMOVALWINDOW
+        extract_entry_id: UI-SURF-GLOBALCOLORREMOVALWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "GlobalColorRemovalWindow"
+        kind: "window"
+        owner: "StageTools"
+        source_locations:
+          - "src/FusionCanvas.App/StageTools/GlobalColorRemovalWindow.axaml"
+          - "src/FusionCanvas.App/StageTools/GlobalColorRemovalWindow.axaml.cs"
+        state_owner: "stageTools:GlobalColorRemovalViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Views/MainWindow.axaml.cs; src/FusionCanvas.App/Views/MainWindowWindowCoordinator.cs"
+        auditable_patterns:
+          - "form"
+          - "image/canvas preview"
+          - "grouped surface/cards"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form", "image/canvas preview", "grouped surface/cards"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/StageTools/GlobalColorRemovalWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-MOCKUPPREVIEWWINDOW
+        extract_entry_id: UI-SURF-MOCKUPPREVIEWWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "MockupPreviewWindow"
+        kind: "window"
+        owner: "StageTools"
+        source_locations:
+          - "src/FusionCanvas.App/StageTools/MockupPreviewWindow.axaml"
+          - "src/FusionCanvas.App/StageTools/MockupPreviewWindow.axaml.cs"
+        state_owner: "stageTools:ListingStageToolViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Views/MainWindow.axaml.cs; src/FusionCanvas.App/Views/MainWindowWindowCoordinator.cs"
+        auditable_patterns:
+          - "image/canvas preview"
+          - "grouped surface/cards"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["image/canvas preview", "grouped surface/cards"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/StageTools/MockupPreviewWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-ADDVARIANTWINDOW
+        extract_entry_id: UI-SURF-ADDVARIANTWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "AddVariantWindow"
+        kind: "window"
+        owner: "Stores"
+        source_locations:
+          - "src/FusionCanvas.App/Stores/AddVariantWindow.axaml"
+          - "src/FusionCanvas.App/Stores/AddVariantWindow.axaml.cs"
+        state_owner: "stores:CatalogSetupViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Stores/StoreEditorWindow.axaml.cs"
+        auditable_patterns:
+          - "form"
+          - "list/repeater"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form", "list/repeater"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Stores/AddVariantWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-BULKADDVARIANTSWINDOW
+        extract_entry_id: UI-SURF-BULKADDVARIANTSWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "BulkAddVariantsWindow"
+        kind: "window"
+        owner: "Stores"
+        source_locations:
+          - "src/FusionCanvas.App/Stores/BulkAddVariantsWindow.axaml"
+          - "src/FusionCanvas.App/Stores/BulkAddVariantsWindow.axaml.cs"
+        state_owner: "stores:CatalogSetupViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Stores/StoreEditorWindow.axaml.cs"
+        auditable_patterns:
+          - "form"
+          - "list/repeater"
+          - "grid/table"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form", "list/repeater", "grid/table"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Stores/BulkAddVariantsWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-DESIGNAREAARCHIVECONFIRMATIONWINDOW
+        extract_entry_id: UI-SURF-DESIGNAREAARCHIVECONFIRMATIONWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "DesignAreaArchiveConfirmationWindow"
+        kind: "window"
+        owner: "Stores"
+        source_locations:
+          - "src/FusionCanvas.App/Stores/DesignAreaArchiveConfirmationWindow.axaml"
+          - "src/FusionCanvas.App/Stores/DesignAreaArchiveConfirmationWindow.axaml.cs"
+        state_owner: "stores:CatalogSetupViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Stores/StoreEditorWindow.axaml.cs"
+        auditable_patterns:
+          - "focused content and action group"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["focused content and action group"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Stores/DesignAreaArchiveConfirmationWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-DESIGNAREAEDITORWINDOW
+        extract_entry_id: UI-SURF-DESIGNAREAEDITORWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "DesignAreaEditorWindow"
+        kind: "window"
+        owner: "Stores"
+        source_locations:
+          - "src/FusionCanvas.App/Stores/DesignAreaEditorWindow.axaml"
+          - "src/FusionCanvas.App/Stores/DesignAreaEditorWindow.axaml.cs"
+        state_owner: "stores:CatalogSetupViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Stores/StoreEditorWindow.axaml.cs"
+        auditable_patterns:
+          - "form"
+          - "list/repeater"
+          - "grouped surface/cards"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form", "list/repeater", "grouped surface/cards"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Stores/DesignAreaEditorWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-ENLARGEDMOCKUPPLACEMENTEDITORWINDOW
+        extract_entry_id: UI-SURF-ENLARGEDMOCKUPPLACEMENTEDITORWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "EnlargedMockupPlacementEditorWindow"
+        kind: "window"
+        owner: "Stores"
+        source_locations:
+          - "src/FusionCanvas.App/Stores/EnlargedMockupPlacementEditorWindow.axaml"
+          - "src/FusionCanvas.App/Stores/EnlargedMockupPlacementEditorWindow.axaml.cs"
+        state_owner: "stores:CatalogSetupViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Stores/MockupTemplateEditorWindow.axaml.cs"
+        auditable_patterns:
+          - "form"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Stores/EnlargedMockupPlacementEditorWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-MOCKUPTEMPLATEARCHIVECONFIRMATIONWINDOW
+        extract_entry_id: UI-SURF-MOCKUPTEMPLATEARCHIVECONFIRMATIONWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "MockupTemplateArchiveConfirmationWindow"
+        kind: "window"
+        owner: "Stores"
+        source_locations:
+          - "src/FusionCanvas.App/Stores/MockupTemplateArchiveConfirmationWindow.axaml"
+          - "src/FusionCanvas.App/Stores/MockupTemplateArchiveConfirmationWindow.axaml.cs"
+        state_owner: "stores:CatalogSetupViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Stores/StoreEditorWindow.axaml.cs"
+        auditable_patterns:
+          - "focused content and action group"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["focused content and action group"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Stores/MockupTemplateArchiveConfirmationWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-MOCKUPTEMPLATEEDITORWINDOW
+        extract_entry_id: UI-SURF-MOCKUPTEMPLATEEDITORWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "MockupTemplateEditorWindow"
+        kind: "window"
+        owner: "Stores"
+        source_locations:
+          - "src/FusionCanvas.App/Stores/MockupTemplateEditorWindow.axaml"
+          - "src/FusionCanvas.App/Stores/MockupTemplateEditorWindow.axaml.cs"
+        state_owner: "stores:CatalogSetupViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Stores/StoreEditorWindow.axaml.cs"
+        auditable_patterns:
+          - "form"
+          - "list/repeater"
+          - "grid/table"
+          - "grouped surface/cards"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form", "list/repeater", "grid/table", "grouped surface/cards"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Stores/MockupTemplateEditorWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-OPTIONVALUEMANAGEMENTWINDOW
+        extract_entry_id: UI-SURF-OPTIONVALUEMANAGEMENTWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "OptionValueManagementWindow"
+        kind: "window"
+        owner: "Stores"
+        source_locations:
+          - "src/FusionCanvas.App/Stores/OptionValueManagementWindow.axaml"
+          - "src/FusionCanvas.App/Stores/OptionValueManagementWindow.axaml.cs"
+        state_owner: "stores:CatalogSetupViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Stores/StoreEditorWindow.axaml.cs"
+        auditable_patterns:
+          - "form"
+          - "list/repeater"
+          - "grouped surface/cards"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form", "list/repeater", "grouped surface/cards"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Stores/OptionValueManagementWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-PRINTIFYAPIKEYWINDOW
+        extract_entry_id: UI-SURF-PRINTIFYAPIKEYWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "PrintifyApiKeyWindow"
+        kind: "window"
+        owner: "Stores"
+        source_locations:
+          - "src/FusionCanvas.App/Stores/PrintifyApiKeyWindow.axaml"
+          - "src/FusionCanvas.App/Stores/PrintifyApiKeyWindow.axaml.cs"
+        state_owner: "stores:PrintifyApiKeyViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Stores/StoreEditorWindow.axaml.cs"
+        auditable_patterns:
+          - "form"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Stores/PrintifyApiKeyWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-PRINTIFYLISTINGIMPORTWINDOW
+        extract_entry_id: UI-SURF-PRINTIFYLISTINGIMPORTWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "PrintifyListingImportWindow"
+        kind: "window"
+        owner: "Stores"
+        source_locations:
+          - "src/FusionCanvas.App/Stores/PrintifyListingImportWindow.axaml"
+          - "src/FusionCanvas.App/Stores/PrintifyListingImportWindow.axaml.cs"
+        state_owner: "stores:PrintifyListingImportViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Views/MainWindow.axaml.cs"
+        auditable_patterns:
+          - "form"
+          - "list/repeater"
+          - "grouped surface/cards"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form", "list/repeater", "grouped surface/cards"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Stores/PrintifyListingImportWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-TERMSCONSENTWINDOW
+        extract_entry_id: UI-SURF-TERMSCONSENTWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "TermsConsentWindow"
+        kind: "window"
+        owner: "TermsConsent"
+        source_locations:
+          - "src/FusionCanvas.App/TermsConsent/TermsConsentWindow.axaml"
+          - "src/FusionCanvas.App/TermsConsent/TermsConsentWindow.axaml.cs"
+        state_owner: "terms:TermsConsentViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/App.axaml.cs; src/FusionCanvas.App/Settings/SettingsWindow.axaml.cs"
+        auditable_patterns:
+          - "form"
+          - "grouped surface/cards"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form", "grouped surface/cards"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/TermsConsent/TermsConsentWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-DOCUMENTCONTEXTHEADER
+        extract_entry_id: UI-SURF-DOCUMENTCONTEXTHEADER@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "DocumentContextHeader"
+        kind: "view"
+        owner: "Views"
+        source_locations:
+          - "src/FusionCanvas.App/Views/DocumentContextHeader.axaml"
+          - "src/FusionCanvas.App/Views/DocumentContextHeader.axaml.cs"
+        state_owner: "views:MainWindowViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Views/MainWindowWindowCoordinator.cs"
+        auditable_patterns:
+          - "form"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Views/DocumentContextHeader.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-MAINWINDOW
+        extract_entry_id: UI-SURF-MAINWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "MainWindow"
+        kind: "window"
+        owner: "Views"
+        source_locations:
+          - "src/FusionCanvas.App/Views/MainWindow.axaml"
+          - "src/FusionCanvas.App/Views/MainWindow.axaml.cs"
+        state_owner: "views:MainWindowViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/App.axaml.cs; src/FusionCanvas.App/StageTools/BuiltInStageToolContentResolver.cs; src/FusionCanvas.App/StageTools/IStageToolContentResolver.cs; src/FusionCanvas.App/StageTools/StageToolContentViewModel.cs; src/FusionCanvas.App/Versioning/AvaloniaClipboardService.cs; src/FusionCanvas.App/Views/MainWindowLayoutNormalizer.cs; src/FusionCanvas.App/Views/MainWindowViewModel.cs; src/FusionCanvas.App/Views/MainWindowWindowCoordinator.cs; src/FusionCanvas.App/Views/WindowGeometryPersistence.cs; src/FusionCanvas.App/Workspace/AppWorkspaceFactory.cs; src/FusionCanvas.App/Workspace/AppWorkspaceRuntime.cs; src/FusionCanvas.App/Workspace/MainWindowApplicationServices.cs"
+        auditable_patterns:
+          - "form"
+          - "tree/list navigation"
+          - "list/repeater"
+          - "grid/table"
+          - "image/canvas preview"
+          - "grouped surface/cards"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form", "tree/list navigation", "list/repeater", "grid/table", "image/canvas preview", "grouped surface/cards"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Views/MainWindow.axaml" plus static code references in FusionCanvas.App
+      - item_id: UI-SURF-WORKSPACEMANAGEMENTWINDOW
+        extract_entry_id: UI-SURF-WORKSPACEMANAGEMENTWINDOW@1
+        extract_revision: 2
+        change_type: ADDED
+        name: "WorkspaceManagementWindow"
+        kind: "window"
+        owner: "Workspace"
+        source_locations:
+          - "src/FusionCanvas.App/Workspace/WorkspaceManagementWindow.axaml"
+          - "src/FusionCanvas.App/Workspace/WorkspaceManagementWindow.axaml.cs"
+        state_owner: "workspace:WorkspaceManagementViewModel"
+        entry_points:
+          - "src/FusionCanvas.App/Views/MainWindow.axaml.cs; src/FusionCanvas.App/Views/MainWindowWindowCoordinator.cs"
+        auditable_patterns:
+          - "form"
+          - "list/repeater"
+          - "grouped surface/cards"
+        shared_dependencies:
+          themes: [Avalonia FluentTheme, FusionCanvas application theme resources]
+          resources_and_styles: [src/FusionCanvas.App/App.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, local window styles when present]
+          components: UNKNOWN; resolve applicable shared/local controls during surface assessment
+          patterns: ["form", "list/repeater", "grouped surface/cards"]
+          tokens: UNKNOWN; compare direct resources and local visual values during audit
+        discovery: "src/FusionCanvas.App/Workspace/WorkspaceManagementWindow.axaml" plus static code references in FusionCanvas.App
+  - extension_revision: 3
+    repository_revision: 783ad061aacbd0e438bf72846be4c56fce57eae5
+    working_tree_state: audit-artifacts-only-changed; application source unchanged
+    generated_at: 2026-11-20T17:15:00+01:00
+    standard_version: "1.4"
+    extract_definition_version: "1.4"
+    change_summary: Corrected the surface taxonomy after treating the reusable DocumentContextHeader control as a component, not a separately auditable surface.
+    current_total_surfaces: 36
+    counts_by_kind: {window: 33, user_control: 3}
+    changes:
+      - change_type: REMOVED_TOMBSTONE
+        item_id: UI-SURF-DOCUMENT-CONTEXT-HEADER
+        superseded_entry_id: UI-SURF-DOCUMENT-CONTEXT-HEADER@1
+        reason: Reusable context header is a component dependency of MainWindow, not an independently assessed page or major surface.
+        replacement_relationship: Retained as a MainWindow dependency at src/FusionCanvas.App/Views/DocumentContextHeader.axaml.
+  - extension_revision: 4
+    repository_revision: 783ad061aacbd0e438bf72846be4c56fce57eae5
+    working_tree_state: audit-artifacts-only-changed; application source unchanged
+    generated_at: 2026-11-20T17:16:00+01:00
+    standard_version: "1.4"
+    extract_definition_version: "1.4"
+    change_summary: Corrected the stable item identifier in the prior component tombstone; no application source changed.
+    changes:
+      - change_type: CORRECTION
+        item_id: UI-SURF-DOCUMENTCONTEXTHEADER
+        extract_entry_id: UI-SURF-DOCUMENTCONTEXTHEADER@1
+        prior_record: extension_revision 3 used a non-matching hyphenated identifier.
+        corrected_tombstone: UI-SURF-DOCUMENTCONTEXTHEADER@1 is removed as an independent Surface and retained as a MainWindow component dependency.
+  - extension_revision: 5
+    repository_revision: 783ad061aacbd0e438bf72846be4c56fce57eae5
+    working_tree_state: audit-artifacts-only-changed; application source unchanged
+    generated_at: 2026-11-20T18:50:00+01:00
+    standard_version: "1.4"
+    extract_definition_version: "1.4"
+    change_summary: Recorded completion of selected source review for all 36 inventoried surfaces and the reachable live UI pass; no new surface or criterion-backed visual findings; retained unknown runtime states.
+    current_total_surfaces: 36
+    counts_by_kind: {window: 33, user_control: 3}
+    live_review:
+      observation_method: Running Windows desktop application, read-only navigation and screenshots
+      reachable_states_reviewed:
+        - Main workspace and item Idea/Concept views
+        - Group details and Filters
+        - Store Editor: Basic info, Niches, Tags, Catalog & mockups
+        - Settings: General, AI, Workspace, Terms, About
+        - Design System Gallery
+        - Assets list and asset preview
+        - Ideation
+        - Rejected Phrases list and unsaved new-entry form
+      confirmed_finding: UI-001, Store Editor Basic info content flush with active tab boundary
+      additional_criterion_backed_visual_findings: none in reachable states
+      unknown_rendered_state_evidence:
+        - Design and Listing stages disabled for the inspected Idea-stage sample item
+        - Provider-dependent, empty, and state-gated workflows not entered
+        - Confirmation and edit dialogs not opened when doing so could change stored user data
+      data_mutation: none
+      status: PROVISIONAL; unknown evidence is not a pass
