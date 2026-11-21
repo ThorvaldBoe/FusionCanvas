@@ -12,7 +12,7 @@
         x:Class="FusionCanvas.App.Stores.StoreEditorWindow"
         x:DataType="stores:StoreManagementViewModel"
         Title="Store Editor"
-        Width="860"
+        Width="900"
         Height="620"
         MinWidth="720"
         MinHeight="520"
@@ -133,10 +133,9 @@
                   BorderBrush="{DynamicResource TabBorderBrush}"
                   BorderThickness="1"
                   CornerRadius="6"
-                  Padding="0">
+                  Padding="{DynamicResource Token.Layout.CardPadding}">
             <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
               <StackPanel IsVisible="{Binding IsBasicInfoTabSelected}"
-                          Margin="{DynamicResource Token.Layout.CardPadding}"
                           Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
             <TextBlock Text="Basic info"
                        FontSize="{DynamicResource Token.Typography.SubsectionHeading}"
