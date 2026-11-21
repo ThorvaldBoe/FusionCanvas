@@ -293,6 +293,8 @@ Cards should be used for tool panels and repeated content, not for every page se
 
 Controls should have a consistent visual inset from the edges of their containing surface and from nearby borders or dividers. They should not touch a tab border, panel edge, card boundary, dialog edge, or other container boundary unless an intentional edge-to-edge treatment is part of the pattern.
 
+A visible border alone does not create an inset. A bordered content surface must provide its inner spacing through the surface's padding or an equivalent inset on its content. Check the nearest visible content at every edge, including the first heading or control at the top and left, and the final action at the bottom and right. A zero-padding wrapper around un-inset content does not satisfy this guidance.
+
 Use shared spacing tokens for equivalent relationships:
 
 - leading and trailing inset from the containing surface
@@ -301,6 +303,8 @@ Use shared spacing tokens for equivalent relationships:
 - separation between distinct control groups
 
 Controls in the same content region should align to the same content inset. This includes contextual return or back actions, breadcrumbs, headings, filters, and primary content controls. A control that appears at the top of a tab or panel should retain the same breathing room as controls lower in that surface; it should not be pressed against the top or side border merely because it is the first element.
+
+For tabbed surfaces, review each tab's content layout independently. The tab-content boundary and the content inset are separate concerns: the boundary groups content, while its padding or equivalent spacing keeps content away from the line. Review each tab's first content row and action area, including tabs whose layouts or nested panels differ.
 
 Spacing should make the container boundary read as a boundary rather than as part of the control. Keep enough separation between neighboring controls for each control's hit target and visual grouping to remain clear, while preserving the application's compact, dense character. Do not introduce one-off margins when an existing layout spacing token or shared container inset expresses the relationship.
 
