@@ -39,7 +39,7 @@ public class SettingsViewModelTests
     public void Open_ResetsToGeneralSectionAndShowsWindow()
     {
         var vm = NewViewModel();
-        vm.SelectedSection = SettingsSection.Workspace;
+        vm.SelectedSection = SettingsSection.WorkspaceDiagnostics;
 
         vm.OpenCommand.Execute(null);
 
@@ -63,7 +63,7 @@ public class SettingsViewModelTests
     {
         var vm = NewViewModel();
         vm.OpenCommand.Execute(null);
-        vm.SelectedSection = SettingsSection.Workspace;
+        vm.SelectedSection = SettingsSection.WorkspaceDiagnostics;
         vm.CloseCommand.Execute(null);
 
         vm.OpenCommand.Execute(null);
@@ -271,16 +271,14 @@ public class SettingsViewModelTests
     }
 
     [Fact]
-    public async Task ManageWorkspaces_DelegatesToExistingWorkspaceManagement()
+    public void Sections_ExposeWorkspaceDiagnosticsAndKeepAppPreferencesTogether()
     {
-        var management = NewWorkspaceManagement(WorkspaceSnapshot.Empty);
-
         var vm = NewViewModel();
-        vm.AttachWorkspaceManagement(management);
 
-        vm.ManageWorkspacesCommand.Execute(null);
-
-        Assert.True(management.IsWorkspaceManagementOpen);
+        Assert.Contains(SettingsSection.WorkspaceDiagnostics, vm.Sections);
+        Assert.DoesNotContain("Workspace", vm.Sections.Select(section => section.ToString()));
+        Assert.Contains(SettingsSection.AI, vm.Sections);
+        Assert.Contains(SettingsSection.About, vm.Sections);
     }
 
     private static SettingsViewModel NewViewModel(string? loadWarning = null) =>

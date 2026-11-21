@@ -85,7 +85,6 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
             IsOpen = false;
         });
         CancelDiscardCommand = new RelayCommand(_ => ConfirmDiscardCredentialDraft = false);
-        ManageWorkspacesCommand = new RelayCommand(_ => ManageWorkspaces(), () => _workspaceManagement is not null);
         CopyDiagnosticsCommand = new RelayCommand(_ => Run(CopyDiagnosticsAsync));
     }
 
@@ -100,7 +99,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
             {
                 OnPropertyChanged(nameof(IsGeneralSection));
                 OnPropertyChanged(nameof(IsAiSection));
-                OnPropertyChanged(nameof(IsWorkspaceSection));
+                OnPropertyChanged(nameof(IsWorkspaceDiagnosticsSection));
                 OnPropertyChanged(nameof(IsTermsSection));
                 OnPropertyChanged(nameof(IsAboutSection));
                 if (value == SettingsSection.AI)
@@ -113,7 +112,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
 
     public bool IsGeneralSection => _selectedSection == SettingsSection.General;
 
-    public bool IsWorkspaceSection => _selectedSection == SettingsSection.Workspace;
+    public bool IsWorkspaceDiagnosticsSection => _selectedSection == SettingsSection.WorkspaceDiagnostics;
 
     public bool IsTermsSection => _selectedSection == SettingsSection.Terms;
 
@@ -125,7 +124,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
     {
         SettingsSection.General,
         SettingsSection.AI,
-        SettingsSection.Workspace,
+        SettingsSection.WorkspaceDiagnostics,
         SettingsSection.Terms,
         SettingsSection.About
     };
@@ -212,7 +211,6 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
 
     public ICommand CloseCommand { get; }
 
-    public ICommand ManageWorkspacesCommand { get; }
     public ICommand ConfirmDiscardCommand { get; }
     public ICommand CancelDiscardCommand { get; }
     public ICommand CopyDiagnosticsCommand { get; }
@@ -350,14 +348,6 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
         ConfirmDiscardCredentialDraft = false;
         IsOpen = false;
         return true;
-    }
-
-    private void ManageWorkspaces()
-    {
-        if (_workspaceManagement is { } management && management.OpenWorkspaceManagementCommand.CanExecute(null))
-        {
-            management.OpenWorkspaceManagementCommand.Execute(null);
-        }
     }
 
     private async Task CopyDiagnosticsAsync()

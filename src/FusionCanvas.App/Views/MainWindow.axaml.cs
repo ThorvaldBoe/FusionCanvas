@@ -52,7 +52,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         ManualListingVariantsGrid.ItemsSource = _manualListingVariantRows;
-        _windowCoordinator = new MainWindowWindowCoordinator(this, WorkspaceTreeControl);
+        _windowCoordinator = new MainWindowWindowCoordinator(this, WorkspaceTreeControl, SettingsRailButton, WorkspaceSelectorButton);
         WorkspaceTreeControl.AddHandler(PointerPressedEvent, OnWorkspaceTreePointerPressed, RoutingStrategies.Tunnel);
         WorkspaceTreeControl.AddHandler(KeyDownEvent, OnWorkspaceTreeKeyDown, RoutingStrategies.Tunnel);
         DataContextChanged += OnStageToolDataContextChanged;
@@ -64,7 +64,7 @@ public partial class MainWindow : Window
         ArgumentNullException.ThrowIfNull(services);
         InitializeComponent();
         ManualListingVariantsGrid.ItemsSource = _manualListingVariantRows;
-        _windowCoordinator = new MainWindowWindowCoordinator(this, WorkspaceTreeControl);
+        _windowCoordinator = new MainWindowWindowCoordinator(this, WorkspaceTreeControl, SettingsRailButton, WorkspaceSelectorButton);
         WorkspaceTreeControl.AddHandler(PointerPressedEvent, OnWorkspaceTreePointerPressed, RoutingStrategies.Tunnel);
         WorkspaceTreeControl.AddHandler(KeyDownEvent, OnWorkspaceTreeKeyDown, RoutingStrategies.Tunnel);
         DataContextChanged += OnStageToolDataContextChanged;
@@ -259,7 +259,7 @@ public partial class MainWindow : Window
                 Width = normalized.Width;
                 Height = normalized.Height;
                 Position = new PixelPoint(normalized.PositionX, normalized.PositionY);
-                MainLayoutGrid.ColumnDefinitions[0].Width =
+                MainLayoutGrid.ColumnDefinitions[1].Width =
                     new GridLength(normalized.NavigationWidth, GridUnitType.Pixel);
             }
             finally
@@ -268,7 +268,7 @@ public partial class MainWindow : Window
             }
         }
 
-        MainLayoutGrid.ColumnDefinitions[0].PropertyChanged += OnNavigationColumnChanged;
+        MainLayoutGrid.ColumnDefinitions[1].PropertyChanged += OnNavigationColumnChanged;
         CaptureNormalLayout();
     }
 
@@ -341,7 +341,7 @@ public partial class MainWindow : Window
 
     private void CaptureNormalLayout()
     {
-        var navigationColumn = MainLayoutGrid.ColumnDefinitions[0];
+        var navigationColumn = MainLayoutGrid.ColumnDefinitions[1];
         var navigationWidth = navigationColumn.ActualWidth;
         if (!double.IsFinite(navigationWidth) || navigationWidth <= 0)
         {
@@ -1045,6 +1045,30 @@ public partial class MainWindow : Window
         }
 
         e.Handled = true;
+    }
+
+    private void OnWorkspaceChoiceClick(object? sender, RoutedEventArgs e)
+    {
+        WorkspaceSelectorButton.Flyout?.Hide();
+    }
+
+    private void OnSettingsRailClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            _windowCoordinator.SyncSettingsWindow(viewModel.Settings);
+        }
+    }
+
+    private void OnManageWorkspacesClick(object? sender, RoutedEventArgs e)
+    {
+        WorkspaceSelectorButton.Flyout?.Hide();
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            PostToDispatcher(
+                () => _windowCoordinator.SyncWorkspaceManagementWindow(viewModel.WorkspaceManagement),
+                DispatcherPriority.Background);
+        }
     }
 
     private async void OnContextNewGroup(object? sender, RoutedEventArgs e)

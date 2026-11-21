@@ -14,7 +14,7 @@
         <TextBlock Text="Telemetry is stored locally for this workspace. Captured service bodies may include creative content. Recognized credentials are redacted, and records expire automatically."
                    FontSize="{DynamicResource Token.Typography.Caption}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
       </StackPanel>
-      <TextBlock IsVisible="{Binding HasNoWorkspace}" Text="Select an active workspace to manage diagnostics." TextWrapping="Wrap" />
+      <TextBlock IsVisible="{Binding HasNoWorkspace}" Text="No workspace selected. Select an active workspace to manage diagnostics." TextWrapping="Wrap" />
       <StackPanel IsEnabled="{Binding HasWorkspace}" Spacing="{DynamicResource Token.Spacing.Gap.ControlPlus}">
         <ToggleSwitch Content="Debug Mode"
                       IsChecked="{Binding DebugModeEnabled, Mode=TwoWay}"
