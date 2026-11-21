@@ -181,7 +181,7 @@ public class ProductCatalogPersistenceTests
 
         Assert.Equal(template, Assert.Single(loaded.MockupTemplates));
         Assert.Equal(revision, Assert.Single(loaded.MockupTemplateRevisions));
-        Assert.Equal(23, SqliteWorkspaceRepository.CurrentSchemaVersion);
+        Assert.Equal(24, SqliteWorkspaceRepository.CurrentSchemaVersion);
     }
 
     [Fact]
@@ -559,7 +559,7 @@ public class ProductCatalogPersistenceTests
         Assert.Empty(loaded.ItemListingDetails);
         Assert.Empty(loaded.ItemVariantListingTerms);
         Assert.Empty(loaded.ItemListingSetupHistory);
-        Assert.Equal(23, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(24, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]

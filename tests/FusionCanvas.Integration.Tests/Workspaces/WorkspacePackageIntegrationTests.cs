@@ -6,6 +6,7 @@ using FusionCanvas.Application.Workspaces.Transfer;
 using FusionCanvas.Application.Snowclones;
 using FusionCanvas.Application.Telemetry;
 using FusionCanvas.Domain.Assets;
+using FusionCanvas.Domain.ArtworkStyles;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Ideation;
 using FusionCanvas.Domain.Mockups;
@@ -31,9 +32,18 @@ public class WorkspacePackageIntegrationTests
         var sourceRepository = new SqliteWorkspaceRepository(temp.GetPath("source.db"));
         var sourceFiles = new LocalWorkspaceFileStore(temp.GetPath("source-files"));
         var snapshot = AddNormalizedCatalog(CreateSnapshot("Round trip", "assets/design.png", archivedAsset: true));
+        var artworkStyle = new ArtworkStyle(Guid.NewGuid(), snapshot.Workspaces[0].Id, "Risograph", "Limited colors with grain", Now, Now);
+        var artworkStyleReferences = new[]
+        {
+            new ArtworkStyleReference(Guid.NewGuid(), artworkStyle.Id, "artwork-styles/first.png", "image/png", 0, Now),
+            new ArtworkStyleReference(Guid.NewGuid(), artworkStyle.Id, "artwork-styles/second.webp", "image/webp", 1, Now)
+        };
+        snapshot = snapshot with { ArtworkStyles = [artworkStyle], ArtworkStyleReferences = artworkStyleReferences };
         await sourceRepository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
         using var sourceContent = new MemoryStream([1, 2, 3, 4]);
         await sourceFiles.RestoreAsync("assets/design.png", sourceContent, TestContext.Current.CancellationToken);
+        await sourceFiles.RestoreAsync("artwork-styles/first.png", new MemoryStream([5, 6]), TestContext.Current.CancellationToken);
+        await sourceFiles.RestoreAsync("artwork-styles/second.webp", new MemoryStream([7, 8]), TestContext.Current.CancellationToken);
         var packagePath = temp.GetPath("roundtrip.fcworkspace");
         var writer = CreatePackageWriter();
         var reader = CreatePackageReader();
@@ -55,6 +65,8 @@ public class WorkspacePackageIntegrationTests
         Assert.True(imported.Succeeded);
         Assert.Equal(snapshot.Workspaces, restored.Workspaces);
         Assert.Equal(snapshot.Stores, restored.Stores);
+        Assert.Equal(snapshot.ArtworkStyles, restored.ArtworkStyles);
+        Assert.Equal(artworkStyleReferences, restored.ArtworkStyleReferences.OrderBy(reference => reference.SortOrder));
         Assert.Equal(snapshot.Niches, restored.Niches);
         Assert.Equal(snapshot.Groups, restored.Groups);
         Assert.Equal(snapshot.Items, restored.Items);
@@ -72,6 +84,8 @@ public class WorkspacePackageIntegrationTests
         Assert.Equal(snapshot.MockupTemplateRevisions, restored.MockupTemplateRevisions);
         Assert.Equal(snapshot.MockupTemplateRevisionColors, restored.MockupTemplateRevisionColors);
         Assert.Equal([1, 2, 3, 4], await ReadBytesAsync(destinationFiles, "assets/design.png"));
+        Assert.Equal([5, 6], await ReadBytesAsync(destinationFiles, "artwork-styles/first.png"));
+        Assert.Equal([7, 8], await ReadBytesAsync(destinationFiles, "artwork-styles/second.webp"));
     }
 
     [Fact]

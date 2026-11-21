@@ -267,6 +267,25 @@ public sealed class DesignStageService : IDesignStageService
         return await SaveDesignMutationAsync(updated, itemId, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<DesignStageResult> SaveArtworkStyleSelectionAsync(Guid itemId, Guid? styleId, CancellationToken cancellationToken = default)
+    {
+        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var item = snapshot.Items.SingleOrDefault(value => value.Id == itemId);
+        if (item is null) return DesignStageResult.Failure("Item was not found.");
+        var decision = ItemWorkflowPolicy.CanPerformOperation(item, ItemOperationKind.DesignStage);
+        if (!decision.IsAllowed) return DesignStageResult.Failure(decision.Reason, BuildState(snapshot, itemId));
+        var workspaceId = snapshot.Stores.SingleOrDefault(value => value.Id == item.StoreId)?.WorkspaceId;
+        if (styleId is Guid selectedId && !snapshot.ArtworkStyles.Any(value => value.Id == selectedId && value.WorkspaceId == workspaceId))
+            return DesignStageResult.Failure("The selected artwork style is not available in this workspace.", BuildState(snapshot, itemId));
+
+        var metadata = ItemMetadataCodec.ParseMetadata(item.MetadataJson);
+        if (styleId is Guid id) metadata[ItemMetadataCodec.ArtworkStyleIdKey] = id.ToString();
+        else metadata.Remove(ItemMetadataCodec.ArtworkStyleIdKey);
+        var updatedItem = item with { MetadataJson = ItemMetadataCodec.SerializeMetadata(metadata), UpdatedAt = _clock() };
+        var updated = snapshot with { Items = [.. snapshot.Items.Where(value => value.Id != itemId), updatedItem] };
+        return await SaveDesignMutationAsync(updated, itemId, cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task<DesignStageResult> AddSelectedColorAsync(Guid itemId, string colorValue, CancellationToken cancellationToken = default)
     {
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
@@ -1450,6 +1469,12 @@ public sealed class DesignStageService : IDesignStageService
                 ? snapshot.Blueprints.SingleOrDefault(blueprint => blueprint.Id == blueprintId)?.Name
                 : null
             : null;
+        var selectedArtworkStyle = Guid.TryParse(itemMetadata.GetValueOrDefault(ItemMetadataCodec.ArtworkStyleIdKey), out var savedArtworkStyleId)
+            ? snapshot.ArtworkStyles.SingleOrDefault(value => value.Id == savedArtworkStyleId && value.WorkspaceId == store?.WorkspaceId)
+            : null;
+        var selectedArtworkStyleReferences = selectedArtworkStyle is null
+            ? []
+            : snapshot.ArtworkStyleReferences.Where(value => value.StyleId == selectedArtworkStyle.Id).ToArray();
 
         return state with
         {
@@ -1467,6 +1492,10 @@ public sealed class DesignStageService : IDesignStageService
             ArtworkPromptOverride = itemMetadata.GetValueOrDefault(ItemMetadataCodec.ArtworkPromptOverrideKey),
             ArtworkAdjustmentPrompt = itemMetadata.GetValueOrDefault(ItemMetadataCodec.ArtworkAdjustmentPromptKey),
             ArtworkContrast = artworkContrast,
+            AvailableArtworkStyles = snapshot.ArtworkStyles.Where(value => value.WorkspaceId == store?.WorkspaceId).OrderBy(value => value.Title, StringComparer.OrdinalIgnoreCase).ToArray(),
+            SelectedArtworkStyleId = selectedArtworkStyle?.Id,
+            SelectedArtworkStyleReferenceCount = selectedArtworkStyleReferences.Length,
+            MissingArtworkStyleReferenceCount = selectedArtworkStyleReferences.Count(value => !IsManagedFileAvailable(value.WorkspaceRelativePath)),
             IsDesignTriangleComplete = isDesignTriangleComplete,
             HasDefaultRowWithSelectedColor = hasDefaultRowWithSelectedColor,
             HasStaleConfiguration = configuredOfferingIsStale,
@@ -1483,6 +1512,12 @@ public sealed class DesignStageService : IDesignStageService
                 : string.Empty,
             RecoveryOfferings = configuredOfferingIsStale ? recoveryOfferings : []
         };
+    }
+
+    private bool IsManagedFileAvailable(string path)
+    {
+        try { return _fileStore.Exists(path); }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or IOException) { return false; }
     }
 
     private WorkspaceSnapshot ReplaceConfiguration(WorkspaceSnapshot snapshot, Item item, Guid offeringId)

@@ -1,5 +1,6 @@
 using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.ContentRisk;
+using FusionCanvas.Domain.ArtworkStyles;
 
 namespace FusionCanvas.Domain.Workspace.Transfer;
 
@@ -14,6 +15,9 @@ public static class WorkspaceSnapshotFilter
         }
 
         var workspaces = source.Workspaces.Where(workspace => workspace.Id == workspaceId).ToArray();
+        var artworkStyles = source.ArtworkStyles.Where(style => style.WorkspaceId == workspaceId).ToArray();
+        var artworkStyleIds = artworkStyles.Select(style => style.Id).ToHashSet();
+        var artworkStyleReferences = source.ArtworkStyleReferences.Where(reference => artworkStyleIds.Contains(reference.StyleId)).ToArray();
         var stores = source.Stores.Where(store => store.WorkspaceId == workspaceId).ToArray();
         var storeIds = stores.Select(store => store.Id).ToHashSet();
         var niches = source.Niches.Where(niche => storeIds.Contains(niche.StoreId)).ToArray();
@@ -129,6 +133,8 @@ public static class WorkspaceSnapshotFilter
                 MockupTemplateRevisions = mockupTemplateRevisions,
                 MockupTemplateRevisionColors = mockupTemplateRevisionColors,
                 ContentRiskReviews = contentRiskReviews
+                ,ArtworkStyles = artworkStyles
+                ,ArtworkStyleReferences = artworkStyleReferences
             },
             droppedLinks);
     }

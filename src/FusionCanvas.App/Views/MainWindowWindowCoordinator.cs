@@ -8,6 +8,8 @@ using FusionCanvas.App.Settings;
 using FusionCanvas.App.StageTools;
 using FusionCanvas.App.Stores;
 using FusionCanvas.App.Workspace;
+using FusionCanvas.App.ArtworkStyles;
+using FusionCanvas.Application.ArtworkStyles;
 
 namespace FusionCanvas.App.Views;
 
@@ -41,6 +43,12 @@ internal sealed class MainWindowWindowCoordinator
     public void SetSettings(SettingsViewModel? settings) => _settings = settings;
 
     public void SetDesignPreviewFocusTarget(Control? control) => _designPreviewFocusTarget = control;
+
+    public Task<Guid?> OpenArtworkStyleManagementAsync(IArtworkStyleManagementService service, Guid workspaceId, bool closeAfterSave = false)
+    {
+        var window = new ArtworkStyleManagementWindow(service, workspaceId, closeAfterSave);
+        return window.ShowDialog<Guid?>(_settingsWindow is { IsVisible: true } settings ? settings : _owner);
+    }
 
     public void SyncSettingsWindow(SettingsViewModel settings)
     {

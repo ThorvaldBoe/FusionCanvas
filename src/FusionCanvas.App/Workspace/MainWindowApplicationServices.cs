@@ -14,6 +14,7 @@ using FusionCanvas.Application.SllGeneration;
 using FusionCanvas.Application.Tags;
 using FusionCanvas.Application.WorkspaceTree;
 using FusionCanvas.Application.Listings;
+using FusionCanvas.Application.ArtworkStyles;
 
 namespace FusionCanvas.App.Workspace;
 
@@ -48,4 +49,5 @@ public sealed record MainWindowApplicationServices(
     IListingProjectionSource? ListingProjectionSource = null,
     IStoreContextMapper? StoreContextMapper = null,
     FusionCanvas.Application.Listings.ManualListingDetailsService? ManualListingDetails = null,
-    FusionCanvas.Application.Stores.Printify.PrintifyListingImportService? PrintifyListingImport = null);
+    FusionCanvas.Application.Stores.Printify.PrintifyListingImportService? PrintifyListingImport = null,
+    IArtworkStyleManagementService? ArtworkStyleManagement = null);

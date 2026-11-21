@@ -45,6 +45,7 @@ using FusionCanvas.Application.Listings;
 using FusionCanvas.Application.Items.Import;
 using FusionCanvas.Application.TitleOptimization;
 using FusionCanvas.App.ConceptRefinement;
+using FusionCanvas.Application.ArtworkStyles;
 
 namespace FusionCanvas.App.Views;
 
@@ -191,6 +192,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
             applicationServices.MockupSourceImageContentReader,
             applicationServices.MockupPlacementPreviewReader,
             applicationServices.MockupOutputResolutionSettings);
+        ArtworkStyleManagement = applicationServices.ArtworkStyleManagement;
         StoreManagement.ActiveStoreChanged += (_, store) => Settings.UpdateActiveStore(store?.Id);
         _groupManagementService = applicationServices.GroupManagement;
         _itemManagementService = applicationServices.ItemManagement;
@@ -381,6 +383,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
     public DocumentWindowViewModel DocumentWindow { get; }
 
     public WorkspaceManagementViewModel WorkspaceManagement { get; }
+    public IArtworkStyleManagementService? ArtworkStyleManagement { get; }
 
     public SettingsViewModel Settings { get; private set; } = null!;
 

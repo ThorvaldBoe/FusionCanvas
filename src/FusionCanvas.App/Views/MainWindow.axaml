@@ -1938,6 +1938,21 @@
                         <TextBlock Text="{Binding DesignTool.ArtworkGenerationGuidance}"
                                    TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Label}"
                                    Foreground="{DynamicResource SecondaryTextBrush}" />
+                        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.InlineGap}">
+                          <ComboBox ItemsSource="{Binding DesignTool.ArtworkStyles}"
+                                    SelectedItem="{Binding DesignTool.SelectedArtworkStyle, Mode=TwoWay}"
+                                    DisplayMemberBinding="{Binding Title}"
+                                    IsEnabled="{Binding !DesignTool.IsReadOnly}"
+                                    AutomationProperties.Name="Artwork style"
+                                    AutomationProperties.AutomationId="Design.ArtworkStyleSelector" />
+                          <Button Content="Add new…" Click="OnAddArtworkStyle"
+                                  IsEnabled="{Binding !DesignTool.IsReadOnly}"
+                                  AutomationProperties.Name="Add new artwork style" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding DesignTool.ArtworkStyleGuidance}"
+                                   IsVisible="{Binding DesignTool.ArtworkStyleGuidance}"
+                                   TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Label}"
+                                   Foreground="{DynamicResource DangerTextBrush}" />
                         <Expander Header="Image prompt and contrast" IsExpanded="False">
                           <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Inline.Right_None.Bottom_None}">
                             <TextBlock Text="Contrast" FontSize="{DynamicResource Token.Typography.Label}"

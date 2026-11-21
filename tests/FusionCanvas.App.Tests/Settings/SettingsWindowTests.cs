@@ -59,6 +59,9 @@ public class SettingsWindowTests
             Assert.True(settings.IsWorkspaceSection);
             var manageButton = FindControl<Button>(window, b => (b.Content as string) == "Manage workspaces" && b.IsVisible);
             Assert.NotNull(manageButton);
+            Assert.True(settings.CanManageArtworkStyles);
+            var stylesButton = FindControl<Button>(window, b => (b.Content as string) == "Manage artwork styles" && b.IsVisible);
+            Assert.NotNull(stylesButton);
             var name = FindControl<TextBlock>(window, t => t.IsVisible && t.Text == "Personal");
             Assert.NotNull(name);
         }

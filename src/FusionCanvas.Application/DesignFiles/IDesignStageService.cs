@@ -24,6 +24,9 @@ public interface IDesignStageService
     /// <summary>Persists the Design-stage artwork target and transparency preference for an item.</summary>
     Task<DesignStageResult> SaveArtworkPreferencesAsync(Guid itemId, Guid? designAreaId, bool transparentBackground, CancellationToken cancellationToken = default);
 
+    Task<DesignStageResult> SaveArtworkStyleSelectionAsync(Guid itemId, Guid? styleId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(DesignStageResult.Failure("Artwork style selection is unavailable."));
+
     Task<DesignStageResult> SaveArtworkPromptPreferencesAsync(
         Guid itemId,
         string? promptOverride,

@@ -103,6 +103,12 @@
                       HorizontalAlignment="Left"
                       MinWidth="160"
                       Classes="primary" />
+              <Button Content="Manage artwork styles"
+                      Command="{Binding ManageArtworkStylesCommand}"
+                      ToolTip.Tip="Create and maintain reusable artwork styles for this workspace"
+                      HorizontalAlignment="Left"
+                      MinWidth="160"
+                      AutomationProperties.AutomationId="Workspace.ManageArtworkStyles" />
             </StackPanel>
           </Border>
           <settings:WorkspaceTelemetrySettingsView DataContext="{Binding Telemetry}" />

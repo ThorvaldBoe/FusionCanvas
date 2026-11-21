@@ -25,6 +25,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
     private readonly IClipboardService _clipboard;
     private readonly SynchronizationContext? _syncContext;
     private WorkspaceManagementViewModel? _workspaceManagement;
+    private bool _canManageArtworkStyles;
     private SettingsSection _selectedSection = SettingsSection.General;
     private bool _isOpen;
     private bool _isDarkMode;
@@ -90,6 +91,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
+    public event EventHandler? ArtworkStylesManagementRequested;
 
     public SettingsSection SelectedSection
     {
@@ -137,6 +139,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
     public AiSettingsViewModel Ai { get; }
 
     public WorkspaceTelemetrySettingsViewModel Telemetry { get; }
+    public bool CanManageArtworkStyles { get => _canManageArtworkStyles; private set => SetField(ref _canManageArtworkStyles, value); }
+    public ICommand ManageArtworkStylesCommand { get; private set; } = new RelayCommand(_ => { });
 
     public UpdateViewModel Updates { get; }
 
@@ -240,6 +244,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
         _workspaceManagement = workspaceManagement;
         _workspaceManagement.ActiveWorkspaceChanged += OnActiveWorkspaceChanged;
         UpdateWorkspaceName(_workspaceManagement.SelectedWorkspace);
+        CanManageArtworkStyles = _workspaceManagement.SelectedWorkspace is not null;
+        ManageArtworkStylesCommand = new RelayCommand(_ => ArtworkStylesManagementRequested?.Invoke(this, EventArgs.Empty), () => CanManageArtworkStyles);
         Telemetry.SetWorkspace(_workspaceManagement.SelectedWorkspace?.Id, _workspaceManagement.SelectedWorkspace?.Name);
     }
 
@@ -296,6 +302,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
     private void OnActiveWorkspaceChanged(object? sender, WorkspaceSummary? workspace)
     {
         UpdateWorkspaceName(workspace);
+        CanManageArtworkStyles = workspace is not null;
+        (ManageArtworkStylesCommand as RelayCommand)?.NotifyCanExecuteChanged();
         UpdateActiveWorkspace(workspace?.Id);
         Telemetry.SetWorkspace(workspace?.Id, workspace?.Name);
     }

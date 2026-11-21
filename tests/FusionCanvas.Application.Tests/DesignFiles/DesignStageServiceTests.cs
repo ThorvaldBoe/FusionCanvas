@@ -14,6 +14,7 @@ using System.Text.Json;
 using FusionCanvas.Integration.Files;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+using FusionCanvas.Domain.ArtworkStyles;
 
 namespace FusionCanvas.Application.Tests.DesignFiles;
 
@@ -24,6 +25,28 @@ public class DesignStageServiceTests
     private static readonly Guid OtherStoreId = Guid.NewGuid();
 
     // --- SelectConfigurationAsync ---
+
+    [Fact]
+    public async Task SaveArtworkStyleSelectionAsync_PersistsCustomStyleAndGeneralFallback()
+    {
+        var repository = new InMemoryWorkspaceRepository(SeedWithProduct());
+        var service = New(repository);
+        var (itemId, _) = await AddItemAndConfig(service, repository);
+        var item = repository.Snapshot.Items.Single(value => value.Id == itemId);
+        var workspaceId = repository.Snapshot.Stores.Single(value => value.Id == item.StoreId).WorkspaceId;
+        var now = Now;
+        var style = new ArtworkStyle(Guid.NewGuid(), workspaceId, "Screen print", "Bold limited palette", now, now);
+        repository.Snapshot = repository.Snapshot with { ArtworkStyles = [style] };
+
+        var selected = await service.SaveArtworkStyleSelectionAsync(itemId, style.Id, TestContext.Current.CancellationToken);
+        var metadata = ItemMetadataCodec.ParseMetadata(repository.Snapshot.Items.Single(value => value.Id == itemId).MetadataJson);
+
+        Assert.True(selected.Succeeded, selected.Error);
+        Assert.Equal(style.Id.ToString(), metadata[ItemMetadataCodec.ArtworkStyleIdKey]);
+        var general = await service.SaveArtworkStyleSelectionAsync(itemId, null, TestContext.Current.CancellationToken);
+        Assert.True(general.Succeeded, general.Error);
+        Assert.False(ItemMetadataCodec.ParseMetadata(repository.Snapshot.Items.Single(value => value.Id == itemId).MetadataJson).ContainsKey(ItemMetadataCodec.ArtworkStyleIdKey));
+    }
 
     [Fact]
     public async Task SelectConfigurationAsync_ValidOffering_PersistsAndReturnsState()

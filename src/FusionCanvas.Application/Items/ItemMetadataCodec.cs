@@ -22,6 +22,7 @@ internal static class ItemMetadataCodec
     public const string ArtworkContrastKey = "design.artworkContrast";
     public const string ArtworkPromptOverrideKey = "design.artworkPromptOverride";
     public const string ArtworkAdjustmentPromptKey = "design.artworkAdjustmentPrompt";
+    public const string ArtworkStyleIdKey = "design.artworkStyleId";
     public const string MockupInvalidationNoticeKey = "listing.mockups.invalidatedNotice";
     public const string InheritedFromPrefix = "inheritedFrom:";
 

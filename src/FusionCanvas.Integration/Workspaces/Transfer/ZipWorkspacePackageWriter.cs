@@ -53,6 +53,7 @@ public sealed class ZipWorkspacePackageWriter : IWorkspacePackageWriter
             var missingFiles = request.Manifest.MissingFiles.ToHashSet(StringComparer.Ordinal);
             var filePaths = request.Snapshot.Assets
                 .Select(asset => ManagedWorkspacePath.Normalize(asset.WorkspaceRelativePath))
+                .Concat(request.Snapshot.ArtworkStyleReferences.Select(reference => ManagedWorkspacePath.Normalize(reference.WorkspaceRelativePath)))
                 .Distinct(StringComparer.Ordinal)
                 .ToArray();
 
