@@ -43,6 +43,23 @@ public class WorkspaceManagementViewModelTests
     }
 
     [Fact]
+    public async Task SelectorWorkspaces_ContainsOnlyActiveWorkspacesAndMarksCurrentChoice()
+    {
+        var active = NewWorkspace("Personal");
+        var archived = NewWorkspace("Archived") with { IsArchived = true };
+        var repository = new InMemoryWorkspaceRepository(
+            new WorkspaceSnapshot([active, archived], [], [], [], [], [], [], [], [], []));
+        var viewModel = NewViewModel(repository);
+
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+
+        var selector = Assert.Single(viewModel.SelectorWorkspaces);
+        Assert.Equal("Personal", selector.Name);
+        Assert.True(selector.IsSelected);
+        Assert.DoesNotContain(viewModel.SelectorWorkspaces, entry => entry.Name == "Archived");
+    }
+
+    [Fact]
     public async Task DeleteWorkspace_RequiresTypedNameAndRemovesOwnedStores()
     {
         var workspace = NewWorkspace("Client");

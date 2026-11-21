@@ -20,6 +20,8 @@ internal sealed class MainWindowWindowCoordinator
 {
     private readonly Window _owner;
     private readonly Control _workspaceTreeControl;
+    private readonly Control _settingsFocusTarget;
+    private readonly Control _workspaceFocusTarget;
     private SettingsViewModel? _settings;
     private StoreEditorWindow? _storeEditorWindow;
     private WorkspaceManagementWindow? _workspaceManagementWindow;
@@ -32,10 +34,16 @@ internal sealed class MainWindowWindowCoordinator
     private Window? _mockupPreviewWindow;
     private Control? _designPreviewFocusTarget;
 
-    public MainWindowWindowCoordinator(Window owner, Control workspaceTreeControl)
+    public MainWindowWindowCoordinator(
+        Window owner,
+        Control workspaceTreeControl,
+        Control settingsFocusTarget,
+        Control workspaceFocusTarget)
     {
         _owner = owner ?? throw new ArgumentNullException(nameof(owner));
         _workspaceTreeControl = workspaceTreeControl ?? throw new ArgumentNullException(nameof(workspaceTreeControl));
+        _settingsFocusTarget = settingsFocusTarget ?? throw new ArgumentNullException(nameof(settingsFocusTarget));
+        _workspaceFocusTarget = workspaceFocusTarget ?? throw new ArgumentNullException(nameof(workspaceFocusTarget));
     }
 
     public void SetSettings(SettingsViewModel? settings) => _settings = settings;
@@ -63,9 +71,16 @@ internal sealed class MainWindowWindowCoordinator
                 if (CanFocusOwner(_owner))
                 {
                     _owner.Activate();
+                    _settingsFocusTarget.Focus();
                 }
             };
             _settingsWindow.Show(_owner);
+            return;
+        }
+
+        if (settings.IsOpen && _settingsWindow is { IsVisible: true } existingSettings)
+        {
+            existingSettings.Activate();
             return;
         }
 
@@ -120,12 +135,19 @@ internal sealed class MainWindowWindowCoordinator
                     workspaceManagement.CloseWorkspaceManagementCommand.Execute(null);
                 }
 
-                if (_settingsWindow is { } settings && settings.IsVisible)
+                if (CanFocusOwner(_owner))
                 {
-                    settings.Activate();
+                    _owner.Activate();
+                    _workspaceFocusTarget.Focus();
                 }
             };
             _workspaceManagementWindow.Show((Window?)_settingsWindow ?? _owner);
+            return;
+        }
+
+        if (workspaceManagement.IsWorkspaceManagementOpen && _workspaceManagementWindow is { IsVisible: true } existingManagement)
+        {
+            existingManagement.Activate();
             return;
         }
 

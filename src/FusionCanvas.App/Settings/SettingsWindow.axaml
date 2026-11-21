@@ -11,6 +11,9 @@
         CanResize="True"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ApplicationBackgroundBrush}">
+  <Window.Resources>
+    <settings:SettingsSectionLabelConverter x:Key="SettingsSectionLabel" />
+  </Window.Resources>
   <Grid ColumnDefinitions="180,*">
     <Border Grid.Column="0"
             Background="{DynamicResource PanelSurfaceBrush}"
@@ -32,7 +35,7 @@
                  Padding="0">
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="settings:SettingsSection">
-              <TextBlock Text="{Binding}" FontSize="{DynamicResource Token.Typography.SectionHeading}" Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Inline.Compact}" />
+              <TextBlock Text="{Binding, Converter={StaticResource SettingsSectionLabel}}" FontSize="{DynamicResource Token.Typography.SectionHeading}" Padding="{DynamicResource Token.Layout.Padding.HorizontalVertical.Inline.Compact}" />
             </DataTemplate>
           </ListBox.ItemTemplate>
         </ListBox>
@@ -75,36 +78,15 @@
           </Border>
         </StackPanel>
 
-        <StackPanel IsVisible="{Binding IsWorkspaceSection}" Spacing="{DynamicResource Token.Spacing.Gap.Large}">
-          <TextBlock Text="Workspace"
+        <StackPanel IsVisible="{Binding IsWorkspaceDiagnosticsSection}" Spacing="{DynamicResource Token.Spacing.Gap.Large}">
+          <TextBlock Text="Workspace Diagnostics"
                      FontSize="{DynamicResource Token.Typography.SurfaceHeading}"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource PrimaryTextBrush}" />
-          <Border Padding="{DynamicResource Token.Layout.CardPadding}"
-                  Background="{DynamicResource ElevatedSurfaceBrush}"
-                  BorderBrush="{DynamicResource ControlBorderBrush}"
-                  BorderThickness="1"
-                  CornerRadius="6">
-            <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Panel}">
-              <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
-                <TextBlock Text="Active workspace"
-                           FontSize="{DynamicResource Token.Typography.Caption}"
-                           FontWeight="SemiBold"
-                           Foreground="{DynamicResource SecondaryTextBrush}" />
-                <TextBlock Text="{Binding WorkspaceName}"
-                           FontSize="{DynamicResource Token.Typography.SubsectionHeading}"
-                           FontWeight="SemiBold"
-                           Foreground="{DynamicResource PrimaryTextBrush}"
-                           TextTrimming="CharacterEllipsis" />
-              </StackPanel>
-              <Button Content="Manage workspaces"
-                      Command="{Binding ManageWorkspacesCommand}"
-                      ToolTip.Tip="Open workspace management"
-                      HorizontalAlignment="Left"
-                      MinWidth="160"
-                      Classes="primary" />
-            </StackPanel>
-          </Border>
+          <TextBlock IsVisible="{Binding Telemetry.HasWorkspace}"
+                     Text="{Binding Telemetry.WorkspaceName, StringFormat='Active workspace: {0}'}"
+                     FontSize="{DynamicResource Token.Typography.Caption}"
+                     Foreground="{DynamicResource SecondaryTextBrush}" />
           <settings:WorkspaceTelemetrySettingsView DataContext="{Binding Telemetry}" />
         </StackPanel>
 

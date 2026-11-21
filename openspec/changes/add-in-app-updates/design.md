@@ -51,9 +51,9 @@ The running product version comes from `IApplicationVersionProvider.ProductVersi
 
 The download adapter writes to an isolated temporary update directory, enforces a bounded installer size, computes SHA-256, and compares it using a constant-time digest comparison. Only a verified file can reach the installer launcher. The UI then presents a final restart/install action. On confirmation it flushes application settings, starts the verified NSIS executable, and requests shutdown. The updater does not rewrite the installed directory or user data itself.
 
-### Keep the update affordance progressive and close to global controls
+### Keep the update affordance progressive in the global utility rail
 
-The main shell keeps its normal layout unchanged when no update exists. When available, a compact button labeled `Update available` appears in the existing global navigation header beside Settings. The About/settings surface owns manual checking, detailed status, retry, cancellation, and the final install confirmation state. This keeps an occasional administrative action discoverable without permanently consuming the primary workspace.
+The main shell keeps its normal layout unchanged when no update exists. When available, a compact button labeled `Update available` appears in the global utility rail immediately above Settings. The About/settings surface owns manual checking, detailed status, retry, cancellation, and the final install confirmation state. The button is an application-wide action; workspace selection and management remain in the workspace navigation pane.
 
 ### Explicit release workflow, no automatic public release on main
 
