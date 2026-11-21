@@ -65,7 +65,12 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
         _themeController.ApplyDarkMode(_isDarkMode);
         Version = _versionProvider.GetVersion();
         DiagnosticsText = ApplicationVersionDiagnostics.Format(Version, ApplicationVersionDiagnostics.BuildPlatformString());
-        Updates = new UpdateViewModel(updateService ?? new DisabledUpdateService(), initialSettings.UpdateTrack, SaveUpdateTrack, Version.ProductVersion);
+        Updates = new UpdateViewModel(
+            updateService ?? new DisabledUpdateService(),
+            initialSettings.UpdateTrack,
+            SaveUpdateTrack,
+            Version.ProductVersion,
+            telemetryService);
 
         OpenCommand = new RelayCommand(_ => Open());
         Ai = ai ?? CreateOfflineAi(initialSettings.Ai);
