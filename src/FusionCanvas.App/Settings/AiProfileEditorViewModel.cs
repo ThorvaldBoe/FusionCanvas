@@ -108,18 +108,34 @@ public sealed class AiProfileEditorViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(ModelIds));
             OnPropertyChanged(nameof(SelectedModel));
             OnPropertyChanged(nameof(HasSelectedModel));
+            OnPropertyChanged(nameof(HasUnavailableSelectedModel));
             OnPropertyChanged(nameof(SupportsReasoning));
             NotifyRouting();
             NotifyCapabilities();
         }
     }
 
-    public IReadOnlyList<string> ModelIds => Models.Select(model => model.Id).ToArray();
+    public IReadOnlyList<string> ModelIds
+    {
+        get
+        {
+            var modelIds = Models.Select(model => model.Id).ToList();
+            var selectedModelId = ModelId;
+            if (!string.IsNullOrWhiteSpace(selectedModelId) &&
+                !modelIds.Contains(selectedModelId, StringComparer.Ordinal))
+            {
+                modelIds.Insert(0, selectedModelId);
+            }
+
+            return modelIds;
+        }
+    }
 
     public AiModelDescriptor? SelectedModel =>
         Models.FirstOrDefault(model => string.Equals(model.Id, ModelId, StringComparison.Ordinal));
 
     public bool HasSelectedModel => SelectedModel is not null;
+    public bool HasUnavailableSelectedModel => !string.IsNullOrWhiteSpace(ModelId) && SelectedModel is null;
 
     public bool SupportsReasoning => SelectedModel?.Reasoning is not null;
     public AiRoutingMode RoutingMode
@@ -376,6 +392,7 @@ public sealed class AiProfileEditorViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(ReasoningTokenBudget));
         OnPropertyChanged(nameof(SelectedModel));
         OnPropertyChanged(nameof(HasSelectedModel));
+        OnPropertyChanged(nameof(HasUnavailableSelectedModel));
         OnPropertyChanged(nameof(SupportsReasoning));
         NotifyRouting();
         NotifyCapabilities();

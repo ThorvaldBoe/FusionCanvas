@@ -240,6 +240,37 @@ public class AiSettingsViewTests
         }
     }
 
+    [AvaloniaFact]
+    public void ProfileEditor_CanReplacePersistedModelMissingFromCatalog()
+    {
+        var profile = new AiProfileEditorViewModel(AiProfileSettings.Empty with { ModelId = "retired/model" })
+        {
+            Models = [Descriptor("available/model", true)]
+        };
+        var window = new Window { Content = new AiProfileEditorView { DataContext = profile } };
+        try
+        {
+            window.Show();
+            window.UpdateLayout();
+            var modelPicker = window.GetVisualDescendants().OfType<ComboBox>().First();
+
+            Assert.Contains("retired/model", modelPicker.Items.OfType<string>());
+            Assert.Contains("available/model", modelPicker.Items.OfType<string>());
+            Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), text =>
+                text.Text == "The saved model is not in the current list. Clear search, adjust privacy settings, refresh the catalog, or choose another model.");
+
+            modelPicker.SelectedItem = "available/model";
+            window.UpdateLayout();
+
+            Assert.Equal("available/model", profile.ModelId);
+            Assert.Same(profile.Models[0], profile.SelectedModel);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
     [Fact]
     public void ProfileEditor_SnapshotUsesCompletionTokenAliasAdvertisedBySelectedEndpoint()
     {
