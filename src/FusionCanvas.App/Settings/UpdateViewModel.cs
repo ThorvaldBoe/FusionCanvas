@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using FusionCanvas.App.Commands;
 using FusionCanvas.App.DocumentWindow;
+using FusionCanvas.Application.Telemetry;
 using FusionCanvas.Application.Updates;
 
 namespace FusionCanvas.App.Settings;
@@ -21,13 +22,20 @@ public sealed class UpdateViewModel : INotifyPropertyChanged, IDisposable
     private UpdateTrack _selectedTrack;
     private readonly Action<UpdateTrack>? _trackChanged;
     private readonly string? _currentVersion;
+    private readonly ITelemetryRecorder? _telemetryRecorder;
 
-    public UpdateViewModel(IUpdateService service, UpdateTrack selectedTrack = UpdateTrack.Stable, Action<UpdateTrack>? trackChanged = null, string? currentVersion = null)
+    public UpdateViewModel(
+        IUpdateService service,
+        UpdateTrack selectedTrack = UpdateTrack.Stable,
+        Action<UpdateTrack>? trackChanged = null,
+        string? currentVersion = null,
+        ITelemetryRecorder? telemetryRecorder = null)
     {
         _service = service ?? throw new ArgumentNullException(nameof(service));
         _selectedTrack = selectedTrack;
         _trackChanged = trackChanged;
         _currentVersion = currentVersion;
+        _telemetryRecorder = telemetryRecorder;
         CheckCommand = new AsyncRelayCommand(() => CheckAsync(manual: true), CanCheck);
         UpdateCommand = new AsyncRelayCommand(DownloadAsync, CanDownload);
         InstallCommand = new AsyncRelayCommand(InstallAsync, CanInstall);
@@ -230,6 +238,8 @@ public sealed class UpdateViewModel : INotifyPropertyChanged, IDisposable
         }
         catch (Exception exception)
         {
+            await UpdateTelemetry.RecordCheckFailureAsync(_telemetryRecorder, exception, _currentVersion, _selectedTrack)
+                .ConfigureAwait(true);
             ErrorMessage = UpdateErrorMessageProvider.ForCheck(exception);
             Status = UpdatePresentationStatus.Error;
         }

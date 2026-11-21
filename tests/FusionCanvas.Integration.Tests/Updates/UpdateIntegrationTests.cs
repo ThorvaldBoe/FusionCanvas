@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
+using FusionCanvas.Application.Telemetry;
 using FusionCanvas.Application.Updates;
 using FusionCanvas.Integration.Updates;
 
@@ -144,6 +145,7 @@ public sealed class UpdateIntegrationTests
         var bytes = Encoding.UTF8.GetBytes("installer bytes");
         var hash = Convert.ToHexString(SHA256.HashData(bytes));
         var manifest = Manifest(hash);
+        var telemetry = new RecordingTelemetryRecorder();
         using var client = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new ByteArrayContent(bytes)
@@ -152,10 +154,13 @@ public sealed class UpdateIntegrationTests
 
         try
         {
-            var package = await new UpdatePackageDownloader(client, new AcceptingAuthenticityVerifier(), directory).DownloadAndVerifyAsync(manifest);
+            var package = await new UpdatePackageDownloader(client, new AcceptingAuthenticityVerifier(), directory, telemetry).DownloadAndVerifyAsync(manifest);
 
             Assert.True(File.Exists(package.InstallerPath));
             Assert.Equal(bytes, await File.ReadAllBytesAsync(package.InstallerPath));
+            var record = Assert.Single(telemetry.Events);
+            Assert.Equal("UpdateDownloadSucceeded", record.Name);
+            Assert.Contains("0.3.0", record.MetadataJson, StringComparison.Ordinal);
         }
         finally
         {
@@ -170,6 +175,7 @@ public sealed class UpdateIntegrationTests
     public async Task Downloader_RejectsChecksumMismatch()
     {
         var manifest = Manifest(new string('A', 64));
+        var telemetry = new RecordingTelemetryRecorder();
         using var client = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new ByteArrayContent(Encoding.UTF8.GetBytes("wrong bytes"))
@@ -182,9 +188,15 @@ public sealed class UpdateIntegrationTests
                 new UpdatePackageDownloader(
                     httpClient: client,
                     authenticityVerifier: new AcceptingAuthenticityVerifier(),
-                    downloadDirectory: directory)
+                    downloadDirectory: directory,
+                    telemetryRecorder: telemetry)
                     .DownloadAndVerifyAsync(manifest));
             Assert.Empty(Directory.EnumerateFiles(directory));
+            var record = Assert.Single(telemetry.Events);
+            Assert.Equal("UpdateDownloadFailed", record.Name);
+            Assert.Contains("checksum-verification", record.MetadataJson, StringComparison.Ordinal);
+            Assert.DoesNotContain(manifest.Sha256, record.Message, StringComparison.Ordinal);
+            Assert.DoesNotContain(manifest.Sha256, record.MetadataJson, StringComparison.Ordinal);
         }
         finally
         {
@@ -192,6 +204,30 @@ public sealed class UpdateIntegrationTests
             {
                 Directory.Delete(directory, recursive: true);
             }
+        }
+    }
+
+    [Fact]
+    public async Task Downloader_InstallerRequestFailureRecordsInstallerDownloadStage()
+    {
+        var manifest = Manifest(new string('A', 64));
+        var telemetry = new RecordingTelemetryRecorder();
+        using var client = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+        var directory = Path.Combine(Path.GetTempPath(), "FusionCanvasUpdateTests", Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            await Assert.ThrowsAsync<HttpRequestException>(() =>
+                new UpdatePackageDownloader(client, new AcceptingAuthenticityVerifier(), directory, telemetry)
+                    .DownloadAndVerifyAsync(manifest));
+
+            var record = Assert.Single(telemetry.Events);
+            Assert.Contains("installer-download", record.MetadataJson, StringComparison.Ordinal);
+            Assert.Contains("503", record.MetadataJson, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
         }
     }
 
@@ -205,11 +241,12 @@ public sealed class UpdateIntegrationTests
             Content = new StreamContent(contentStream)
         });
         using var cancellation = new CancellationTokenSource();
+        var telemetry = new RecordingTelemetryRecorder();
         var directory = Path.Combine(Path.GetTempPath(), "FusionCanvasUpdateTests", Guid.NewGuid().ToString("N"));
 
         try
         {
-            var download = new UpdatePackageDownloader(client, new AcceptingAuthenticityVerifier(), directory)
+            var download = new UpdatePackageDownloader(client, new AcceptingAuthenticityVerifier(), directory, telemetry)
                 .DownloadAndVerifyAsync(manifest, cancellationToken: cancellation.Token);
 
             await contentStream.FirstRead.Task.WaitAsync(TimeSpan.FromSeconds(3));
@@ -218,6 +255,7 @@ public sealed class UpdateIntegrationTests
 
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => download);
             Assert.Empty(Directory.EnumerateFiles(directory));
+            Assert.Empty(telemetry.Events);
         }
         finally
         {
@@ -232,6 +270,7 @@ public sealed class UpdateIntegrationTests
     public async Task Downloader_RejectsDeclaredOversizedContent()
     {
         var manifest = Manifest(new string('A', 64));
+        var telemetry = new RecordingTelemetryRecorder();
         using var client = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new DeclaredLengthContent(250L * 1024 * 1024 + 1)
@@ -244,8 +283,10 @@ public sealed class UpdateIntegrationTests
                 new UpdatePackageDownloader(
                     httpClient: client,
                     authenticityVerifier: new AcceptingAuthenticityVerifier(),
-                    downloadDirectory: directory)
+                    downloadDirectory: directory,
+                    telemetryRecorder: telemetry)
                     .DownloadAndVerifyAsync(manifest));
+            Assert.Contains("installer-size", Assert.Single(telemetry.Events).MetadataJson, StringComparison.Ordinal);
         }
         finally
         {
@@ -261,6 +302,7 @@ public sealed class UpdateIntegrationTests
     {
         var bytes = Encoding.UTF8.GetBytes("installer bytes");
         var manifest = Manifest(Convert.ToHexString(SHA256.HashData(bytes)));
+        var telemetry = new RecordingTelemetryRecorder();
         using var client = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new ByteArrayContent(bytes)
@@ -270,8 +312,9 @@ public sealed class UpdateIntegrationTests
         try
         {
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                new UpdatePackageDownloader(client, new RejectingAuthenticityVerifier(), directory).DownloadAndVerifyAsync(manifest));
+                new UpdatePackageDownloader(client, new RejectingAuthenticityVerifier(), directory, telemetry).DownloadAndVerifyAsync(manifest));
             Assert.Empty(Directory.EnumerateFiles(directory));
+            Assert.Contains("provenance-verification", Assert.Single(telemetry.Events).MetadataJson, StringComparison.Ordinal);
         }
         finally
         {
@@ -283,10 +326,40 @@ public sealed class UpdateIntegrationTests
     }
 
     [Fact]
+    public async Task Downloader_FinalizationFailureRecordsPackageFinalizationStage()
+    {
+        var bytes = Encoding.UTF8.GetBytes("installer bytes");
+        var manifest = Manifest(Convert.ToHexString(SHA256.HashData(bytes)));
+        var telemetry = new RecordingTelemetryRecorder();
+        using var client = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent(bytes)
+        });
+        var directory = Path.Combine(Path.GetTempPath(), "FusionCanvasUpdateTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        Directory.CreateDirectory(Path.Combine(directory, "FusionCanvas-0.3.0-Setup.exe"));
+
+        try
+        {
+            var exception = await Assert.ThrowsAnyAsync<Exception>(() =>
+                new UpdatePackageDownloader(client, new AcceptingAuthenticityVerifier(), directory, telemetry)
+                    .DownloadAndVerifyAsync(manifest));
+
+            Assert.True(exception is IOException or UnauthorizedAccessException);
+            Assert.Contains("package-finalization", Assert.Single(telemetry.Events).MetadataJson, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Downloader_RejectsMissingBundleAndCleansUpInstaller()
     {
         var bytes = Encoding.UTF8.GetBytes("installer bytes");
         var manifest = Manifest(Convert.ToHexString(SHA256.HashData(bytes)));
+        var telemetry = new RecordingTelemetryRecorder();
         using var client = CreateClient(request => request.RequestUri!.AbsolutePath.EndsWith(".sigstore.json", StringComparison.Ordinal)
             ? new HttpResponseMessage(HttpStatusCode.NotFound)
             : new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) });
@@ -295,8 +368,10 @@ public sealed class UpdateIntegrationTests
         try
         {
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                new UpdatePackageDownloader(client, new AcceptingAuthenticityVerifier(), directory).DownloadAndVerifyAsync(manifest));
+                new UpdatePackageDownloader(client, new AcceptingAuthenticityVerifier(), directory, telemetry).DownloadAndVerifyAsync(manifest));
             Assert.Empty(Directory.EnumerateFiles(directory));
+            var record = Assert.Single(telemetry.Events);
+            Assert.Contains("provenance-download", record.MetadataJson, StringComparison.Ordinal);
         }
         finally
         {
@@ -350,6 +425,20 @@ public sealed class UpdateIntegrationTests
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
             Task.FromResult(handler(request));
+    }
+
+    private sealed class RecordingTelemetryRecorder : ITelemetryRecorder
+    {
+        public bool IsCaptureEnabled => true;
+        public bool ThrowOnRecord { get; init; }
+        public List<TelemetryEventRequest> Events { get; } = [];
+
+        public Task RecordAsync(TelemetryEventRequest request, CancellationToken cancellationToken = default)
+        {
+            if (ThrowOnRecord) throw new IOException("telemetry unavailable");
+            Events.Add(request);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class BlockingHandler : HttpMessageHandler
