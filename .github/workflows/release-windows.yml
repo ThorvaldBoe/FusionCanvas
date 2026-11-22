@@ -140,7 +140,27 @@ jobs:
           FUSIONCANVAS_RELEASE_INSTALLER: artifacts\${{ steps.release-assets.outputs.installer }}
           FUSIONCANVAS_RELEASE_BUNDLE: artifacts\${{ steps.release-assets.outputs.installer }}.sigstore.json
         shell: pwsh
-        run: dotnet test .\tests\FusionCanvas.Integration.Tests\FusionCanvas.Integration.Tests.csproj --configuration Release --nologo
+        run: |
+          $resultsDirectory = "artifacts\verification-results"
+          New-Item -ItemType Directory -Force -Path $resultsDirectory | Out-Null
+          dotnet test .\tests\FusionCanvas.Integration.Tests\FusionCanvas.Integration.Tests.csproj `
+            --configuration Release `
+            --nologo `
+            --logger "trx;LogFileName=release-verification.trx" `
+            --results-directory $resultsDirectory
+
+      - name: Upload release verification diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-verification-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/FusionCanvas-*-Setup.exe
+            artifacts/FusionCanvas-*.sha256
+            artifacts/FusionCanvas-*.json
+            artifacts/verification-results/**
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Verify release trust policy in a disposable install
         env:
