@@ -134,6 +134,14 @@ jobs:
           $installerName = "${{ steps.release-assets.outputs.installer }}"
           Copy-Item -LiteralPath "${{ steps.attest.outputs.bundle-path }}" -Destination "artifacts\$installerName.sigstore.json"
 
+      - name: Verify release bundle with the in-app verifier
+        env:
+          FUSIONCANVAS_RELEASE_MANIFEST: artifacts\${{ steps.release-assets.outputs.manifest }}
+          FUSIONCANVAS_RELEASE_INSTALLER: artifacts\${{ steps.release-assets.outputs.installer }}
+          FUSIONCANVAS_RELEASE_BUNDLE: artifacts\${{ steps.release-assets.outputs.installer }}.sigstore.json
+        shell: pwsh
+        run: dotnet test .\tests\FusionCanvas.Integration.Tests\FusionCanvas.Integration.Tests.csproj --configuration Release --nologo
+
       - name: Verify release trust policy in a disposable install
         env:
           GH_TOKEN: ${{ github.token }}
