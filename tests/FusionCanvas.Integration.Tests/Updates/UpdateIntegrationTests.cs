@@ -104,9 +104,11 @@ public sealed class UpdateIntegrationTests
 
         try
         {
-            var package = await new UpdatePackageDownloader(client, new AcceptingAuthenticityVerifier(), directory).DownloadAndVerifyAsync(manifest);
+            var verifier = new RecordingAuthenticityVerifier();
+            var package = await new UpdatePackageDownloader(client, verifier, directory).DownloadAndVerifyAsync(manifest);
 
             Assert.Equal(installer, await File.ReadAllBytesAsync(package.InstallerPath));
+            Assert.Equal(Path.GetFileName(manifest.InstallerUri.LocalPath), verifier.InstallerFileName);
         }
         finally
         {
@@ -191,7 +193,7 @@ public sealed class UpdateIntegrationTests
                     downloadDirectory: directory,
                     telemetryRecorder: telemetry)
                     .DownloadAndVerifyAsync(manifest));
-            Assert.Empty(Directory.EnumerateFiles(directory));
+            Assert.Empty(Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories));
             var record = Assert.Single(telemetry.Events);
             Assert.Equal("UpdateDownloadFailed", record.Name);
             Assert.Contains("checksum-verification", record.MetadataJson, StringComparison.Ordinal);
@@ -254,7 +256,7 @@ public sealed class UpdateIntegrationTests
             cancellation.Cancel();
 
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => download);
-            Assert.Empty(Directory.EnumerateFiles(directory));
+            Assert.Empty(Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories));
             Assert.Empty(telemetry.Events);
         }
         finally
@@ -313,7 +315,7 @@ public sealed class UpdateIntegrationTests
         {
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 new UpdatePackageDownloader(client, new RejectingAuthenticityVerifier(), directory, telemetry).DownloadAndVerifyAsync(manifest));
-            Assert.Empty(Directory.EnumerateFiles(directory));
+            Assert.Empty(Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories));
             Assert.Contains("provenance-verification", Assert.Single(telemetry.Events).MetadataJson, StringComparison.Ordinal);
         }
         finally
@@ -369,7 +371,7 @@ public sealed class UpdateIntegrationTests
         {
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 new UpdatePackageDownloader(client, new AcceptingAuthenticityVerifier(), directory, telemetry).DownloadAndVerifyAsync(manifest));
-            Assert.Empty(Directory.EnumerateFiles(directory));
+            Assert.Empty(Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories));
             var record = Assert.Single(telemetry.Events);
             Assert.Contains("provenance-download", record.MetadataJson, StringComparison.Ordinal);
         }
@@ -410,7 +412,7 @@ public sealed class UpdateIntegrationTests
     {
         for (var attempt = 0; attempt < 100; attempt++)
         {
-            if (Directory.EnumerateFiles(directory).Any())
+            if (Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories).Any())
             {
                 return;
             }
@@ -526,6 +528,17 @@ public sealed class UpdateIntegrationTests
     {
         public Task VerifyAsync(string installerPath, string bundlePath, UpdateManifest manifest, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
+    }
+
+    private sealed class RecordingAuthenticityVerifier : IInstallerAuthenticityVerifier
+    {
+        public string? InstallerFileName { get; private set; }
+
+        public Task VerifyAsync(string installerPath, string bundlePath, UpdateManifest manifest, CancellationToken cancellationToken = default)
+        {
+            InstallerFileName = Path.GetFileName(installerPath);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class RejectingAuthenticityVerifier : IInstallerAuthenticityVerifier
