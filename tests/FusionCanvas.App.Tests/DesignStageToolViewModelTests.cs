@@ -58,14 +58,14 @@ public class DesignStageToolViewModelTests
     }
 
     [Fact]
-    public async Task LoadAsync_DefaultRowWithoutSelectedColor_DisablesArtworkGenerationWithGuidance()
+    public async Task LoadAsync_DefaultArtworkVariantDoesNotRequireProductColorSelection()
     {
         var viewModel = await CreateArtworkReadinessViewModelAsync(
             conceptComplete: true,
             includeDefaultRowColor: false);
 
-        Assert.False(viewModel.CanGenerateArtwork);
-        Assert.Contains("product color", viewModel.ArtworkGenerationGuidance, StringComparison.OrdinalIgnoreCase);
+        Assert.True(viewModel.CanGenerateArtwork);
+        Assert.DoesNotContain("product color", viewModel.ArtworkGenerationGuidance, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

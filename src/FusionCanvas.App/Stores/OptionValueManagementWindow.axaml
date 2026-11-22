@@ -30,10 +30,15 @@
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="catalog:OfferingOptionValue">
             <Border Classes="listItem" Padding="{DynamicResource Token.Layout.PreviewPadding}" DragDrop.AllowDrop="True" DragDrop.DragOver="OnValueDragOver" DragDrop.Drop="OnValueDrop">
-              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
+              <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
                 <Button Grid.Column="0" Content="☷" Classes="grip" PointerPressed="OnGripPointerPressed" PointerMoved="OnGripPointerMoved" ToolTip.Tip="Drag to reorder" AutomationProperties.Name="{Binding Value, StringFormat='Drag to reorder {0}'}" />
                 <TextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" VerticalAlignment="Center" />
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.InlineGap}">
+                <ToggleButton Grid.Column="2" Content="☆" IsChecked="{Binding IsFavorite, Mode=OneWay}"
+                              IsVisible="{Binding $parent[ItemsControl].DataContext.IsSelectedOptionColor}"
+                              Command="{Binding $parent[ItemsControl].DataContext.ToggleColorFavoriteCommand}"
+                              CommandParameter="{Binding}" ToolTip.Tip="Favorite Color for Listing"
+                              AutomationProperties.Name="{Binding Value, StringFormat='Toggle {0} favorite'}" />
+                <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.InlineGap}">
                   <Button Content="↑" Command="{Binding $parent[ItemsControl].DataContext.MoveOptionValueUpCommand}" CommandParameter="{Binding}" Classes="secondary compact" ToolTip.Tip="Move up" AutomationProperties.Name="{Binding Value, StringFormat='Move {0} up'}" />
                   <Button Content="↓" Command="{Binding $parent[ItemsControl].DataContext.MoveOptionValueDownCommand}" CommandParameter="{Binding}" Classes="secondary compact" ToolTip.Tip="Move down" AutomationProperties.Name="{Binding Value, StringFormat='Move {0} down'}" />
                   <Button Content="Edit" Command="{Binding $parent[ItemsControl].DataContext.EditOptionValueCommand}" CommandParameter="{Binding}" Classes="secondary" AutomationProperties.Name="{Binding Value, StringFormat='Edit {0}'}" />

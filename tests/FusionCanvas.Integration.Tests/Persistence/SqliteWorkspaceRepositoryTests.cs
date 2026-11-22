@@ -64,7 +64,7 @@ public class SqliteWorkspaceRepositoryTests
 
         Assert.Equal(style, Assert.Single(loaded.ArtworkStyles));
         Assert.Equal(refs, loaded.ArtworkStyleReferences.OrderBy(value => value.SortOrder));
-        Assert.Equal(24, await ReadUserVersionAsync(tempDirectory.GetPath("workspace.db")));
+        Assert.Equal(26, await ReadUserVersionAsync(tempDirectory.GetPath("workspace.db")));
     }
 
     [Fact]

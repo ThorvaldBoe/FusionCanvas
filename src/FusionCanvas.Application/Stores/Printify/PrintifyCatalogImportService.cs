@@ -226,7 +226,10 @@ public sealed class PrintifyCatalogImportService(
                     var variant = variants.SingleOrDefault(value => value.OfferingId == offering.Id && MetadataHasId(value.MetadataJson, importedVariant.Id));
                     var variantId = variant?.Id ?? newId();
                     var metadataJson = UpdateVariantMetadata(variant?.MetadataJson, importedVariant.Id, importedVariant.ProductionCost);
-                    var replacement = new OfferingVariant(variantId, offering.Id, importedVariant.Title, optionValueIds, !importedVariant.IsEnabled || !importedVariant.IsAvailable, variant?.CreatedAt ?? now, now, metadataJson);
+                    var replacement = new OfferingVariant(variantId, offering.Id, importedVariant.Title, optionValueIds, !importedVariant.IsEnabled, variant?.CreatedAt ?? now, now, metadataJson)
+                    {
+                        ProviderIsAvailable = importedVariant.IsAvailable
+                    };
                     if (variant is null) variants.Add(replacement); else Replace(variants, value => value.Id == variant.Id, replacement);
                     localVariantIds[importedVariant.Id] = variantId;
                 }
@@ -429,12 +432,12 @@ public sealed class PrintifyCatalogImportService(
                         && MetadataHasId(value.MetadataJson, declaredValue.Id));
                 if (optionValue is null)
                 {
-                    optionValue = new OfferingOptionValue(newId(), option.Id, offeringId, declaredValue.Title.Trim(), values.Count(value => value.OptionId == option.Id), metadataJson: Metadata("option-value", declaredValue.Id));
+                    optionValue = new OfferingOptionValue(newId(), option.Id, offeringId, declaredValue.Title.Trim(), values.Count(value => value.OptionId == option.Id), metadataJson: OptionValueMetadata(declaredValue));
                     values.Add(optionValue);
                 }
                 else
                 {
-                    var updatedValue = optionValue with { Value = declaredValue.Title.Trim(), IsArchived = false };
+                    var updatedValue = optionValue with { Value = declaredValue.Title.Trim(), IsArchived = false, MetadataJson = OptionValueMetadata(declaredValue) };
                     Replace(values, value => value.Id == optionValue.Id, updatedValue);
                     optionValue = updatedValue;
                 }
@@ -454,6 +457,15 @@ public sealed class PrintifyCatalogImportService(
         };
 
     private static string Metadata(string kind, params int[] ids) => JsonSerializer.Serialize(new { source = "printify", kind, ids });
+    private static string OptionValueMetadata(PrintifyCatalogOptionValue value) => JsonSerializer.Serialize(new
+    {
+        source = "printify",
+        kind = "option-value",
+        ids = new[] { value.Id },
+        hex = IsValidApproximateHex(value.Hex) ? value.Hex : null
+    });
+    private static bool IsValidApproximateHex(string? value) => value is { Length: 7 or 4 } && value[0] == '#'
+        && value[1..].All(Uri.IsHexDigit);
     private static string Metadata(string kind, int blueprintId, string productId) => JsonSerializer.Serialize(new { source = "printify", kind, blueprintId, productId });
 
     private static string UpdateVariantMetadata(string? existingMetadata, int variantId, decimal? productionCost)

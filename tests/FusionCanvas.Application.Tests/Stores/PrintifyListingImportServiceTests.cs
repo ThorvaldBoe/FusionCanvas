@@ -159,9 +159,14 @@ public sealed class PrintifyListingImportServiceTests
         Assert.True(second.Succeeded, second.Message);
         Assert.Single(fixture.Repository.Snapshot.ItemListingConfigurations);
         Assert.Single(fixture.Repository.Snapshot.DesignVariantRows);
-        Assert.Equal(["Black", "White"], fixture.Repository.Snapshot.DesignSelectedColors.Select(value => value.ColorValue));
+        var importedColorIds = fixture.Repository.Snapshot.ListingColorSelections
+            .Select(value => value.ColorOptionValueId).ToHashSet();
+        Assert.Equal(2, importedColorIds.Count);
+        Assert.All(importedColorIds, colorId => Assert.Contains(fixture.Repository.Snapshot.OfferingOptionValues, value => value.Id == colorId));
+        Assert.All(fixture.Repository.Snapshot.ListingColorSelections, selection =>
+            Assert.Equal(Assert.Single(fixture.Repository.Snapshot.DesignVariantRows).Id, selection.ArtworkVariantId));
         Assert.Equal(assetId, Assert.Single(fixture.Repository.Snapshot.DesignSlotAssignments).AssetId);
-        Assert.Equal(2, fixture.Repository.Snapshot.DesignVariantRowColors.Count);
+        Assert.Empty(fixture.Repository.Snapshot.DesignVariantRowColors);
         Assert.DoesNotContain("scale", fixture.Repository.Snapshot.Assets.Single().MetadataJson, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("rotation", fixture.Repository.Snapshot.Assets.Single().MetadataJson, StringComparison.OrdinalIgnoreCase);
         Assert.Equal("My local title", fixture.Repository.Snapshot.Items.Single().Name);

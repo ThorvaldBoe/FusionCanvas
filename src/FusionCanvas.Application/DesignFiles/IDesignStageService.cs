@@ -1,4 +1,5 @@
 using FusionCanvas.Application.AI;
+using FusionCanvas.Domain.Products;
 
 namespace FusionCanvas.Application.DesignFiles;
 
@@ -20,6 +21,10 @@ public interface IDesignStageService
 
     /// <summary>Replaces a stale listing configuration after explicit user confirmation.</summary>
     Task<DesignStageResult> RecoverStaleConfigurationAsync(Guid itemId, Guid offeringId, CancellationToken cancellationToken = default);
+
+    /// <summary>Adds an independent artwork variant with empty slots for the selected Offering's Design Areas.</summary>
+    Task<DesignStageResult> AddArtworkVariantAsync(Guid itemId, ArtworkContrastIntent? contrastIntent = null, CancellationToken cancellationToken = default) =>
+        Task.FromResult(DesignStageResult.Failure("Adding artwork variants is unavailable."));
 
     /// <summary>Persists the Design-stage artwork target and transparency preference for an item.</summary>
     Task<DesignStageResult> SaveArtworkPreferencesAsync(Guid itemId, Guid? designAreaId, bool transparentBackground, CancellationToken cancellationToken = default);

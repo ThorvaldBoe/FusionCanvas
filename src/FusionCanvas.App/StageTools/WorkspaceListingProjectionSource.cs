@@ -86,7 +86,10 @@ public sealed class WorkspaceListingProjectionSource(
             dimensions,
             pricing,
             shippingProfile,
-            outOfStockPolicy));
+            outOfStockPolicy)
+        {
+            ListingColorSelections = snapshot.ListingColorSelections.Where(value => value.ItemId == itemId).ToArray()
+        });
     }
 
     private static IReadOnlyList<DesignArea> BuildDesignAreas(WorkspaceSnapshot snapshot, Guid offeringId)

@@ -1,7 +1,9 @@
 using System.ComponentModel;
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using Avalonia.Media.Imaging;
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.Application.Listings;
 using FusionCanvas.Application.Stores;
@@ -42,6 +44,14 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
     private string? _shopTitle;
     private bool _publicationOperationsAvailable;
     private string? _publicationAvailabilityMessage;
+    private bool _isPublishAvailabilityConfirmationVisible;
+    private bool _publishAvailabilityAcknowledged;
+    private readonly IListingColorSelectionService? _listingColors;
+    private bool _isMoreOptionsVisible;
+    private string _listingColorSearchText = string.Empty;
+    private string _previewColorName = string.Empty;
+    private string _previewSwatchHex = "#808080";
+    private Bitmap? _previewArtworkBitmap;
 
     public PrintifyListingStageToolViewModel(
         IListingLifecycleServiceFactory? serviceFactory,
@@ -49,7 +59,8 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         Func<WorkspaceSnapshot> snapshot,
         Func<Guid, Store?> storeResolver,
         IStoreContextMapper storeContextMapper,
-        PrintifyListingImportService? variantSetupImport = null)
+        PrintifyListingImportService? variantSetupImport = null,
+        IListingColorSelectionService? listingColors = null)
     {
         _serviceFactory = serviceFactory;
         _projectionSource = projectionSource;
@@ -57,12 +68,15 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         _storeResolver = storeResolver ?? throw new ArgumentNullException(nameof(storeResolver));
         _storeContextMapper = storeContextMapper ?? throw new ArgumentNullException(nameof(storeContextMapper));
         _variantSetupImport = variantSetupImport;
+        _listingColors = listingColors;
         CreateOrUpdateCommand = new RelayCommand(_ => _ = CreateOrUpdateAsync(), () => CanCreateOrUpdate);
         ReconcileUncertainCreateCommand = new RelayCommand(_ => _ = ReconcileUncertainCreateAsync(), () => CanReconcileUncertainCreate);
         ConfirmUncertainCreateRetryCommand = new RelayCommand(_ => _ = ConfirmUncertainCreateRetryAsync(), () => CanConfirmUncertainCreateRetry);
         CancelUncertainCreateRetryCommand = new RelayCommand(_ => CancelUncertainCreateRetry(), () => IsUncertainCreateRetryConfirmationVisible);
         RefreshCommand = new RelayCommand(_ => _ = RefreshAsync(), () => CanRefresh);
-        PublishCommand = new RelayCommand(_ => _ = PublishAsync(), () => CanPublish);
+        PublishCommand = new RelayCommand(_ => ShowPublishAvailabilityConfirmation(), () => CanPublish && !IsPublishAvailabilityConfirmationVisible);
+        ConfirmPublishAvailabilityCommand = new RelayCommand(_ => _ = ConfirmPublishAvailabilityAsync(), () => CanConfirmPublishAvailability);
+        CancelPublishAvailabilityCommand = new RelayCommand(_ => CancelPublishAvailabilityConfirmation(), () => IsPublishAvailabilityConfirmationVisible);
         UnpublishCommand = new RelayCommand(_ => _ = UnpublishAsync(), () => CanUnpublish);
         ArchiveCommand = new RelayCommand(_ => _ = ArchiveAsync(), () => CanArchive);
         DeleteCommand = new RelayCommand(_ => ShowDeleteConfirmation(), () => CanDelete);
@@ -74,6 +88,11 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         AcceptRemoteCommand = new RelayCommand(_ => _ = ReconcileAsync(ListingConflictResolution.AcceptRemote), () => CanReconcile);
         KeepLocalCommand = new RelayCommand(_ => _ = ReconcileAsync(ListingConflictResolution.KeepLocal), () => CanReconcile);
         DownloadVariantSetupCommand = new RelayCommand(_ => _ = DownloadVariantSetupAsync(), () => CanDownloadVariantSetup);
+        ShowMoreOptionsCommand = new RelayCommand(_ => OpenMoreOptions(), () => ListingOtherColors.Count > 0);
+        ApplyMoreOptionsCommand = new RelayCommand(_ => _ = ApplyMoreOptionsAsync(), () => IsMoreOptionsVisible && !IsBusy);
+        CancelMoreOptionsCommand = new RelayCommand(_ => CancelMoreOptions(), () => IsMoreOptionsVisible);
+        PreviewListingColorCommand = new RelayCommand(parameter => _ = PreviewListingColorAsync(parameter as ListingColorChoiceViewModel));
+        ToggleFavoriteListingColorCommand = new RelayCommand(parameter => _ = ToggleFavoriteListingColorAsync(parameter as ListingColorChoiceViewModel), () => !IsBusy && _canEdit);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -84,6 +103,8 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
     public ICommand CancelUncertainCreateRetryCommand { get; }
     public ICommand RefreshCommand { get; }
     public ICommand PublishCommand { get; }
+    public ICommand ConfirmPublishAvailabilityCommand { get; }
+    public ICommand CancelPublishAvailabilityCommand { get; }
     public ICommand UnpublishCommand { get; }
     public ICommand ArchiveCommand { get; }
     public ICommand DeleteCommand { get; }
@@ -95,6 +116,14 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
     public ICommand AcceptRemoteCommand { get; }
     public ICommand KeepLocalCommand { get; }
     public ICommand DownloadVariantSetupCommand { get; }
+    public ICommand ShowMoreOptionsCommand { get; }
+    public ICommand ApplyMoreOptionsCommand { get; }
+    public ICommand CancelMoreOptionsCommand { get; }
+    public ICommand PreviewListingColorCommand { get; }
+    public ICommand ToggleFavoriteListingColorCommand { get; }
+    public ObservableCollection<ListingColorChoiceViewModel> ListingFavoriteColors { get; } = [];
+    public ObservableCollection<ListingColorChoiceViewModel> ListingOtherColors { get; } = [];
+    public ObservableCollection<UnresolvedListingColorViewModel> UnresolvedListingColors { get; } = [];
     public string Status { get => _status; private set => SetField(ref _status, value); }
     public string ConnectionStatus { get => _connectionStatus; private set => SetField(ref _connectionStatus, value); }
     public string Title { get => _title; private set { if (SetField(ref _title, value)) NotifyActions(); } }
@@ -135,6 +164,48 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         ? _publicationAvailabilityMessage
         : null;
     public bool HasPublicationAvailabilityMessage => !string.IsNullOrWhiteSpace(PublicationAvailabilityMessage);
+    public bool IsMoreOptionsVisible { get => _isMoreOptionsVisible; private set { if (SetField(ref _isMoreOptionsVisible, value)) NotifyActions(); } }
+    public string ListingColorSearchText
+    {
+        get => _listingColorSearchText;
+        set { if (SetField(ref _listingColorSearchText, value ?? string.Empty)) OnPropertyChanged(nameof(FilteredListingOtherColors)); }
+    }
+    public IReadOnlyList<ListingColorChoiceViewModel> FilteredListingOtherColors => ListingOtherColors
+        .Where(value => string.IsNullOrWhiteSpace(ListingColorSearchText)
+            || value.Name.Contains(ListingColorSearchText.Trim(), StringComparison.OrdinalIgnoreCase)).ToArray();
+    public string PreviewColorName { get => _previewColorName; private set => SetField(ref _previewColorName, value); }
+    public string PreviewSwatchHex { get => _previewSwatchHex; private set => SetField(ref _previewSwatchHex, value); }
+    public Bitmap? PreviewArtworkBitmap
+    {
+        get => _previewArtworkBitmap;
+        private set
+        {
+            if (ReferenceEquals(_previewArtworkBitmap, value)) return;
+            _previewArtworkBitmap?.Dispose();
+            _previewArtworkBitmap = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(HasPreviewArtwork));
+        }
+    }
+    public bool HasPreviewArtwork => PreviewArtworkBitmap is not null;
+    public bool HasListingColors => ListingFavoriteColors.Count > 0 || ListingOtherColors.Count > 0 || UnresolvedListingColors.Count > 0;
+    public bool CanShowMoreOptions => ListingOtherColors.Count > 0;
+    public string PreviewColorSummary => string.IsNullOrWhiteSpace(PreviewColorName) ? "Choose a Color to preview its flat swatch." : $"Viewing {PreviewColorName}";
+    public string PreviewSelectionNote => string.IsNullOrWhiteSpace(PreviewColorName)
+        ? "Preview changes do not add a Color."
+        : $"Previewing {PreviewColorName}. Preview changes do not add a Color.";
+    public bool IsPublishAvailabilityConfirmationVisible
+    {
+        get => _isPublishAvailabilityConfirmationVisible;
+        private set { if (SetField(ref _isPublishAvailabilityConfirmationVisible, value)) NotifyActions(); }
+    }
+    public bool PublishAvailabilityAcknowledged
+    {
+        get => _publishAvailabilityAcknowledged;
+        set { if (SetField(ref _publishAvailabilityAcknowledged, value)) { OnPropertyChanged(nameof(CanConfirmPublishAvailability)); NotifyActions(); } }
+    }
+    public string PublishAvailabilityReminder => "Check the product's availability setting in Printify and make sure it remains visible in your store when out of stock. FusionCanvas cannot read or change this setting.";
+    public bool CanConfirmPublishAvailability => IsPublishAvailabilityConfirmationVisible && PublishAvailabilityAcknowledged && CanPublish;
     public bool CanCreateOrUpdate => !IsBusy && !HasUnresolvedOperation && _canEdit && _service is not null && _projection is not null && _request is not null && string.IsNullOrWhiteSpace(ErrorMessage) && !HasConflict;
     public bool CanReconcileUncertainCreate => !IsBusy && _canEdit && HasUnresolvedCreate && _service is not null && _projection is not null && _request is not null;
     public bool CanConfirmUncertainCreateRetry => !IsBusy && IsUncertainCreateRetryConfirmationVisible && _service is not null && _projection is not null && _request is not null;
@@ -152,6 +223,10 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
 
     public async Task LoadAsync(Guid itemId, bool canEdit, CancellationToken cancellationToken = default)
     {
+        CancelPublishAvailabilityConfirmation();
+        PreviewArtworkBitmap = null;
+        PreviewColorName = string.Empty;
+        PreviewSwatchHex = "#808080";
         _itemId = itemId;
         _canEdit = canEdit;
         _projection = null;
@@ -159,6 +234,10 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         _mapping = null;
         _publicationOperationsAvailable = false;
         _publicationAvailabilityMessage = null;
+        ListingFavoriteColors.Clear();
+        ListingOtherColors.Clear();
+        UnresolvedListingColors.Clear();
+        IsMoreOptionsVisible = false;
         IsUncertainCreateRetryConfirmationVisible = false;
         _linkCandidate = null;
         CandidateProductId = string.Empty;
@@ -225,6 +304,7 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
             return;
         }
 
+        await LoadListingColorsAsync(itemId, cancellationToken).ConfigureAwait(true);
         var projectionResult = await _projectionSource.BuildAsync(_snapshot(), itemId, new ListingPricingInput(ListingPricingPolicy.FixedRetailPrice, ParsePrice()), ShippingProfile, null, cancellationToken).ConfigureAwait(true);
         if (!projectionResult.IsValid)
         {
@@ -293,6 +373,204 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
 
     private Task RefreshAsync() => RunAsync(async cancellationToken => ApplyResult(await _service!.RefreshAsync(_request!, _itemId, cancellationToken).ConfigureAwait(true)));
     private Task PublishAsync() => RunAsync(async cancellationToken => ApplyResult(await _service!.PublishAsync(_request!, _itemId, cancellationToken).ConfigureAwait(true)));
+
+    private async Task LoadListingColorsAsync(Guid itemId, CancellationToken cancellationToken)
+    {
+        if (_listingColors is null) return;
+        var state = await _listingColors.LoadAsync(itemId, cancellationToken).ConfigureAwait(true);
+        ListingFavoriteColors.Clear();
+        ListingOtherColors.Clear();
+        foreach (var choice in state.Favorites)
+        {
+            var viewModel = new ListingColorChoiceViewModel(choice, state.ArtworkVariants);
+            viewModel.ArtworkVariantChanged += (_, variant) => _ = SaveArtworkVariantAsync(viewModel, variant);
+            ListingFavoriteColors.Add(viewModel);
+        }
+        foreach (var choice in state.OtherColors)
+        {
+            var viewModel = new ListingColorChoiceViewModel(choice, state.ArtworkVariants);
+            viewModel.ArtworkVariantChanged += (_, variant) => _ = SaveArtworkVariantAsync(viewModel, variant);
+            ListingOtherColors.Add(viewModel);
+        }
+        var candidates = ListingFavoriteColors.Concat(ListingOtherColors).Where(value => value.CanSelect).ToArray();
+        foreach (var choice in state.UnresolvedColors)
+        {
+            var viewModel = new UnresolvedListingColorViewModel(choice, candidates);
+            viewModel.CandidateSelected += ResolveUnresolvedListingColor;
+            UnresolvedListingColors.Add(viewModel);
+        }
+        if (string.IsNullOrWhiteSpace(PreviewColorName))
+        {
+            var first = ListingFavoriteColors.FirstOrDefault() ?? ListingOtherColors.FirstOrDefault();
+            if (first is not null) await PreviewListingColorAsync(first).ConfigureAwait(true);
+        }
+        OnPropertyChanged(nameof(HasListingColors));
+        OnPropertyChanged(nameof(CanShowMoreOptions));
+        OnPropertyChanged(nameof(FilteredListingOtherColors));
+        NotifyActions();
+    }
+
+    private void OpenMoreOptions()
+    {
+        foreach (var color in ListingOtherColors) color.IsDraftSelected = color.IsSelected;
+        IsMoreOptionsVisible = true;
+        ListingColorSearchText = string.Empty;
+    }
+
+    private void CancelMoreOptions()
+    {
+        foreach (var color in ListingOtherColors) color.IsDraftSelected = color.IsSelected;
+        IsMoreOptionsVisible = false;
+    }
+
+    private async Task ApplyMoreOptionsAsync()
+    {
+        if (_listingColors is null || !IsMoreOptionsVisible || IsBusy) return;
+        var selected = ListingFavoriteColors.Where(value => value.IsSelected).Select(value => value.OptionValueId)
+            .Concat(ListingOtherColors.Where(value => value.IsDraftSelected).Select(value => value.OptionValueId))
+            .Distinct().ToArray();
+        IsBusy = true;
+        try
+        {
+            await _listingColors.SetSelectedColorsAsync(_itemId, selected).ConfigureAwait(true);
+            IsMoreOptionsVisible = false;
+            await LoadListingColorsAsync(_itemId, CancellationToken.None).ConfigureAwait(true);
+            await RebuildListingProjectionAsync().ConfigureAwait(true);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            ErrorMessage = exception.Message;
+        }
+        finally { IsBusy = false; }
+    }
+
+    private async Task ToggleFavoriteListingColorAsync(ListingColorChoiceViewModel? color)
+    {
+        if (color is null || _listingColors is null || IsBusy) return;
+        var selected = ListingFavoriteColors.Where(value => value.OptionValueId != color.OptionValueId && value.IsSelected)
+            .Concat(ListingOtherColors.Where(value => value.IsSelected))
+            .Select(value => value.OptionValueId).ToList();
+        if (!color.IsSelected) selected.Add(color.OptionValueId);
+        IsBusy = true;
+        try
+        {
+            await _listingColors.SetSelectedColorsAsync(_itemId, selected).ConfigureAwait(true);
+            await LoadListingColorsAsync(_itemId, CancellationToken.None).ConfigureAwait(true);
+            await RebuildListingProjectionAsync().ConfigureAwait(true);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { ErrorMessage = exception.Message; }
+        finally { IsBusy = false; }
+    }
+
+    private async Task SaveArtworkVariantAsync(ListingColorChoiceViewModel color, ListingArtworkVariantChoice? variant)
+    {
+        if (_listingColors is null || variant is null || !color.IsSelected) return;
+        IsBusy = true;
+        try
+        {
+            await _listingColors.SetArtworkVariantAsync(_itemId, color.OptionValueId, variant.Id).ConfigureAwait(true);
+            await RebuildListingProjectionAsync().ConfigureAwait(true);
+            if (ReferenceEquals(color, ListingFavoriteColors.FirstOrDefault(value => value.OptionValueId == color.OptionValueId))
+                || ReferenceEquals(color, ListingOtherColors.FirstOrDefault(value => value.OptionValueId == color.OptionValueId)))
+                await LoadListingColorsAsync(_itemId, CancellationToken.None).ConfigureAwait(true);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { ErrorMessage = exception.Message; }
+        finally { IsBusy = false; }
+    }
+
+    private async void ResolveUnresolvedListingColor(UnresolvedListingColorViewModel unresolved, ListingColorChoiceViewModel candidate)
+    {
+        if (_listingColors is null || IsBusy) return;
+        IsBusy = true;
+        try
+        {
+            await _listingColors.ResolveUnresolvedColorAsync(_itemId, unresolved.SortOrder, candidate.OptionValueId).ConfigureAwait(true);
+            await LoadListingColorsAsync(_itemId, CancellationToken.None).ConfigureAwait(true);
+            await RebuildListingProjectionAsync().ConfigureAwait(true);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { ErrorMessage = exception.Message; }
+        finally { IsBusy = false; }
+    }
+
+    private async Task PreviewListingColorAsync(ListingColorChoiceViewModel? color)
+    {
+        if (color is null) return;
+        PreviewColorName = color.Name;
+        PreviewSwatchHex = color.SwatchHex;
+        if (_listingColors is not null)
+        {
+            try
+            {
+                await using var stream = await _listingColors.OpenArtworkPreviewAsync(_itemId, color.OptionValueId).ConfigureAwait(true);
+                PreviewArtworkBitmap = stream is null ? null : new Bitmap(stream);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                PreviewArtworkBitmap = null;
+                ErrorMessage = $"Artwork preview could not be loaded. {exception.Message}";
+            }
+        }
+        OnPropertyChanged(nameof(PreviewSwatchBrush));
+        OnPropertyChanged(nameof(PreviewColorSummary));
+        OnPropertyChanged(nameof(PreviewSelectionNote));
+    }
+
+    public Avalonia.Media.IBrush PreviewSwatchBrush
+    {
+        get
+        {
+            try { return new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse(PreviewSwatchHex)); }
+            catch (FormatException) { return new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#808080")); }
+        }
+    }
+
+    private async Task RebuildListingProjectionAsync()
+    {
+        if (_projectionSource is null) return;
+        var result = await _projectionSource.BuildAsync(_snapshot(), _itemId,
+            new ListingPricingInput(ListingPricingPolicy.FixedRetailPrice, ParsePrice()), ShippingProfile, null,
+            CancellationToken.None).ConfigureAwait(true);
+        if (!result.IsValid)
+        {
+            _projection = null;
+            ErrorMessage = string.Join(" ", result.Issues.Select(value => value.Message));
+            OnPropertyChanged(nameof(VariantSummary));
+            OnPropertyChanged(nameof(ArtworkSummary));
+            OnPropertyChanged(nameof(ProductSummary));
+            NotifyActions();
+            return;
+        }
+
+        _projection = result.Projection;
+        ErrorMessage = null;
+        Title = _projection!.Title;
+        Description = _projection.Description ?? string.Empty;
+        OnPropertyChanged(nameof(VariantSummary));
+        OnPropertyChanged(nameof(ArtworkSummary));
+        OnPropertyChanged(nameof(ProductSummary));
+        NotifyActions();
+    }
+
+    private void ShowPublishAvailabilityConfirmation()
+    {
+        if (!CanPublish) return;
+        PublishAvailabilityAcknowledged = false;
+        IsPublishAvailabilityConfirmationVisible = true;
+    }
+
+    private async Task ConfirmPublishAvailabilityAsync()
+    {
+        if (!CanConfirmPublishAvailability) return;
+        IsPublishAvailabilityConfirmationVisible = false;
+        await PublishAsync().ConfigureAwait(true);
+        PublishAvailabilityAcknowledged = false;
+    }
+
+    private void CancelPublishAvailabilityConfirmation()
+    {
+        IsPublishAvailabilityConfirmationVisible = false;
+        PublishAvailabilityAcknowledged = false;
+    }
     private Task UnpublishAsync() => RunAsync(async cancellationToken => ApplyResult(await _service!.UnpublishAsync(_request!, _itemId, cancellationToken).ConfigureAwait(true)));
     private Task ArchiveAsync() => RunAsync(async cancellationToken => ApplyResult(await _service!.ArchiveLocallyAsync(_request!.StoreId, _itemId, cancellationToken).ConfigureAwait(true)));
     private Task DeleteAsync() => RunAsync(async cancellationToken => ApplyResult(await _service!.DeleteRemoteAsync(_request!, _itemId, cancellationToken).ConfigureAwait(true)));
@@ -417,6 +695,7 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CanConfirmUncertainCreateRetry));
         OnPropertyChanged(nameof(CanRefresh));
         OnPropertyChanged(nameof(CanPublish));
+        OnPropertyChanged(nameof(CanConfirmPublishAvailability));
         OnPropertyChanged(nameof(CanUnpublish));
         OnPropertyChanged(nameof(CanArchive));
         OnPropertyChanged(nameof(CanDelete));
@@ -428,7 +707,7 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CanDownloadVariantSetup));
         OnPropertyChanged(nameof(PublicationAvailabilityMessage));
         OnPropertyChanged(nameof(HasPublicationAvailabilityMessage));
-        foreach (var command in new[] { CreateOrUpdateCommand, ReconcileUncertainCreateCommand, ConfirmUncertainCreateRetryCommand, CancelUncertainCreateRetryCommand, RefreshCommand, PublishCommand, UnpublishCommand, ArchiveCommand, DeleteCommand, ConfirmDeleteCommand, CancelDeleteCommand, VerifyProductLinkCommand, ConfirmProductLinkCommand, CancelProductLinkCommand, AcceptRemoteCommand, KeepLocalCommand })
+        foreach (var command in new[] { CreateOrUpdateCommand, ReconcileUncertainCreateCommand, ConfirmUncertainCreateRetryCommand, CancelUncertainCreateRetryCommand, RefreshCommand, PublishCommand, ConfirmPublishAvailabilityCommand, CancelPublishAvailabilityCommand, UnpublishCommand, ArchiveCommand, DeleteCommand, ConfirmDeleteCommand, CancelDeleteCommand, VerifyProductLinkCommand, ConfirmProductLinkCommand, CancelProductLinkCommand, AcceptRemoteCommand, KeepLocalCommand, ShowMoreOptionsCommand, ApplyMoreOptionsCommand, CancelMoreOptionsCommand, PreviewListingColorCommand, ToggleFavoriteListingColorCommand })
             (command as RelayCommand)?.NotifyCanExecuteChanged();
     }
 

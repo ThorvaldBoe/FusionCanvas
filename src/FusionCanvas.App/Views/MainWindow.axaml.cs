@@ -45,6 +45,8 @@ public partial class MainWindow : Window
     private FusionCanvas.Application.Items.Import.IItemCsvCodec? _itemCsvImportCodec;
     private DesignStageToolViewModel? _subscribedDesignTool;
     private ListingStageToolViewModel? _subscribedListingTool;
+    private PrintifyListingStageToolViewModel? _subscribedPrintifyTool;
+    private ListingColorOptionsWindow? _listingColorOptionsWindow;
     private ManualListingDetailsStageToolViewModel? _subscribedManualListingTool;
     private readonly InMemoryDataProvider<VariantListingTermsViewModel> _manualListingVariantRows = new([]);
 
@@ -167,6 +169,11 @@ public partial class MainWindow : Window
             _subscribedListingTool.PropertyChanged -= OnListingToolPropertyChanged;
         }
 
+        if (_subscribedPrintifyTool is not null)
+        {
+            _subscribedPrintifyTool.PropertyChanged -= OnPrintifyToolPropertyChanged;
+        }
+
         SubscribeManualListingTool(null);
 
         _subscribedDesignTool = (DataContext as MainWindowViewModel)?.DesignTool;
@@ -179,6 +186,12 @@ public partial class MainWindow : Window
         if (_subscribedListingTool is not null)
         {
             _subscribedListingTool.PropertyChanged += OnListingToolPropertyChanged;
+        }
+
+        _subscribedPrintifyTool = (DataContext as MainWindowViewModel)?.PrintifyTool;
+        if (_subscribedPrintifyTool is not null)
+        {
+            _subscribedPrintifyTool.PropertyChanged += OnPrintifyToolPropertyChanged;
         }
 
         SubscribeManualListingTool((DataContext as MainWindowViewModel)?.ManualListingDetailsTool);
@@ -235,6 +248,33 @@ public partial class MainWindow : Window
         {
             PostToDispatcher(() => _windowCoordinator.SyncMockupPreviewWindow(listingTool), DispatcherPriority.Background);
         }
+    }
+
+    private void OnPrintifyToolPropertyChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (sender is not PrintifyListingStageToolViewModel tool
+            || args.PropertyName != nameof(PrintifyListingStageToolViewModel.IsMoreOptionsVisible)) return;
+
+        PostToDispatcher(() =>
+        {
+            if (tool.IsMoreOptionsVisible)
+            {
+                if (_listingColorOptionsWindow is { IsVisible: true }) return;
+                var dialog = new ListingColorOptionsWindow { DataContext = tool };
+                _listingColorOptionsWindow = dialog;
+                dialog.Closed += (_, _) =>
+                {
+                    if (ReferenceEquals(_listingColorOptionsWindow, dialog)) _listingColorOptionsWindow = null;
+                    if (tool.IsMoreOptionsVisible) tool.CancelMoreOptionsCommand.Execute(null);
+                    Dispatcher.UIThread.Post(() => ListingMoreOptionsButton.Focus(), DispatcherPriority.Input);
+                };
+                _ = dialog.ShowDialog(this);
+            }
+            else if (_listingColorOptionsWindow is { IsVisible: true } dialog)
+            {
+                dialog.Close();
+            }
+        }, DispatcherPriority.Background);
     }
 
     private void InitializeWindowLayout(SettingsViewModel? settings)

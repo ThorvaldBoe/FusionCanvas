@@ -360,7 +360,7 @@ public class DesignStageToolHeadlessTests
         Assert.True(stale.ViewModel.DesignTool.ShowsConfiguredState);
         Assert.Equal(stale.Replacement.Id, stale.ViewModel.DesignTool.SelectedOfferingId);
         Assert.Empty(stale.ViewModel.DesignTool.SelectedColors);
-        Assert.Empty(stale.ViewModel.DesignTool.Rows);
+        Assert.Single(stale.ViewModel.DesignTool.Rows);
         var configuration = window.FindControl<ComboBox>("DesignConfigurationComboBox")!;
         Assert.True(configuration.IsFocused);
         Assert.Equal("Design.ConfigurationSelector", AutomationProperties.GetAutomationId(configuration));
@@ -455,8 +455,7 @@ public class DesignStageToolHeadlessTests
 
         var row = vm.DesignTool.Rows[0];
         Assert.True(row.IsDefault);
-        Assert.Contains("Black", row.ColorValues);
-        Assert.Contains("White", row.ColorValues);
+        Assert.Empty(row.ColorValues);
         Assert.Equal(2, row.Slots.Count); // 2 design areas
     }
 
@@ -466,9 +465,7 @@ public class DesignStageToolHeadlessTests
         var vm = CreateConfiguredDesignViewModel();
         NavigateToDesign(vm);
 
-        Assert.NotEmpty(vm.DesignTool.AvailableColors);
-        Assert.Contains(vm.DesignTool.AvailableColors, c => c.ColorValue == "Black");
-        Assert.Contains(vm.DesignTool.AvailableColors, c => c.ColorValue == "White");
+        Assert.Empty(vm.DesignTool.AvailableColors);
     }
 
     [AvaloniaFact]
@@ -557,10 +554,7 @@ public class DesignStageToolHeadlessTests
         var vm = CreateConfiguredDesignViewModel();
         NavigateToDesign(vm);
 
-        // Selected colors from the configured snapshot
-        Assert.Equal(2, vm.DesignTool.SelectedColors.Count);
-        Assert.Contains(vm.DesignTool.SelectedColors, c => c.ColorValue == "Black");
-        Assert.Contains(vm.DesignTool.SelectedColors, c => c.ColorValue == "White");
+        Assert.Empty(vm.DesignTool.SelectedColors);
     }
 
     [AvaloniaFact]
@@ -603,25 +597,13 @@ public class DesignStageToolHeadlessTests
     // === Additional headless view tests for color operations and slot grid affordances ===
 
     [AvaloniaFact]
-    public void ConfiguredState_ColorToggle_AddsAndRemovesColor()
+    public void ConfiguredState_DesignStageHasNoProductColorSelection()
     {
         var vm = CreateConfiguredDesignViewModel();
         NavigateToDesign(vm);
 
-        // Start with Black and White selected
-        Assert.Contains(vm.DesignTool.SelectedColors, c => c.ColorValue == "Black");
-
-        // Remove "Black" via the ViewModel service method
-        vm.DesignTool.ToggleColorAsync("Black", add: false).GetAwaiter().GetResult();
-
-        // Black should no longer be selected
-        Assert.DoesNotContain(vm.DesignTool.SelectedColors, c => c.ColorValue == "Black");
-        // But White should still be selected
-        Assert.Contains(vm.DesignTool.SelectedColors, c => c.ColorValue == "White");
-
-        // Add "Black" back
-        vm.DesignTool.ToggleColorAsync("Black", add: true).GetAwaiter().GetResult();
-        Assert.Contains(vm.DesignTool.SelectedColors, c => c.ColorValue == "Black");
+        Assert.Empty(vm.DesignTool.SelectedColors);
+        Assert.Empty(vm.DesignTool.AvailableColors);
     }
 
     [AvaloniaFact]
@@ -630,36 +612,26 @@ public class DesignStageToolHeadlessTests
         var vm = CreateConfiguredDesignViewModel();
         NavigateToDesign(vm);
 
-        // Start with 1 default row serving both colors
+        // Artwork variants no longer belong to product Colors.
         Assert.Single(vm.DesignTool.Rows);
         var defaultRow = vm.DesignTool.Rows[0];
         Assert.True(defaultRow.IsDefault);
-        Assert.Contains("Black", defaultRow.ColorValues);
+        vm.DesignTool.AddArtworkVariantCommand.Execute(null);
 
-        // Make "Black" specific
-        vm.DesignTool.MakeSpecificForColorAsync("Black").GetAwaiter().GetResult();
-
-        // Now there should be 2 rows  (default row for White, specific row for Black)
         Assert.Equal(2, vm.DesignTool.Rows.Count);
         var specificRow = vm.DesignTool.Rows.FirstOrDefault(r => !r.IsDefault);
         Assert.NotNull(specificRow);
-        Assert.Contains("Black", specificRow!.ColorValues);
-        Assert.DoesNotContain("White", specificRow.ColorValues);
-
-        // Default row should only have White
-        var updatedDefault = vm.DesignTool.Rows.First(r => r.IsDefault);
-        Assert.DoesNotContain("Black", updatedDefault.ColorValues);
-        Assert.Contains("White", updatedDefault.ColorValues);
+        Assert.Empty(specificRow!.ColorValues);
+        Assert.Empty(defaultRow.ColorValues);
     }
 
     [AvaloniaFact]
-    public void ConfiguredState_RemoveSpecificRow_RevertsColorsToDefault()
+    public void ConfiguredState_RemoveArtworkVariantKeepsDefault()
     {
         var vm = CreateConfiguredDesignViewModel();
         NavigateToDesign(vm);
 
-        // Make "Black" specific first
-        vm.DesignTool.MakeSpecificForColorAsync("Black").GetAwaiter().GetResult();
+        vm.DesignTool.AddArtworkVariantCommand.Execute(null);
         Assert.Equal(2, vm.DesignTool.Rows.Count);
 
         // Remove the specific row
@@ -670,12 +642,11 @@ public class DesignStageToolHeadlessTests
         // Confirm removal
         vm.DesignTool.ConfirmPendingRemovalAsync().GetAwaiter().GetResult();
 
-        // Back to 1 default row with both colors
+        // Back to the default artwork variant.
         Assert.Single(vm.DesignTool.Rows);
         var defaultRow = vm.DesignTool.Rows[0];
         Assert.True(defaultRow.IsDefault);
-        Assert.Contains("Black", defaultRow.ColorValues);
-        Assert.Contains("White", defaultRow.ColorValues);
+        Assert.Empty(defaultRow.ColorValues);
     }
 
     [AvaloniaFact]
@@ -719,12 +690,10 @@ public class DesignStageToolHeadlessTests
         {
             var wrappingTexts = window.GetVisualDescendants()
                 .OfType<TextBlock>()
-                .Where(textBlock => textBlock.Text is
-                    "Select the colors this design will use." or
-                    "Sketches, references, and existing artwork.")
+                .Where(textBlock => textBlock.Text == "Sketches, references, and existing artwork.")
                 .ToArray();
 
-            Assert.Equal(2, wrappingTexts.Length);
+            Assert.Single(wrappingTexts);
             Assert.All(wrappingTexts, textBlock => Assert.Equal(TextWrapping.Wrap, textBlock.TextWrapping));
 
             Assert.NotNull(vm.DesignTool.SelectedOfferingName);
@@ -746,7 +715,7 @@ public class DesignStageToolHeadlessTests
     }
 
     [AvaloniaFact]
-    public void ConfiguredState_DesignCardsUseSharedReadableSizingAndAlignedSelectedColorActions()
+    public void ConfiguredState_DesignCardsUseSharedReadableSizingWithoutColorActions()
     {
         var vm = CreateConfiguredDesignViewModel(secondSelectedColor: "Heather Royal");
         NavigateToDesign(vm);
@@ -760,27 +729,7 @@ public class DesignStageToolHeadlessTests
 
         try
         {
-            var selectedColorButtons = window.GetVisualDescendants()
-                .OfType<Button>()
-                .Where(button => button.IsEffectivelyVisible
-                    && button.DataContext is DesignColorViewModel
-                    && button.Content is "Make specific"
-                    && button.GetVisualAncestors().OfType<ItemsControl>().Any(control =>
-                        ReferenceEquals(control.ItemsSource, vm.DesignTool.SelectedColors)))
-                .ToArray();
-            var firstSelectedColorButton = Assert.Single(selectedColorButtons.Where(button => Equals(button.Tag, "Black")));
-            var secondSelectedColorButton = Assert.Single(selectedColorButtons.Where(button => Equals(button.Tag, "Heather Royal")));
-            var firstActionPoint = firstSelectedColorButton.TranslatePoint(new Point(0, 0), window);
-            var secondActionPoint = secondSelectedColorButton.TranslatePoint(new Point(0, 0), window);
-            Assert.True(firstActionPoint.HasValue);
-            Assert.True(secondActionPoint.HasValue);
-            Assert.InRange(Math.Abs(firstActionPoint!.Value.X - secondActionPoint!.Value.X), 0, 0.1);
-            Assert.True(secondActionPoint.Value.Y >= firstActionPoint.Value.Y + firstSelectedColorButton.Bounds.Height + 5);
-            Assert.All(selectedColorButtons, button =>
-            {
-                Assert.True(button.FontSize >= 11);
-                Assert.True(button.Bounds.Height >= 28);
-            });
+            Assert.Empty(window.GetVisualDescendants().Where(control => control.DataContext is DesignColorViewModel));
 
             var finalThumbnailBorders = window.GetVisualDescendants()
                 .OfType<Border>()

@@ -12,6 +12,8 @@ public sealed class DesignRowViewModel
         IsDefault = summary.IsDefault;
         SortOrder = summary.SortOrder;
         ColorValues = [.. summary.ColorValues];
+        ContrastIntent = summary.ContrastIntent;
+        DisplayName = $"Artwork variant {summary.SortOrder + 1}" + (summary.IsDefault ? " · default" : string.Empty);
         IsReadOnly = isReadOnly;
         foreach (var s in summary.Slots)
         {
@@ -24,7 +26,8 @@ public sealed class DesignRowViewModel
     public int SortOrder { get; }
     public bool IsReadOnly { get; }
     public IReadOnlyList<string> ColorValues { get; }
-    public string ColorChips => ColorValues.Count > 0 ? string.Join(", ", ColorValues) : "(no colors)";
+    public ArtworkContrastIntent? ContrastIntent { get; }
+    public string DisplayName { get; }
     public ObservableCollection<DesignSlotViewModel> Slots { get; } = [];
 
     public bool CanRemove => !IsDefault && !IsReadOnly;

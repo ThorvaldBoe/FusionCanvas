@@ -134,6 +134,7 @@ public static class AppWorkspaceFactory
         var nicheManagement = new NicheManagementService(repository);
         var productSupplierSetup = new LegacyCatalogCompatibilityService(repository);
         var catalogSetup = new CatalogSetupService(repository);
+        var listingColorSelection = new ListingColorSelectionService(repository, fileStore);
         var mockupTemplateSetup = new MockupTemplateSetupService(repository);
         var providerCatalog = new UnavailableProviderCatalogCandidateSource();
         var offeringManagement = new OfferingManagementService(repository, providerCatalog);
@@ -220,6 +221,7 @@ public static class AppWorkspaceFactory
             new FusionCanvas.Integration.Stores.StoreContextMapper(),
             new FusionCanvas.Application.Listings.ManualListingDetailsService(repository),
             new PrintifyListingImportService(storeManagement, printifyImportCredentials, printifyImportClient, repository, fileStore, printifyCatalogClient),
+            listingColorSelection,
             artworkStyleManagement);
         return new AppWorkspaceRuntime(
             repository,

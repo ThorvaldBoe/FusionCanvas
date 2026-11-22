@@ -89,6 +89,24 @@ public sealed class CatalogSetupService : ICatalogSetupService
             return Success(snapshot with { OfferingOptionValues = NormalizeOptionValues([.. snapshot.OfferingOptionValues, value], option.Id) }, offering.StoreId);
         }, cancellationToken);
 
+    public Task<CatalogSetupResult> SetColorFavoriteAsync(Guid storeId, Guid offeringId, Guid optionValueId, bool isFavorite, CancellationToken cancellationToken = default) =>
+        MutateAsync(storeId, snapshot =>
+        {
+            var storeCheck = EnsureWritableStore(snapshot, storeId);
+            if (storeCheck is not null) return Failure(snapshot, storeId, storeCheck);
+            var offering = snapshot.BlueprintOfferings.SingleOrDefault(value => value.Id == offeringId && value.StoreId == storeId && !value.IsArchived);
+            var value = snapshot.OfferingOptionValues.SingleOrDefault(candidate => candidate.Id == optionValueId && candidate.OfferingId == offeringId && !candidate.IsArchived);
+            var colorOption = value is null ? null : snapshot.OfferingOptions.SingleOrDefault(candidate =>
+                candidate.Id == value.OptionId && candidate.OfferingId == offeringId && candidate.OptionKind == OptionKind.Color && !candidate.IsArchived);
+            if (offering is null || value is null || colorOption is null)
+                return Failure(snapshot, storeId, "Only an active Color value in this Offering can be marked as a favorite.");
+            return Success(snapshot with
+            {
+                OfferingOptionValues = [.. snapshot.OfferingOptionValues.Select(candidate =>
+                    candidate.Id == optionValueId ? candidate with { IsFavorite = isFavorite } : candidate)]
+            }, storeId);
+        }, cancellationToken);
+
     public Task<CatalogSetupResult> ReorderOptionValuesAsync(ReorderOptionValuesRequest request, CancellationToken cancellationToken = default) =>
         MutateAsync(request.StoreId, snapshot =>
         {

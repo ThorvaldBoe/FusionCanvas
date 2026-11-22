@@ -235,6 +235,28 @@ public class DesignStageServiceTests
     // --- AddSelectedColorAsync / RemoveSelectedColorAsync ---
 
     [Fact]
+    public async Task AddArtworkVariantAsync_AddsColorIndependentAlternativeWithItsOwnAreaAssignments()
+    {
+        var repo = new InMemoryWorkspaceRepository(SeedWithProduct());
+        var service = New(repo);
+        var (itemId, offeringId) = await AddItemWithConfig(service, repo);
+        await service.SelectConfigurationAsync(itemId, offeringId, TestContext.Current.CancellationToken);
+
+        var result = await service.AddArtworkVariantAsync(itemId, ArtworkContrastIntent.LightForDarkProduct, TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded, result.Error);
+        var rows = repo.Snapshot.DesignVariantRows.Where(value => value.ItemId == itemId).OrderBy(value => value.SortOrder).ToArray();
+        Assert.Equal(2, rows.Length);
+        Assert.True(rows[0].IsDefault);
+        Assert.Equal(ArtworkContrastIntent.LightForDarkProduct, rows[1].ContrastIntent);
+        Assert.Empty(repo.Snapshot.DesignVariantRowColors.Where(value => rows.Any(row => row.Id == value.RowId)));
+        var areaIds = repo.Snapshot.OfferingPlaceholders.Where(value => value.OfferingId == offeringId && !value.IsArchived).Select(value => value.Id)
+            .Concat(repo.Snapshot.DesignAreas.Where(value => value.FulfillmentOfferingId == offeringId).Select(value => value.Id)).ToHashSet();
+        Assert.Equal(areaIds, repo.Snapshot.DesignSlotAssignments.Where(value => value.RowId == rows[1].Id).Select(value => value.DesignAreaId).ToHashSet());
+        Assert.Empty(result.State!.SelectedColors);
+    }
+
+    [Fact]
     public async Task AddSelectedColorAsync_CreatesDefaultRowAndAddsColor()
     {
         var repo = new InMemoryWorkspaceRepository(SeedWithProduct());
@@ -246,7 +268,7 @@ public class DesignStageServiceTests
 
         Assert.True(result.Succeeded);
         var state = await service.LoadDesignStageStateAsync(itemId, TestContext.Current.CancellationToken);
-        Assert.Contains(state.SelectedColors, c => c.Equals("Black", StringComparison.OrdinalIgnoreCase));
+        Assert.Empty(state.SelectedColors); // Product Colors are owned by Listing.
         Assert.Single(state.Rows);
         Assert.True(state.Rows[0].IsDefault);
     }
@@ -264,7 +286,7 @@ public class DesignStageServiceTests
 
         Assert.True(result.Succeeded); // Idempotent
         var state = await service.LoadDesignStageStateAsync(itemId, TestContext.Current.CancellationToken);
-        Assert.Single(state.SelectedColors);
+        Assert.Empty(state.SelectedColors);
     }
 
     [Fact]
@@ -302,8 +324,8 @@ public class DesignStageServiceTests
         var state = await service.LoadDesignStageStateAsync(itemId, TestContext.Current.CancellationToken);
         Assert.Equal(2, state.Rows.Count);
         var specific = state.Rows.Single(r => !r.IsDefault);
-        Assert.Equal(["Black"], specific.ColorValues);
-        Assert.Contains("White", state.Rows.Single(r => r.IsDefault).ColorValues);
+        Assert.Empty(specific.ColorValues);
+        Assert.Empty(state.Rows.Single(r => r.IsDefault).ColorValues);
     }
 
     [Fact]
@@ -323,7 +345,7 @@ public class DesignStageServiceTests
         Assert.Equal(2, state.Rows.Count);
         var defaultRow = state.Rows.Single(r => r.IsDefault);
         var specificRow = state.Rows.Single(r => !r.IsDefault);
-        Assert.Equal(["Black"], specificRow.ColorValues);
+        Assert.Empty(specificRow.ColorValues);
         Assert.Empty(defaultRow.ColorValues);
     }
 
@@ -346,7 +368,7 @@ public class DesignStageServiceTests
         var state = await service.LoadDesignStageStateAsync(itemId, TestContext.Current.CancellationToken);
         Assert.Single(state.Rows);
         Assert.True(state.Rows[0].IsDefault);
-        Assert.Contains("Black", state.Rows[0].ColorValues);
+        Assert.Empty(state.Rows[0].ColorValues);
     }
 
     [Fact]
@@ -834,8 +856,8 @@ public class DesignStageServiceTests
         Assert.Equal(offering.Id, state.SelectedOfferingId);
         Assert.True(state.IsReadOnly);
         Assert.Contains("read-only", state.ReadOnlyReason, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(["Black", "White"], state.AvailableColors);
-        Assert.Equal(["Black"], state.SelectedColors);
+        Assert.Empty(state.AvailableColors);
+        Assert.Empty(state.SelectedColors);
         Assert.Contains(state.AvailableOfferings, value => value.Id == offering.Id);
         Assert.True(state.HasStaleConfiguration);
         Assert.False(state.CanRecoverStaleConfiguration);
@@ -906,14 +928,14 @@ public class DesignStageServiceTests
         var result = await service.RecoverStaleConfigurationAsync(
             fixture.ItemId, fixture.ReplacementOfferingId, TestContext.Current.CancellationToken);
 
-        Assert.True(result.Succeeded);
+        Assert.False(result.Succeeded); // Assigned artwork needs manual adaptation before a provider change.
         var after = fixture.Repository.Snapshot;
-        Assert.Equal(fixture.ReplacementOfferingId,
+        Assert.Equal(fixture.StaleOfferingId,
             Assert.Single(after.ItemListingConfigurations, value => value.ItemId == fixture.ItemId).OfferingId);
-        Assert.DoesNotContain(after.DesignSelectedColors, value => value.ItemId == fixture.ItemId);
-        Assert.DoesNotContain(after.DesignVariantRows, value => value.ItemId == fixture.ItemId);
-        Assert.DoesNotContain(after.DesignVariantRowColors, value => value.RowId == fixture.ItemRowId);
-        Assert.DoesNotContain(after.DesignSlotAssignments, value => value.RowId == fixture.ItemRowId);
+        Assert.Equal(before.DesignSelectedColors, after.DesignSelectedColors);
+        Assert.Contains(after.DesignVariantRows, value => value.Id == fixture.ItemRowId);
+        Assert.Equal(before.DesignVariantRowColors, after.DesignVariantRowColors);
+        Assert.Contains(after.DesignSlotAssignments, value => value.RowId == fixture.ItemRowId);
         Assert.Contains(after.DesignVariantRows, value => value.Id == fixture.OtherItemRowId);
         Assert.Contains(after.DesignSlotAssignments, value => value.RowId == fixture.OtherItemRowId);
         Assert.Equal(before.Assets, after.Assets);
@@ -926,24 +948,24 @@ public class DesignStageServiceTests
         using var metadata = JsonDocument.Parse(updatedItem.MetadataJson);
         Assert.Equal("Keep idea", metadata.RootElement.GetProperty("idea").GetString());
         Assert.Equal("Keep SLL", metadata.RootElement.GetProperty("sll").GetString());
-        Assert.False(metadata.RootElement.TryGetProperty("design.artworkTargetId", out _));
-        Assert.False(metadata.RootElement.TryGetProperty("design.artworkTargetPreference", out _));
-        Assert.False(metadata.RootElement.TryGetProperty("design.transparentBackground", out _));
+        Assert.True(metadata.RootElement.TryGetProperty("design.artworkTargetId", out _));
+        Assert.True(metadata.RootElement.TryGetProperty("design.artworkTargetPreference", out _));
+        Assert.True(metadata.RootElement.TryGetProperty("design.transparentBackground", out _));
 
         Assert.NotNull(result.State);
-        Assert.False(result.State.HasStaleConfiguration);
-        Assert.False(result.State.IsReadOnly);
-        Assert.Equal(fixture.ReplacementOfferingId, result.State.SelectedOfferingId);
+        Assert.True(result.State.HasStaleConfiguration);
+        Assert.True(result.State.IsReadOnly);
+        Assert.Equal(fixture.StaleOfferingId, result.State.SelectedOfferingId);
         Assert.Empty(result.State.SelectedColors);
-        Assert.Empty(result.State.Rows);
+        Assert.Single(result.State.Rows);
 
         var reopened = await service.LoadDesignStageStateAsync(
             fixture.ItemId, TestContext.Current.CancellationToken);
-        Assert.False(reopened.HasStaleConfiguration);
-        Assert.False(reopened.IsReadOnly);
-        Assert.Equal(fixture.ReplacementOfferingId, reopened.SelectedOfferingId);
+        Assert.True(reopened.HasStaleConfiguration);
+        Assert.True(reopened.IsReadOnly);
+        Assert.Equal(fixture.StaleOfferingId, reopened.SelectedOfferingId);
         Assert.Empty(reopened.SelectedColors);
-        Assert.Empty(reopened.Rows);
+        Assert.Single(reopened.Rows);
     }
 
     [Fact]
@@ -992,6 +1014,8 @@ public class DesignStageServiceTests
     {
         var fixture = CreateRecoveryFixture();
         var before = fixture.Repository.Snapshot;
+        fixture.Repository.Snapshot = before with { DesignSlotAssignments = [] };
+        before = fixture.Repository.Snapshot;
         fixture.Repository.ThrowOnSave = true;
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => New(fixture.Repository).RecoverStaleConfigurationAsync(
@@ -1038,7 +1062,7 @@ public class DesignStageServiceTests
 
         var state = await New(new InMemoryWorkspaceRepository(snapshot)).LoadDesignStageStateAsync(itemId, TestContext.Current.CancellationToken);
 
-        Assert.Equal(["Black", "Navy", "Heather Gray"], state.AvailableColors);
+        Assert.Empty(state.AvailableColors); // Catalog Colors are surfaced in Listing.
     }
 
     [Fact]

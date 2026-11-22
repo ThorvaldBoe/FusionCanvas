@@ -10,4 +10,7 @@ public sealed record ListingArtworkProjection(
 {
     public string Position { get; init; } = string.Empty;
     public string DecorationMethod { get; init; } = string.Empty;
+    public Guid? ColorOptionValueId { get; init; }
+    public Guid ArtworkVariantId { get; init; }
+    public IReadOnlyList<Guid> SourceVariantIds { get; init; } = [];
 }

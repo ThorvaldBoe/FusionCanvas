@@ -77,6 +77,23 @@ public sealed class MockupGenerationApplicabilityRegressionTests
         Assert.Single(repository.Snapshot.AssetLinks.Where(link => link.EntityId == fixture.Item.Id));
     }
 
+    [Fact]
+    public async Task Apply_generates_ready_color_with_its_assigned_art_and_keeps_unready_color_selected()
+    {
+        var fixture = AddSecondColor(CreateFixture(true));
+        var compositor = new CountingCompositor();
+
+        var result = await fixture.Service(compositor).ApplyAsync(new(fixture.Item.Id, fixture.Template.Id));
+
+        Assert.True(result.Succeeded);
+        var output = Assert.Single(result.Outputs);
+        Assert.Equal("White", output.ColorValue);
+        Assert.Equal(fixture.Snapshot.Assets.Single(value => value.Name == "white-design.png").Id, output.DesignAssetId);
+        Assert.Equal("Black", Assert.Single(result.Diagnostics).ColorValue);
+        Assert.Equal(1, compositor.Calls);
+        Assert.Equal(2, fixture.Snapshot.ListingColorSelections.Count(value => value.ItemId == fixture.Item.Id));
+    }
+
     private static Fixture CreateFixture(bool twoSizeSpecificSources)
     {
         var storeId = Guid.NewGuid(); var offeringId = Guid.NewGuid();
@@ -97,7 +114,7 @@ public sealed class MockupGenerationApplicabilityRegressionTests
         var snapshot = new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [new Store(storeId, "Store", null, false, Now, Now, "{}")], [], [], [], [], [], [], [], [])
         {
             Blueprints = [blueprint], BlueprintOfferings = [offering], OfferingOptions = [colorOption, sizeOption], OfferingOptionValues = [color, medium, large], OfferingVariants = variants, OfferingPlaceholders = [area], MockupTemplates = [template], MockupTemplateRevisions = [revision], MockupTemplateSourceImages = sourceImages, MockupTemplateSourceImageOptionValues = conditions,
-            MockupTemplateRevisionSourceImages = sourceImages.Select(x => new MockupTemplateRevisionSourceImage(x.Id, revision.Id, x.SourceAssetId, x.ImageMapping)).ToArray(), MockupTemplateRevisionSourceImageOptionValues = conditions.Select(x => new MockupTemplateRevisionSourceImageOptionValue(x.SourceImageId, x.OptionValueId)).ToArray(), Items = [item], ItemListingConfigurations = [new(item.Id, offeringId)], DesignSelectedColors = [new(item.Id, "Black")], DesignVariantRows = [row], DesignVariantRowColors = [new(row.Id, "Black")], DesignSlotAssignments = [new(row.Id, area.Id, design.Id)], Assets = [design, .. sourceImages.Select(x => new Asset(x.SourceAssetId, storeId, "source.png", null, AssetKind.MockupImage, $"assets/{x.Id}.png", null, false, false, Now, Now, "{}"))]
+            MockupTemplateRevisionSourceImages = sourceImages.Select(x => new MockupTemplateRevisionSourceImage(x.Id, revision.Id, x.SourceAssetId, x.ImageMapping)).ToArray(), MockupTemplateRevisionSourceImageOptionValues = conditions.Select(x => new MockupTemplateRevisionSourceImageOptionValue(x.SourceImageId, x.OptionValueId)).ToArray(), Items = [item], ItemListingConfigurations = [new(item.Id, offeringId)], ListingColorSelections = [new(item.Id, color.Id, row.Id, 0)], DesignVariantRows = [row], DesignSlotAssignments = [new(row.Id, area.Id, design.Id)], Assets = [design, .. sourceImages.Select(x => new Asset(x.SourceAssetId, storeId, "source.png", null, AssetKind.MockupImage, $"assets/{x.Id}.png", null, false, false, Now, Now, "{}"))]
         };
         var files = new MemoryFiles(); return new(snapshot, item, template, files);
     }
@@ -123,9 +140,8 @@ public sealed class MockupGenerationApplicabilityRegressionTests
             OfferingOptionValues = [.. snapshot.OfferingOptionValues, white],
             OfferingVariants = [.. snapshot.OfferingVariants, whiteVariant],
             OfferingPlaceholders = [placeholder],
-            DesignSelectedColors = [.. snapshot.DesignSelectedColors, new(fixture.Item.Id, "White")],
+            ListingColorSelections = [.. snapshot.ListingColorSelections, new(fixture.Item.Id, white.Id, row.Id, 1)],
             DesignVariantRows = [.. snapshot.DesignVariantRows, row],
-            DesignVariantRowColors = [.. snapshot.DesignVariantRowColors, new(row.Id, "White")],
             DesignSlotAssignments = [.. snapshot.DesignSlotAssignments, new(row.Id, placeholder.Id, design.Id)],
             Assets = [.. snapshot.Assets, design]
         };

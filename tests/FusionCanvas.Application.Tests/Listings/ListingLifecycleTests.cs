@@ -122,6 +122,47 @@ public sealed class ListingLifecycleTests
     }
 
     [Fact]
+    public void Projection_uses_each_listing_color_artwork_assignment_and_keepsOutOfStockVariants()
+    {
+        var request = CreateRequest();
+        var black = request.OptionValues.Single();
+        var white = new OfferingOptionValue(Guid.NewGuid(), black.OptionId, request.Offering.Id, "White", 1);
+        var secondVariant = new OfferingVariant(Guid.NewGuid(), request.Offering.Id, "White / M", [white.Id], false,
+            DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "{\"externalVariantId\":102}") { ProviderIsAvailable = false };
+        var alternateRow = new DesignVariantRow(Guid.NewGuid(), request.Item.Id, false, 1);
+        var alternateAsset = new Asset(Guid.NewGuid(), request.Item.StoreId, "Light artwork", null, AssetKind.ExportedImage,
+            "assets/light-artwork.png", null, false, false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "{}");
+        request = request with
+        {
+            Variants = [request.Variants[0], secondVariant],
+            OptionValues = [black, white],
+            ListingColorSelections =
+            [
+                new ListingColorSelection(request.Item.Id, black.Id, request.VariantRows[0].Id, 0),
+                new ListingColorSelection(request.Item.Id, white.Id, alternateRow.Id, 1)
+            ],
+            VariantRows = [request.VariantRows[0], alternateRow],
+            VariantRowColors = [],
+            SlotAssignments =
+            [
+                request.SlotAssignments[0],
+                new DesignSlotAssignment(alternateRow.Id, request.DesignAreas[0].Id, alternateAsset.Id)
+            ],
+            Assets = [.. request.Assets, alternateAsset],
+            ArtworkDimensions = new Dictionary<Guid, ArtworkDimensions>(request.ArtworkDimensions) { [alternateAsset.Id] = new(1000, 1000) }
+        };
+
+        var result = ListingProjectionBuilder.Build(request);
+
+        Assert.True(result.IsValid, string.Join("; ", result.Issues.Select(value => value.Message)));
+        Assert.Equal(2, result.Projection!.Variants.Count);
+        var blackArtwork = Assert.Single(result.Projection.Artwork.Where(value => value.ArtworkVariantId == request.VariantRows[0].Id));
+        var whiteArtwork = Assert.Single(result.Projection.Artwork.Where(value => value.ArtworkVariantId == alternateRow.Id));
+        Assert.Equal(request.Variants[0].Id, Assert.Single(blackArtwork.SourceVariantIds));
+        Assert.Equal(secondVariant.Id, Assert.Single(whiteArtwork.SourceVariantIds));
+    }
+
+    [Fact]
     public void Projection_reads_blueprint_identity_from_imported_product_metadata()
     {
         var request = CreateRequest();

@@ -52,6 +52,8 @@ public sealed record WorkspaceSnapshot(
 
     public IReadOnlyList<DesignSlotAssignment> DesignSlotAssignments { get; init; } = [];
 
+    public IReadOnlyList<ListingColorSelection> ListingColorSelections { get; init; } = [];
+
     public IReadOnlyList<Blueprint> Blueprints { get; init; } = [];
 
     public IReadOnlyList<PrintProvider> PrintProviders { get; init; } = [];

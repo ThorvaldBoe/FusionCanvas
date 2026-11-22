@@ -77,6 +77,7 @@ public static class WorkspaceSnapshotFilter
         var designVariantRows = source.DesignVariantRows.Where(value => itemIds.Contains(value.ItemId)).ToArray();
         var designVariantRowIds = designVariantRows.Select(value => value.Id).ToHashSet();
         var designVariantRowColors = source.DesignVariantRowColors.Where(value => designVariantRowIds.Contains(value.RowId)).ToArray();
+        var listingColorSelections = source.ListingColorSelections.Where(value => itemIds.Contains(value.ItemId)).ToArray();
         var designSlotAssignments = source.DesignSlotAssignments.Where(value => designVariantRowIds.Contains(value.RowId) && designAreaIds.Contains(value.DesignAreaId)).ToArray();
 
         var blueprints = source.Blueprints.Where(value => storeIds.Contains(value.StoreId)).ToArray();
@@ -120,6 +121,7 @@ public static class WorkspaceSnapshotFilter
                 DesignSelectedColors = designSelectedColors,
                 DesignVariantRows = designVariantRows,
                 DesignVariantRowColors = designVariantRowColors,
+                ListingColorSelections = listingColorSelections,
                 DesignSlotAssignments = designSlotAssignments,
                 Blueprints = blueprints,
                 PrintProviders = printProviders,

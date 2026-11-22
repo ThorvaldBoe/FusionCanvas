@@ -2,7 +2,7 @@ namespace FusionCanvas.Domain.Catalog;
 
 public sealed record OfferingOptionValue
 {
-    public OfferingOptionValue(Guid id, Guid optionId, Guid offeringId, string value, int sortOrder, bool isArchived = false, string metadataJson = "{}")
+    public OfferingOptionValue(Guid id, Guid optionId, Guid offeringId, string value, int sortOrder, bool isArchived = false, string metadataJson = "{}", bool isFavorite = false)
     {
         Id = CatalogRecordValidation.Id(id, nameof(id));
         OptionId = CatalogRecordValidation.Id(optionId, nameof(optionId));
@@ -11,6 +11,7 @@ public sealed record OfferingOptionValue
         SortOrder = sortOrder;
         IsArchived = isArchived;
         MetadataJson = MetadataJsonDefaults.Normalize(metadataJson);
+        IsFavorite = isFavorite;
     }
 
     public Guid Id { get; init; }
@@ -20,4 +21,5 @@ public sealed record OfferingOptionValue
     public int SortOrder { get; init; }
     public bool IsArchived { get; init; }
     public string MetadataJson { get; init; }
+    public bool IsFavorite { get; init; }
 }
