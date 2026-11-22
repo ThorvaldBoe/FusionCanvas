@@ -1,0 +1,41 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:styles="clr-namespace:FusionCanvas.App.ArtworkStyles"
+        xmlns:domain="clr-namespace:FusionCanvas.Domain.ArtworkStyles;assembly=FusionCanvas.Domain"
+        x:Class="FusionCanvas.App.ArtworkStyles.ArtworkStyleManagementWindow"
+        x:DataType="styles:ArtworkStyleManagementViewModel"
+        Title="Manage artwork styles" Width="840" Height="620" MinWidth="680" MinHeight="480"
+        WindowStartupLocation="CenterOwner" Background="{DynamicResource ApplicationBackgroundBrush}">
+  <Grid ColumnDefinitions="220,*" RowDefinitions="*,Auto" Margin="20" ColumnSpacing="18" RowSpacing="12">
+    <StackPanel Grid.RowSpan="2" Spacing="10">
+      <TextBlock Text="Workspace styles" FontSize="20" FontWeight="SemiBold" />
+      <ListBox ItemsSource="{Binding Styles}" SelectedItem="{Binding SelectedStyle, Mode=TwoWay}" AutomationProperties.Name="Artwork styles">
+        <ListBox.ItemTemplate><DataTemplate x:DataType="domain:ArtworkStyle"><TextBlock Text="{Binding Title}" Padding="6" /></DataTemplate></ListBox.ItemTemplate>
+      </ListBox>
+      <Button Content="Add style" Command="{Binding CreateCommand}" HorizontalAlignment="Stretch" />
+    </StackPanel>
+    <ScrollViewer Grid.Column="1">
+      <StackPanel Spacing="12">
+        <TextBlock Text="Style details" FontSize="20" FontWeight="SemiBold" />
+        <TextBlock Text="Unsaved edits" IsVisible="{Binding HasUnsavedDraft}" Foreground="{DynamicResource SecondaryTextBrush}" />
+        <TextBlock Text="Title" /><TextBox Text="{Binding Title, Mode=TwoWay}" MaxLength="80" AutomationProperties.Name="Style title" />
+        <TextBlock Text="Description" /><TextBox Text="{Binding Description, Mode=TwoWay}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="100" AutomationProperties.Name="Style description" />
+        <TextBlock Text="Reference images" FontSize="16" FontWeight="SemiBold" />
+        <TextBlock Text="One or more images guide the image model toward this visual style. Their order is preserved." TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+        <ListBox x:Name="ReferencesList" ItemsSource="{Binding ReferenceLabels}" SelectedItem="{Binding SelectedReference, Mode=TwoWay}" MinHeight="100" AutomationProperties.Name="Style reference images" />
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Content="Add images…" Click="OnAddImages" />
+          <Button Content="Move up" Click="OnMoveImageUp" />
+          <Button Content="Move down" Click="OnMoveImageDown" />
+          <Button Content="Remove selected" Click="OnRemoveImage" />
+        </StackPanel>
+        <TextBlock Text="{Binding Error}" IsVisible="{Binding HasError}" TextWrapping="Wrap" Foreground="{DynamicResource DangerTextBrush}" />
+      </StackPanel>
+    </ScrollViewer>
+    <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button Content="Delete style" Command="{Binding DeleteCommand}" />
+      <Button Content="Save style" Command="{Binding SaveCommand}" Classes="primary" AutomationProperties.AutomationId="ArtworkStyle.Save" />
+      <Button Content="Close" Click="OnClose" />
+    </StackPanel>
+  </Grid>
+</Window>

@@ -2,6 +2,7 @@ using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.AI;
+using FusionCanvas.Domain.ArtworkStyles;
 
 namespace FusionCanvas.Application.DesignFiles;
 
@@ -40,4 +41,8 @@ public sealed record DesignStageState(
     public string? ArtworkPromptOverride { get; init; }
     public string? ArtworkAdjustmentPrompt { get; init; }
     public ArtworkContrast ArtworkContrast { get; init; } = ArtworkContrast.DarkOnLight;
+    public IReadOnlyList<ArtworkStyle> AvailableArtworkStyles { get; init; } = [];
+    public Guid? SelectedArtworkStyleId { get; init; }
+    public int SelectedArtworkStyleReferenceCount { get; init; }
+    public int MissingArtworkStyleReferenceCount { get; init; }
 }

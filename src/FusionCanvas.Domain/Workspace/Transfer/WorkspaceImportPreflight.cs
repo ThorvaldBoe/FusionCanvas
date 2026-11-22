@@ -18,6 +18,8 @@ public static class WorkspaceImportPreflight
         AddGuidCollisions(collisions, "Asset", live.Assets.Select(x => x.Id), package.Assets.Select(x => x.Id));
         AddGuidCollisions(collisions, "Prompt", live.Prompts.Select(x => x.Id), package.Prompts.Select(x => x.Id));
         AddGuidCollisions(collisions, "Tag", live.Tags.Select(x => x.Id), package.Tags.Select(x => x.Id));
+        AddGuidCollisions(collisions, "ArtworkStyle", live.ArtworkStyles.Select(x => x.Id), package.ArtworkStyles.Select(x => x.Id));
+        AddGuidCollisions(collisions, "ArtworkStyleReference", live.ArtworkStyleReferences.Select(x => x.Id), package.ArtworkStyleReferences.Select(x => x.Id));
         AddGuidCollisions(
             collisions,
             "IdeationRejection",

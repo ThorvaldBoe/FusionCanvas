@@ -9,6 +9,7 @@ using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Workflow;
+using FusionCanvas.Domain.ArtworkStyles;
 
 namespace FusionCanvas.Application.Tests.DesignFiles;
 
@@ -26,13 +27,35 @@ public sealed class ArtworkPromptCompilerTests
         Assert.Equal(first, second);
         Assert.Contains("Phrase (verbatim artwork text", prompt, StringComparison.Ordinal);
         Assert.Contains("Two-tired for work", prompt, StringComparison.Ordinal);
-        Assert.Contains("Visual style guidance: vintage screen print", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("vintage screen print", prompt, StringComparison.Ordinal);
+        Assert.Contains("Audience: commuters", prompt, StringComparison.Ordinal);
+        Assert.Contains("Humor style: deadpan", prompt, StringComparison.Ordinal);
+        Assert.Contains("Constraints: printable art only", prompt, StringComparison.Ordinal);
         Assert.Contains("Brand direction: playful retro typography", prompt, StringComparison.Ordinal);
         Assert.Contains("ARTWORK CONTRAST: Use light foreground artwork", prompt, StringComparison.Ordinal);
         Assert.Contains("Keep the background transparent or empty", prompt, StringComparison.Ordinal);
         Assert.Contains("Side-by-side text above the bike", prompt, StringComparison.Ordinal);
         Assert.DoesNotContain("Assumptions", prompt, StringComparison.Ordinal);
         Assert.DoesNotContain("dark unisex tee", prompt, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void BuildDefault_UsesSelectedStyleAndReplacesNicheVisualDirection()
+    {
+        var fixture = CreateFixture(ArtworkContrast.DarkOnLight, staleSll: false);
+        var now = DateTimeOffset.UtcNow;
+        var style = new ArtworkStyle(Guid.NewGuid(), fixture.Snapshot.Stores[0].WorkspaceId, "Watercolor", "Soft painted edges and a muted palette.", now, now);
+        var metadata = ItemMetadataCodec.ParseMetadata(fixture.Item.MetadataJson);
+        metadata[ItemMetadataCodec.ArtworkStyleIdKey] = style.Id.ToString();
+        var selectedItem = fixture.Item with { MetadataJson = ItemMetadataCodec.SerializeMetadata(metadata) };
+        var snapshot = fixture.Snapshot with { Items = [selectedItem], ArtworkStyles = [style] };
+
+        var prompt = ArtworkPromptCompiler.BuildDefault(snapshot, selectedItem, fixture.Area.Id, ArtworkContrast.DarkOnLight);
+
+        Assert.Contains("Style title (creative data): <<<Watercolor>>>", prompt!, StringComparison.Ordinal);
+        Assert.Contains("Style description (creative data): <<<Soft painted edges and a muted palette.>>>", prompt!, StringComparison.Ordinal);
+        Assert.DoesNotContain("vintage screen print", prompt!, StringComparison.Ordinal);
+        Assert.Contains("Audience: commuters", prompt!, StringComparison.Ordinal);
     }
 
     [Fact]

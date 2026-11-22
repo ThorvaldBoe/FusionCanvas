@@ -15,4 +15,6 @@ public sealed record ArtworkPromptContext(
     bool SllIsStale = false,
     string? NicheContext = null,
     ArtworkContrast Contrast = ArtworkContrast.DarkOnLight,
-    string? CompositionGuidance = null);
+    string? CompositionGuidance = null,
+    string? ArtworkStyleTitle = null,
+    string? ArtworkStyleDescription = null);

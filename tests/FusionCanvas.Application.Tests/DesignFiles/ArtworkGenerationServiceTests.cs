@@ -9,6 +9,7 @@ using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Workflow;
+using FusionCanvas.Domain.ArtworkStyles;
 
 namespace FusionCanvas.Application.Tests.DesignFiles;
 
@@ -100,8 +101,79 @@ public sealed class ArtworkGenerationServiceTests
         Assert.Contains("Coffee enthusiasts", prompt, StringComparison.Ordinal);
         Assert.Contains("flat printable artwork image only", prompt, StringComparison.Ordinal);
         Assert.Contains("Do not show it applied to a mug, shirt, garment, person, product, or in a product photograph or mockup.", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("Warm hand-drawn linework", prompt, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task GenerateAsync_SendsEverySelectedStyleReferenceInSavedOrder()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var workspaceId = Guid.NewGuid();
+        var store = new Store(Guid.NewGuid(), workspaceId, "Store", null, false, now, now, "{}");
+        var product = new StoreProduct(Guid.NewGuid(), store.Id, "Shirt", null, null, now, now, "{}");
+        var offering = new FulfillmentOffering(Guid.NewGuid(), product.Id, "Provider", null, FulfillmentKind.FixedProvider, "Provider", null, now, now, "{}");
+        var area = new DesignArea(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 1200, 1400, null, now, now, "{}");
+        var style = new ArtworkStyle(Guid.NewGuid(), workspaceId, "Woodblock", "Carved bold forms", now, now);
+        var item = new Item(Guid.NewGuid(), store.Id, null, null, "Fox", null, ItemStatus.Draft, WorkflowStage.Design, false, now, now,
+            $"{{\"idea\":\"fox\",\"concept.idea\":\"clever fox\",\"phrase\":\"RUN WITH PURPOSE\",\"graphicDirection\":\"bold fox\",\"{FusionCanvas.Application.Items.ItemMetadataCodec.ArtworkStyleIdKey}\":\"{style.Id}\"}}");
+        var row = new DesignVariantRow(Guid.NewGuid(), item.Id, true, 0);
+        var first = new ArtworkStyleReference(Guid.NewGuid(), style.Id, "styles/first.png", "image/png", 0, now);
+        var second = new ArtworkStyleReference(Guid.NewGuid(), style.Id, "styles/second.jpg", "image/jpeg", 1, now);
+        var repo = new Repo(new WorkspaceSnapshot([store], [], [], [item], [], [], [], [], [])
+        {
+            StoreProducts = [product], FulfillmentOfferings = [offering], DesignAreas = [area],
+            ItemListingConfigurations = [new(item.Id, offering.Id)], DesignVariantRows = [row],
+            DesignVariantRowColors = [new(row.Id, "Black")], ArtworkStyles = [style], ArtworkStyleReferences = [first, second]
+        });
+        var files = new Files { Reads = new Dictionary<string, byte[]> { [first.WorkspaceRelativePath] = [1], [second.WorkspaceRelativePath] = [2] } };
+        var provider = new Provider();
+        var service = new ArtworkGenerationService(repo, files, new TestAiImageProvenanceCodec(), provider, new Normalizer(), () => now, Guid.NewGuid);
+        var model = new AiModelDescriptor("image/model", "Image", null, null, ["text"], ["image"], [], null, null, null, null, true, null);
+        var endpoint = new AiImageEndpointCapabilities("endpoint", model.Id, true, true, ["png"], [new(1200, 1400)], false,
+            Parameters: new AiImageEndpointParameterCapabilities([], [], true, true, ["opaque"], true, MaxInputReferences: 2));
+        var request = new ArtworkGenerationRequest(item.Id, area.Id, "secret", AiProfileSettings.Empty with { ModelId = model.Id }, [model], [endpoint], false);
+
+        var result = await service.GenerateAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded, result.Error);
+        Assert.Equal(new byte[] { 1, 2 }, provider.LastRequest!.InputReferences!.Select(reference => reference.ImageBytes[0]));
+        Assert.Equal(new[] { "image/png", "image/jpeg" }, provider.LastRequest.InputReferences!.Select(reference => reference.MediaType));
+        Assert.Contains("Style title (creative data): <<<Woodblock>>>", provider.LastRequest.Prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_UnsupportedStyleReferenceBlocksProviderDispatch()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var workspaceId = Guid.NewGuid();
+        var store = new Store(Guid.NewGuid(), workspaceId, "Store", null, false, now, now, "{}");
+        var product = new StoreProduct(Guid.NewGuid(), store.Id, "Shirt", null, null, now, now, "{}");
+        var offering = new FulfillmentOffering(Guid.NewGuid(), product.Id, "Provider", null, FulfillmentKind.FixedProvider, "Provider", null, now, now, "{}");
+        var area = new DesignArea(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 1200, 1400, null, now, now, "{}");
+        var style = new ArtworkStyle(Guid.NewGuid(), workspaceId, "Unsupported", "Unsupported file", now, now);
+        var item = new Item(Guid.NewGuid(), store.Id, null, null, "Fox", null, ItemStatus.Draft, WorkflowStage.Design, false, now, now,
+            $"{{\"idea\":\"fox\",\"concept.idea\":\"clever fox\",\"phrase\":\"RUN WITH PURPOSE\",\"graphicDirection\":\"bold fox\",\"{FusionCanvas.Application.Items.ItemMetadataCodec.ArtworkStyleIdKey}\":\"{style.Id}\"}}");
+        var row = new DesignVariantRow(Guid.NewGuid(), item.Id, true, 0);
+        var reference = new ArtworkStyleReference(Guid.NewGuid(), style.Id, "styles/unsupported.gif", "image/gif", 0, now);
+        var repository = new Repo(new WorkspaceSnapshot([store], [], [], [item], [], [], [], [], [])
+        {
+            StoreProducts = [product], FulfillmentOfferings = [offering], DesignAreas = [area],
+            ItemListingConfigurations = [new(item.Id, offering.Id)], DesignVariantRows = [row],
+            DesignVariantRowColors = [new(row.Id, "Black")], ArtworkStyles = [style], ArtworkStyleReferences = [reference]
+        });
+        var provider = new Provider();
+        var service = new ArtworkGenerationService(repository, new Files(), new TestAiImageProvenanceCodec(), provider, new Normalizer(), () => now, Guid.NewGuid);
+        var model = new AiModelDescriptor("image/model", "Image", null, null, ["text"], ["image"], [], null, null, null, null, true, null);
+        var endpoint = new AiImageEndpointCapabilities("endpoint", model.Id, true, true, ["png"], [new(1200, 1400)], false,
+            Parameters: new AiImageEndpointParameterCapabilities([], [], true, true, ["opaque"], true, MaxInputReferences: 1));
+        var request = new ArtworkGenerationRequest(item.Id, area.Id, "secret", AiProfileSettings.Empty with { ModelId = model.Id }, [model], [endpoint], false);
+
+        var result = await service.GenerateAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("style image format is not supported", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, provider.Calls);
+    }
     [Fact]
     public async Task GenerateAsync_EditSendsCurrentPngAndSeparateInstructionsThenPreservesBeforeImage()
     {
@@ -500,6 +572,7 @@ public sealed class ArtworkGenerationServiceTests
     {
         public Stream? SavedContent { get; private set; }
         public byte[] ReadBytes { get; init; } = [];
+        public IReadOnlyDictionary<string, byte[]> Reads { get; init; } = new Dictionary<string, byte[]>();
         public List<string> DeletedPaths { get; } = [];
         public Exception? SaveFailure { get; init; }
         public bool DeleteResult { get; init; } = true;
@@ -523,7 +596,7 @@ public sealed class ArtworkGenerationServiceTests
         }
         public Task<Stream> OpenReadAsync(string workspaceRelativePath, CancellationToken cancellationToken = default) =>
             OpenReadFailure is null
-                ? Task.FromResult<Stream>(new MemoryStream(ReadBytes, writable: false))
+                ? Task.FromResult<Stream>(new MemoryStream(Reads.GetValueOrDefault(workspaceRelativePath) ?? ReadBytes, writable: false))
                 : Task.FromException<Stream>(OpenReadFailure);
         public Task ExportCopyAsync(string workspaceRelativePath, string destinationPath, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }

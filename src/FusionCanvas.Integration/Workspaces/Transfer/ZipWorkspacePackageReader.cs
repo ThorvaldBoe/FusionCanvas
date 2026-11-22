@@ -124,6 +124,18 @@ public sealed class ZipWorkspacePackageReader : IWorkspacePackageReader
                 return WorkspacePackageReadResult.Failure("The workspace package data does not match its manifest.");
             }
 
+            var declaredPaths = manifest.Files.Select(file => ManagedWorkspacePath.Normalize(file.Path))
+                .Concat(manifest.MissingFiles.Select(ManagedWorkspacePath.Normalize))
+                .ToHashSet(StringComparer.Ordinal);
+            foreach (var reference in snapshot.ArtworkStyleReferences)
+            {
+                var normalizedPath = ManagedWorkspacePath.Normalize(reference.WorkspaceRelativePath);
+                if (!declaredPaths.Contains(normalizedPath)
+                    || !LocalWorkspaceFileStore.IsSupportedCreativeAssetPath(normalizedPath)
+                    || reference.MediaType is not ("image/png" or "image/jpeg" or "image/webp"))
+                    return WorkspacePackageReadResult.Failure("The workspace package contains an invalid artwork style reference.");
+            }
+
             var skippedUnsupported = new List<string>();
             var restorableFiles = new List<WorkspacePackageReadEntry>();
             foreach (var file in manifest.Files)

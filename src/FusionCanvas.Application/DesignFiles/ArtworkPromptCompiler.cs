@@ -29,6 +29,9 @@ public static class ArtworkPromptCompiler
         }
 
         var metadata = ItemMetadataCodec.ParseMetadata(item.MetadataJson);
+        var selectedStyle = Guid.TryParse(metadata.GetValueOrDefault(ItemMetadataCodec.ArtworkStyleIdKey), out var selectedStyleId)
+            ? snapshot.ArtworkStyles.SingleOrDefault(value => value.Id == selectedStyleId && value.WorkspaceId == snapshot.Stores.SingleOrDefault(store => store.Id == item.StoreId)?.WorkspaceId)
+            : null;
         var phrase = metadata.GetValueOrDefault(ItemMetadataCodec.PhraseKey) ?? string.Empty;
         var sll = metadata.GetValueOrDefault(ItemMetadataCodec.SllKey);
         var fingerprint = metadata.GetValueOrDefault(ItemMetadataCodec.SllSourceFingerprintKey);
@@ -58,7 +61,9 @@ public static class ArtworkPromptCompiler
             SllIsStale: isSllStale,
             NicheContext: BuildStoreNicheContext(snapshot, item),
             Contrast: contrast,
-            CompositionGuidance: composition));
+            CompositionGuidance: composition,
+            ArtworkStyleTitle: selectedStyle?.Title,
+            ArtworkStyleDescription: selectedStyle?.Description));
     }
 
     private static string? ReadCompositionGuidance(string? sll, string phrase)
@@ -111,7 +116,6 @@ public static class ArtworkPromptCompiler
             {
                 ("Audience", "audience"),
                 ("Humor style", "humorStyle"),
-                ("Visual style guidance", "visualStyleGuidance"),
                 ("Constraints", "constraints")
             })
             {
