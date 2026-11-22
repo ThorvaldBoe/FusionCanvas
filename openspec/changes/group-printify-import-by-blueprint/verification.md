@@ -11,17 +11,16 @@
 | Product-scoped Niche listing import and linked-listing Variant Setup compatibility | Existing `PrintifyListingImportServiceTests` and related Application/Integration suite; string product IDs retain `LoadSelectedProductsAsync` and `ApplySelectedCatalog`, while Store Editor uses the new integer Blueprint path | Passed |
 | Virtualized grid labels, tooltips, accessible names, and selection through row recycling | `StoreEditorHeadlessTests.PrintifyCatalogGridVirtualizesRowsAndPreservesAccessibleSelectionAcrossScrolling` and `PrintifyCatalogImportViewModelTests.ImportItemSummarizesBlueprintProvidersAndShopProducts` | Passed |
 | Mockup-template readiness rules remain separate | No template validation or readiness behavior was changed; the imported catalog includes all supported sellable Variants and existing template validation remains unchanged | Reviewed |
+| Paginated shop product options and color hex metadata replace grouped-import detail calls; progress covers scan and Provider pairs; local post-request failures identify mapping/save phase without raw bodies | `PrintifyCatalogClientTests.GroupsShopProductsByBlueprintAndLoadsFullCatalogVariantsForEveryUsedProvider` asserts no product-detail paths, one variants request per pair, counts, and preserved color hex; `PrintifyCatalogImportViewModelTests.ShowsScanProgressWhileShopProductsAreLoading`; `PrintifyCatalogImportServiceTests.RejectsDuplicateProviderPayloadWithoutSaving`, `RecordsLocalFailurePhaseAndSafeExceptionSummaryToTelemetry`, and `ReturnsSafeFailureWhenRepositorySaveFails`; `StoreEditorHeadlessTests.PrintifyImportPanelSupportsKeyboardCancelWithoutProviderImageControls` | Passed |
 
 ## Commands
 
-- `dotnet test .\tests\FusionCanvas.Application.Tests\FusionCanvas.Application.Tests.csproj --no-restore -p:UseSharedCompilation=false -m:1 -v:q` — passed, 724 tests.
-- `dotnet test .\tests\FusionCanvas.Integration.Tests\FusionCanvas.Integration.Tests.csproj --no-restore -p:UseSharedCompilation=false -m:1 -v:q` — passed, 462 tests.
-- `dotnet test .\tests\FusionCanvas.App.Tests\FusionCanvas.App.Tests.csproj --no-restore -p:UseSharedCompilation=false -m:1 -v:q` — passed, 1,042 tests, including Avalonia headless coverage.
-- `dotnet test .\FusionCanvas.sln --no-restore -p:UseSharedCompilation=false -m:1 -v:q` — passed; Domain 294, Application 724, Integration 465, App 1,042, and UI Description 29 tests (2,554 total) after rebasing onto current `main`.
-- `openspec validate group-printify-import-by-blueprint --strict` — passed.
+- `dotnet test .\FusionCanvas.sln` — passed against latest `main`; Domain 301, Application 741, Integration 473, App 1,056, and UI Description 29 tests (2,600 total).
+- `openspec validate group-printify-import-by-blueprint --type change --strict` — passed.
 
 ## Limitations and follow-up
 
 - Full sellable Variant import can expose many Colors and increase the number of mockup templates that need attention. Template validation and coverage policy were deliberately not changed; handle that concern in a separate change.
 - Earlier product-level catalog records remain intact alongside the canonical Blueprint records. This change does not merge or delete them.
 - A failed full-solution run during development exposed an outdated UI test expectation for the imported Blueprint display name. The expectation was updated to the current shop/catalog context and the final complete solution run passed.
+- The first full baseline after adding the progress label exposed a headless assertion that dereferenced nullable `TextBlock.Text`; the assertion now skips empty labels, and the complete rerun passed.

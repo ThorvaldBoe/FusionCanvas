@@ -22,6 +22,7 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged, IDi
     private bool _isOpen;
     private bool _isBusy;
     private string? _errorMessage;
+    private string? _progressMessage;
 
     public PrintifyCatalogImportViewModel(IPrintifyCatalogImportService service, Func<StoreCredentialScope?> scope, Func<StoreCredentialScope, CancellationToken, Task>? onImported = null)
     {
@@ -41,6 +42,7 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged, IDi
     public ICommand CancelCommand { get; }
     public bool IsOpen { get => _isOpen; private set => SetField(ref _isOpen, value); }
     public bool IsBusy { get => _isBusy; private set => SetField(ref _isBusy, value); }
+    public string? ProgressMessage { get => _progressMessage; private set => SetField(ref _progressMessage, value); }
     public Task PendingOperation { get; private set; } = Task.CompletedTask;
     public bool HasPendingOperations
     {
@@ -110,7 +112,9 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged, IDi
 
             IsBusy = true;
             ErrorMessage = null;
-            var result = await _service.LoadBlueprintsAsync(currentScope, cancellationToken).ConfigureAwait(true);
+            ProgressMessage = "Starting Printify shop scan…";
+            var progress = new Progress<PrintifyCatalogImportProgress>(value => UpdateProgress(operationVersion, value));
+            var result = await _service.LoadBlueprintsAsync(currentScope, cancellationToken, progress).ConfigureAwait(true);
             if (!CanPublish(operationVersion, currentScope)) return;
             if (!result.Succeeded) { ErrorMessage = result.Message; return; }
             foreach (var blueprint in result.ShopBlueprints ?? [])
@@ -137,6 +141,7 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged, IDi
             if (IsCurrentVersion(operationVersion))
             {
                 IsBusy = false;
+                ProgressMessage = null;
                 NotifyCommands();
             }
         }
@@ -153,9 +158,11 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged, IDi
         var cancellationToken = source.Token;
         IsBusy = true;
         ErrorMessage = null;
+        ProgressMessage = "Starting catalog import…";
         try
         {
-            var result = await _service.LoadSelectedAsync(scope, Blueprints.Where(item => item.IsSelected).Select(item => item.BlueprintId).ToArray(), cancellationToken).ConfigureAwait(true);
+            var progress = new Progress<PrintifyCatalogImportProgress>(value => UpdateProgress(operationVersion, value));
+            var result = await _service.LoadSelectedAsync(scope, Blueprints.Where(item => item.IsSelected).Select(item => item.BlueprintId).ToArray(), cancellationToken, progress).ConfigureAwait(true);
             if (!CanPublish(operationVersion, scope)) return;
             if (!result.Succeeded) { ErrorMessage = result.Message; return; }
             if (_onImported is not null && CanPublish(operationVersion, scope))
@@ -178,6 +185,7 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged, IDi
             if (IsCurrentVersion(operationVersion))
             {
                 IsBusy = false;
+                ProgressMessage = null;
                 NotifyCommands();
             }
         }
@@ -194,6 +202,7 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged, IDi
         finally
         {
             IsBusy = false;
+            ProgressMessage = null;
             IsOpen = false;
             ClearBlueprints();
             NotifyCommands();
@@ -205,6 +214,7 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged, IDi
         if (_isDisposed) return;
         InvalidateOperation();
         IsBusy = false;
+        ProgressMessage = null;
         IsOpen = false;
         ErrorMessage = null;
         NotifyCommands();
@@ -275,6 +285,20 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged, IDi
         OnPropertyChanged(nameof(HasError));
         OnPropertyChanged(nameof(CanStart));
         (ConfirmCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+    }
+
+    private void UpdateProgress(long operationVersion, PrintifyCatalogImportProgress progress)
+    {
+        if (!IsCurrentVersion(operationVersion) || !IsBusy || string.IsNullOrWhiteSpace(progress.Phase)) return;
+        ProgressMessage = progress.Completed is int completed && progress.Total is int total
+            ? progress.Phase switch
+            {
+                "Scanning shop products" => $"{completed} of {total} products processed",
+                "Loading Provider catalogs" => $"{completed} of {total} Provider catalogs loaded",
+                "Resolving shop Blueprints" => $"{completed} of {total} Blueprints resolved",
+                _ => $"{progress.Phase}: {completed} of {total}"
+            }
+            : $"{progress.Phase}…";
     }
 
     private Task TrackOperation(Task operation)

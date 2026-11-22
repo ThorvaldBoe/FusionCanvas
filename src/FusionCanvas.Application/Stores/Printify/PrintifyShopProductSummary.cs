@@ -6,4 +6,7 @@ public sealed record PrintifyShopProductSummary(
     string? Description,
     int BlueprintId,
     int ProviderId,
-    string? BlueprintName = null);
+    string? BlueprintName = null)
+{
+    public IReadOnlyList<PrintifyCatalogOption> Options { get; init; } = [];
+}

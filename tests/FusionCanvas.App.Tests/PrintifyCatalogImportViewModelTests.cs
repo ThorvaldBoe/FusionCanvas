@@ -38,6 +38,24 @@ public sealed class PrintifyCatalogImportViewModelTests
     }
 
     [Fact]
+    public async Task ShowsScanProgressWhileShopProductsAreLoading()
+    {
+        var scope = new StoreCredentialScope(Guid.NewGuid(), Guid.NewGuid());
+        var pending = new TaskCompletionSource<PrintifyCatalogResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var service = new StubService { ProgressBlueprintTask = pending.Task };
+        var viewModel = new PrintifyCatalogImportViewModel(service, () => scope);
+
+        viewModel.Open();
+        await WaitForAsync(() => viewModel.ProgressMessage == "4 of 12 products processed");
+
+        Assert.True(viewModel.IsBusy);
+        pending.SetResult(Loaded((68, "Tee")));
+        await WaitForAsync(() => !viewModel.IsBusy);
+
+        Assert.Null(viewModel.ProgressMessage);
+    }
+
+    [Fact]
     public async Task CancellingInFlightLoadReturnsToStableStateAndIgnoresLateResult()
     {
         var scope = new StoreCredentialScope(Guid.NewGuid(), Guid.NewGuid());
@@ -51,6 +69,9 @@ public sealed class PrintifyCatalogImportViewModelTests
 
         Assert.False(viewModel.IsBusy);
         Assert.False(viewModel.IsOpen);
+        service.LastProgress?.Report(new("Scanning shop products", 5, 20));
+        await Task.Yield();
+        Assert.Null(viewModel.ProgressMessage);
         pending.SetResult(Loaded((68, "Late")));
         await Task.Yield();
 
@@ -242,6 +263,7 @@ public sealed class PrintifyCatalogImportViewModelTests
     private sealed class StubService : IPrintifyCatalogImportService
     {
         public Task<PrintifyCatalogResult> BlueprintsTask { get; init; } = Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Empty, "empty", []));
+        public Task<PrintifyCatalogResult>? ProgressBlueprintTask { get; init; }
         public Queue<Task<PrintifyCatalogResult>>? BlueprintTasks { get; init; }
         public Func<CancellationToken, Task<PrintifyCatalogResult>>? BlueprintsOperation { get; set; }
         public WaitHandle? BlueprintsWaitHandle { get; set; }
@@ -250,12 +272,20 @@ public sealed class PrintifyCatalogImportViewModelTests
         public int SelectedCalls { get; private set; }
         public CancellationToken BlueprintsToken { get; private set; }
         public CancellationToken SelectedToken { get; private set; }
+        public IProgress<PrintifyCatalogImportProgress>? LastProgress { get; private set; }
 
         public Task<PrintifyCatalogResult> LoadBlueprintsAsync(StoreCredentialScope scope, CancellationToken cancellationToken = default)
         {
             BlueprintsToken = cancellationToken;
             return BlueprintsOperation?.Invoke(cancellationToken)
                 ?? (BlueprintTasks is null ? BlueprintsTask : BlueprintTasks.Dequeue());
+        }
+
+        public Task<PrintifyCatalogResult> LoadBlueprintsAsync(StoreCredentialScope scope, CancellationToken cancellationToken, IProgress<PrintifyCatalogImportProgress>? progress)
+        {
+            LastProgress = progress;
+            progress?.Report(new("Scanning shop products", 4, 12));
+            return ProgressBlueprintTask ?? LoadBlueprintsAsync(scope, cancellationToken);
         }
 
         public Task<PrintifyCatalogResult> LoadSelectedAsync(StoreCredentialScope scope, IReadOnlyCollection<int> blueprintIds, CancellationToken cancellationToken = default)

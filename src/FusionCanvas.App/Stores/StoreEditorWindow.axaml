@@ -539,6 +539,7 @@
                              TextWrapping="Wrap"
                              Foreground="{DynamicResource SecondaryTextBrush}" />
                   <ProgressBar IsVisible="{Binding IsBusy}" IsIndeterminate="True" Height="4" />
+                  <TextBlock IsVisible="{Binding IsBusy}" Text="{Binding ProgressMessage}" Classes="muted" />
                   <TextBlock IsVisible="{Binding !HasBlueprints}" Text="No products are available in the selected Printify shop to identify Blueprints." Foreground="{DynamicResource SecondaryTextBrush}" />
                   <virtualGrid:VirtualDataGrid x:Name="PrintifyBlueprintGrid"
                                                Classes="printifyBlueprintGrid"

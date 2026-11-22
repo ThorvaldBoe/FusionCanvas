@@ -19,11 +19,17 @@ public interface IPrintifyCatalogClient
         return result with { ShopBlueprints = blueprints };
     }
 
+    Task<PrintifyCatalogResult> LoadShopBlueprintsAsync(string key, int shopId, CancellationToken cancellationToken, IProgress<PrintifyCatalogImportProgress>? progress) =>
+        LoadShopBlueprintsAsync(key, shopId, cancellationToken);
+
     async Task<PrintifyCatalogResult> LoadSelectedBlueprintsAsync(string key, int shopId, IReadOnlyCollection<int> blueprintIds, CancellationToken cancellationToken = default)
     {
         var result = await LoadSelectedAsync(key, blueprintIds, cancellationToken).ConfigureAwait(false);
         return result with { SelectedProducts = result.SelectedCatalog };
     }
+
+    Task<PrintifyCatalogResult> LoadSelectedBlueprintsAsync(string key, int shopId, IReadOnlyCollection<int> blueprintIds, CancellationToken cancellationToken, IProgress<PrintifyCatalogImportProgress>? progress) =>
+        LoadSelectedBlueprintsAsync(key, shopId, blueprintIds, cancellationToken);
 
     async Task<PrintifyCatalogResult> LoadShopProductsAsync(string key, int shopId, CancellationToken cancellationToken = default)
     {
@@ -34,6 +40,9 @@ public interface IPrintifyCatalogClient
         };
     }
 
+    Task<PrintifyCatalogResult> LoadShopProductsAsync(string key, int shopId, CancellationToken cancellationToken, IProgress<PrintifyCatalogImportProgress>? progress) =>
+        LoadShopProductsAsync(key, shopId, cancellationToken);
+
     async Task<PrintifyCatalogResult> LoadSelectedProductsAsync(string key, int shopId, IReadOnlyCollection<string> productIds, CancellationToken cancellationToken = default)
     {
         var ids = productIds.Select(id => int.TryParse(id, out var value) ? value : -1).ToArray();
@@ -41,12 +50,21 @@ public interface IPrintifyCatalogClient
         return result with { SelectedProducts = result.SelectedCatalog };
     }
 
+    Task<PrintifyCatalogResult> LoadSelectedProductsAsync(string key, int shopId, IReadOnlyCollection<string> productIds, CancellationToken cancellationToken, IProgress<PrintifyCatalogImportProgress>? progress) =>
+        LoadSelectedProductsAsync(key, shopId, productIds, cancellationToken);
+
     Task<PrintifyCatalogResult> LoadBlueprintsAsync(
         string key,
         CancellationToken cancellationToken = default);
+
+    Task<PrintifyCatalogResult> LoadBlueprintsAsync(string key, CancellationToken cancellationToken, IProgress<PrintifyCatalogImportProgress>? progress) =>
+        LoadBlueprintsAsync(key, cancellationToken);
 
     Task<PrintifyCatalogResult> LoadSelectedAsync(
         string key,
         IReadOnlyCollection<int> blueprintIds,
         CancellationToken cancellationToken = default);
+
+    Task<PrintifyCatalogResult> LoadSelectedAsync(string key, IReadOnlyCollection<int> blueprintIds, CancellationToken cancellationToken, IProgress<PrintifyCatalogImportProgress>? progress) =>
+        LoadSelectedAsync(key, blueprintIds, cancellationToken);
 }

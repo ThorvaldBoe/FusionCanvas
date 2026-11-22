@@ -65,17 +65,11 @@ public sealed class PrintifyCatalogClientTests
             if (path.EndsWith("/variants.json", StringComparison.Ordinal))
                 providerVariantQueries.Add(request.RequestUri.Query);
             var body = path.EndsWith("/shops/42/products.json", StringComparison.Ordinal)
-                ? "{\"last_page\":1,\"data\":[{\"id\":\"product-a\",\"title\":\"Listing A\",\"blueprint_id\":68,\"print_provider_id\":9},{\"id\":\"product-b\",\"title\":\"Listing B\",\"blueprint_id\":68,\"print_provider_id\":9},{\"id\":\"product-c\",\"title\":\"Listing C\",\"blueprint_id\":68,\"print_provider_id\":10}]}"
+                ? "{\"last_page\":1,\"total\":3,\"data\":[{\"id\":\"product-a\",\"title\":\"Listing A\",\"blueprint_id\":68,\"print_provider_id\":9,\"options\":[{\"name\":\"Color\",\"type\":\"color\",\"values\":[{\"id\":1,\"title\":\"Black\",\"hex\":\"#111111\"},{\"id\":2,\"title\":\"White\"},{\"id\":6,\"title\":\"Red\"}]},{\"name\":\"Size\",\"type\":\"size\",\"values\":[{\"id\":3,\"title\":\"S\"},{\"id\":4,\"title\":\"M\"}]}]},{\"id\":\"product-b\",\"title\":\"Listing B\",\"blueprint_id\":68,\"print_provider_id\":9,\"options\":[{\"name\":\"Color\",\"type\":\"color\",\"values\":[{\"id\":1,\"title\":\"Black\",\"hex\":\"#111111\"},{\"id\":2,\"title\":\"White\"},{\"id\":6,\"title\":\"Red\"}]},{\"name\":\"Size\",\"type\":\"size\",\"values\":[{\"id\":3,\"title\":\"S\"},{\"id\":4,\"title\":\"M\"}]}]},{\"id\":\"product-c\",\"title\":\"Listing C\",\"blueprint_id\":68,\"print_provider_id\":10,\"options\":[{\"name\":\"Color\",\"type\":\"color\",\"values\":[{\"id\":5,\"title\":\"Navy\"}]}]}]}"
                 : path.EndsWith("/blueprints/68.json", StringComparison.Ordinal)
                     ? "{\"id\":68,\"title\":\"Tee\",\"brand\":\"Gildan\",\"model\":\"64000\"}"
                 : path.EndsWith("/blueprints/68/print_providers.json", StringComparison.Ordinal)
                     ? "[{\"id\":9,\"title\":\"SwiftPOD\"},{\"id\":10,\"title\":\"Gooten\"},{\"id\":11,\"title\":\"Unused Provider\"}]"
-                : path.EndsWith("/products/product-a.json", StringComparison.Ordinal)
-                    ? ProductDetail("product-a", "Listing A", 9, 101)
-                : path.EndsWith("/products/product-b.json", StringComparison.Ordinal)
-                    ? ProductDetail("product-b", "Listing B", 9, 102)
-                : path.EndsWith("/products/product-c.json", StringComparison.Ordinal)
-                    ? "{\"id\":\"product-c\",\"title\":\"Listing C\",\"blueprint_id\":68,\"print_provider_id\":10,\"options\":[{\"name\":\"Color\",\"type\":\"color\",\"values\":[{\"id\":5,\"title\":\"Navy\"}]}],\"variants\":[{\"id\":201,\"title\":\"Navy\",\"options\":[5],\"is_enabled\":true,\"is_available\":true}],\"print_areas\":[]}"
                 : path.EndsWith("/print_providers/9/variants.json", StringComparison.Ordinal)
                     ? "{\"variants\":[{\"id\":101,\"title\":\"Black / S\",\"options\":[1,3],\"is_enabled\":true,\"is_available\":true,\"placeholders\":[]},{\"id\":102,\"title\":\"White / M\",\"options\":[2,4],\"is_enabled\":true,\"is_available\":true,\"placeholders\":[]},{\"id\":103,\"title\":\"Red / S\",\"options\":[6,3],\"is_enabled\":true,\"is_available\":false,\"placeholders\":[]},{\"id\":104,\"title\":\"Black / XL\",\"options\":[1,7],\"is_enabled\":false,\"is_available\":true,\"placeholders\":[]}]}"
                 : path.EndsWith("/print_providers/10/variants.json", StringComparison.Ordinal)
@@ -86,9 +80,11 @@ public sealed class PrintifyCatalogClientTests
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body) });
         })) { BaseAddress = PrintifyCatalogClient.ApiBaseUri };
         var catalog = new PrintifyCatalogClient(client);
+        var progressEvents = new List<PrintifyCatalogImportProgress>();
+        var progress = new InlineProgress<PrintifyCatalogImportProgress>(progressEvents.Add);
 
         var choices = await catalog.LoadShopBlueprintsAsync("synthetic-key", 42, TestContext.Current.CancellationToken);
-        var result = await catalog.LoadSelectedBlueprintsAsync("synthetic-key", 42, [68], TestContext.Current.CancellationToken);
+        var result = await catalog.LoadSelectedBlueprintsAsync("synthetic-key", 42, [68], TestContext.Current.CancellationToken, progress);
 
         Assert.True(choices.Succeeded, choices.Message);
         var choice = Assert.Single(choices.ShopBlueprints!);
@@ -117,6 +113,10 @@ public sealed class PrintifyCatalogClientTests
         Assert.Contains("/v1/catalog/blueprints/68/print_providers/9/variants.json", requests);
         Assert.Contains("/v1/catalog/blueprints/68/print_providers/10/variants.json", requests);
         Assert.Equal(["?show-out-of-stock=1", "?show-out-of-stock=1"], providerVariantQueries);
+        Assert.DoesNotContain(requests, request => request.Contains("/products/product-", StringComparison.Ordinal));
+        Assert.Equal(2, requests.Count(request => request.EndsWith("/variants.json", StringComparison.Ordinal)));
+        Assert.Contains(progressEvents, value => value.Phase == "Scanning shop products" && value.Completed == 3 && value.Total == 3);
+        Assert.Contains(progressEvents, value => value.Phase == "Loading Provider catalogs" && value.Completed == 2 && value.Total == 2);
     }
 
     private static string ProductDetail(string id, string title, int providerId, int variantId) =>
@@ -407,5 +407,10 @@ public sealed class PrintifyCatalogClientTests
     private sealed class Handler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => send(request, cancellationToken);
+    }
+
+    private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
+    {
+        public void Report(T value) => report(value);
     }
 }

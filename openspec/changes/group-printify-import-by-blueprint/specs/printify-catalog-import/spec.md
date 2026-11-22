@@ -123,3 +123,23 @@ The Store Editor SHALL present each distinct Blueprint discovered from the selec
 - **WHEN** a Blueprint name or Provider summary is too long to fit in a fixed-height row
 - **THEN** the visible text may be trimmed with an ellipsis
 - **AND** the complete value is available from its tooltip and the checkbox accessible name
+
+### Requirement: Printify catalog retrieval and import report progress
+The Store Editor SHALL show phase-aware progress while retrieving the selected shop's paginated products, resolving Blueprint and Provider catalogs, preparing local catalog changes, and saving the import. Product scanning progress SHALL report the number of products scanned and the total when Printify supplies it. Provider-catalog progress SHALL report completed and total selected Blueprint/Provider pairs. A failed post-request import SHALL record a safe diagnostic event containing the failing local phase and exception summary in the existing technical telemetry monitor; it SHALL NOT include credentials, authorization headers, or raw provider response bodies.
+
+#### Scenario: Shop products are scanned from paginated responses
+- **WHEN** the selected Printify shop contains many products
+- **THEN** each product's Blueprint ID, Provider ID, and available Option/value definitions are read from the paginated product response
+- **AND** the importer does not issue a separate product-detail request for every product solely to retrieve Option/value definitions
+- **AND** progress reports the number of products scanned and total products when available
+
+#### Scenario: Selected Provider catalogs are loaded
+- **WHEN** the user confirms one or more Blueprints
+- **THEN** progress reports completion across the distinct selected Blueprint/Provider pairs
+- **AND** each pair's authoritative catalog Variant and Placeholder data is retrieved once for the import
+
+#### Scenario: Local import fails after successful provider requests
+- **WHEN** provider requests succeed but snapshot mapping or persistence fails
+- **THEN** the user sees a safe recoverable failure message
+- **AND** the technical telemetry monitor records the local failure phase and sanitized exception summary
+- **AND** no imported catalog records are partially committed

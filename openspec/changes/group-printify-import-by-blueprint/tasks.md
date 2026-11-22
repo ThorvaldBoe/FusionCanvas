@@ -24,3 +24,11 @@
 - [x] 4.2 Run the focused Integration, Application, persistence, ViewModel, and headless Store Editor checks; correct failures and rerun affected checks.
 - [x] 4.3 Run `dotnet test .\FusionCanvas.sln` and strict `openspec validate`; record results in `verification.md`.
 - [x] 4.4 Review changed-scope behavior, UI safety, Store scoping, persistence identity, and compatibility with the separate Niche-level Printify listing import and linked-listing Variant Setup; update artifacts for any accepted correction.
+
+## 5. Paginated product reuse, progress, and diagnostics
+
+- [x] 5.1 Parse and retain shop-product Option/value definitions from paginated list responses; remove the grouped Store import's per-product detail requests while preserving product-scoped listing import and Variant Setup behavior.
+- [x] 5.2 Add phase/count progress contracts across product scanning, selected Blueprint/Provider catalog retrieval, local preparation, and saving; show progress text beside the existing busy indicator.
+- [x] 5.3 Record sanitized post-request failure phase and exception diagnostics in technical telemetry; preserve safe user messaging and atomic persistence.
+- [x] 5.4 Add focused Integration, Application, and Avalonia headless coverage for request counts, product scan progress, provider-pair progress, failure diagnostics, cancellation, and message visibility.
+- [x] 5.5 Update criterion-level verification, run focused checks, the full solution baseline, strict OpenSpec validation, and changed-scope review.
