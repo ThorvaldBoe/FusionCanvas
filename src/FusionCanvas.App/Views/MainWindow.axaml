@@ -61,7 +61,7 @@
                 AutomationProperties.Name="Update available"
                 AutomationProperties.AutomationId="Updates.Available"
                 Classes="utilityRailButton">
-          <PathIcon Data="M12,3 V15 M7,10 L12,15 L17,10 M4,20 H20"
+          <PathIcon Data="M11,2 H13 V11.17 L15.59,8.59 L17,10 L12,15 L7,10 L8.41,8.59 L11,11.17 Z M4,14 H6 V18 H18 V14 H20 V20 H4 Z"
                     Width="18" Height="18"
                     Foreground="{DynamicResource StrongTextBrush}" />
         </Button>
@@ -2710,6 +2710,8 @@
       <Setter Property="Height" Value="40" />
       <Setter Property="Padding" Value="0" />
       <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Foreground" Value="{DynamicResource StrongTextBrush}" />
       <Setter Property="BorderThickness" Value="0" />
