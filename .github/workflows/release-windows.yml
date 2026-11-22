@@ -136,9 +136,9 @@ jobs:
 
       - name: Verify release bundle with the in-app verifier
         env:
-          FUSIONCANVAS_RELEASE_MANIFEST: artifacts\${{ steps.release-assets.outputs.manifest }}
-          FUSIONCANVAS_RELEASE_INSTALLER: artifacts\${{ steps.release-assets.outputs.installer }}
-          FUSIONCANVAS_RELEASE_BUNDLE: artifacts\${{ steps.release-assets.outputs.installer }}.sigstore.json
+          FUSIONCANVAS_RELEASE_MANIFEST: ${{ github.workspace }}\artifacts\${{ steps.release-assets.outputs.manifest }}
+          FUSIONCANVAS_RELEASE_INSTALLER: ${{ github.workspace }}\artifacts\${{ steps.release-assets.outputs.installer }}
+          FUSIONCANVAS_RELEASE_BUNDLE: ${{ github.workspace }}\artifacts\${{ steps.release-assets.outputs.installer }}.sigstore.json
         shell: pwsh
         run: |
           $resultsDirectory = "artifacts\verification-results"
