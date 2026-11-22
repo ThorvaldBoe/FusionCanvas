@@ -491,7 +491,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
 
     public void ConfigurePrintify(FusionCanvas.Application.Stores.Printify.IStorePrintifyCredentialStore credentials,
         FusionCanvas.Application.Stores.Printify.IPrintifyCredentialVerifier verifier,
-        FusionCanvas.Application.Stores.Printify.IPrintifyCatalogClient? catalogClient = null)
+        FusionCanvas.Application.Stores.Printify.IPrintifyCatalogClient? catalogClient = null,
+        FusionCanvas.Application.Telemetry.ITelemetryRecorder? telemetry = null)
     {
         if (_isDisposed)
         {
@@ -513,7 +514,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
         PrintifyCredentials = new(new FusionCanvas.Application.Stores.Printify.StorePrintifyConfigurationService(_service, credentials, verifier));
         PrintifyCatalogImport = catalogClient is null
             ? null
-            : new FusionCanvas.Application.Stores.Printify.PrintifyCatalogImportService(_service, credentials, catalogClient, _workspaceRepository);
+            : new FusionCanvas.Application.Stores.Printify.PrintifyCatalogImportService(_service, credentials, catalogClient, _workspaceRepository, telemetry: telemetry);
         PrintifyCatalogImportSession = PrintifyCatalogImport is null
             ? null
             : new PrintifyCatalogImportViewModel(PrintifyCatalogImport, () =>

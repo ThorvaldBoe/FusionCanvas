@@ -79,7 +79,7 @@ public partial class MainWindow : Window
             cancellationToken: cancellationToken);
         _itemCsvImportCodec = services.ItemCsvImportCodec;
         if (services.PrintifyCredentials is { } printifyCredentials && services.PrintifyVerifier is { } printifyVerifier && services.PrintifyCatalogClient is { } catalogClient)
-            viewModel.StoreManagement.ConfigurePrintify(printifyCredentials, printifyVerifier, catalogClient);
+            viewModel.StoreManagement.ConfigurePrintify(printifyCredentials, printifyVerifier, catalogClient, services.Telemetry);
         viewModel.WorkspaceManagement.PackagePicker = new AvaloniaWorkspacePackagePicker(StorageProvider);
         viewModel.Settings.Telemetry.SetExportFilePicker(new AvaloniaTelemetryExportFilePicker(StorageProvider));
         viewModel.WorkspaceTree.FilePicker = new FusionCanvas.App.Items.AvaloniaItemCsvFilePicker(StorageProvider);

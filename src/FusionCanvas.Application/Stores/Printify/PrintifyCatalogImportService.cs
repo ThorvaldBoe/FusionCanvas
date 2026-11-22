@@ -15,7 +15,8 @@ public sealed class PrintifyCatalogImportService(
     IPrintifyCatalogClient client,
     IWorkspaceRepository? repository = null,
     Func<DateTimeOffset>? clock = null,
-    Func<Guid>? newId = null) : IPrintifyCatalogImportService
+    Func<Guid>? newId = null,
+    ITelemetryRecorder? telemetry = null) : IPrintifyCatalogImportService
 {
     private readonly Func<DateTimeOffset> _clock = clock ?? (() => DateTimeOffset.UtcNow);
     private readonly Func<Guid> _newId = newId ?? Guid.NewGuid;
@@ -24,20 +25,30 @@ public sealed class PrintifyCatalogImportService(
         new(PrintifyCatalogResultKind.InvalidRequest, "Save an active Printify Store with a selected Printify shop first.");
 
     public Task<PrintifyCatalogResult> LoadBlueprintsAsync(StoreCredentialScope scope, CancellationToken cancellationToken = default) =>
-        ExecuteAsync(scope, (key, shopId, token) => client.LoadShopBlueprintsAsync(key, shopId, token), cancellationToken, blueprintScoped: true);
+        LoadBlueprintsAsync(scope, cancellationToken, null);
 
-    public Task<PrintifyCatalogResult> LoadSelectedAsync(StoreCredentialScope scope, IReadOnlyCollection<string> productIds, CancellationToken cancellationToken = default) =>
+    public Task<PrintifyCatalogResult> LoadBlueprintsAsync(StoreCredentialScope scope, CancellationToken cancellationToken = default, IProgress<PrintifyCatalogImportProgress>? progress = null) =>
+        ExecuteAsync(scope, (key, shopId, token) => client.LoadShopBlueprintsAsync(key, shopId, token, progress), cancellationToken, progress, blueprintScoped: true);
+
+    public Task<PrintifyCatalogResult> LoadSelectedAsync(StoreCredentialScope scope, IReadOnlyCollection<string> productIds, CancellationToken cancellationToken = default, IProgress<PrintifyCatalogImportProgress>? progress = null) =>
         productIds is null || productIds.Count == 0 || productIds.Any(string.IsNullOrWhiteSpace)
             ? Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.InvalidRequest, "Select at least one valid product."))
-            : ExecuteAsync(scope, (key, shopId, token) => client.LoadSelectedProductsAsync(key, shopId, productIds, token), cancellationToken, blueprintScoped: false);
+            : ExecuteAsync(scope, (key, shopId, token) => client.LoadSelectedProductsAsync(key, shopId, productIds, token, progress), cancellationToken, progress, blueprintScoped: false);
+
+    public Task<PrintifyCatalogResult> LoadSelectedAsync(StoreCredentialScope scope, IReadOnlyCollection<string> productIds, CancellationToken cancellationToken = default) =>
+        LoadSelectedAsync(scope, productIds, cancellationToken, null);
 
     public Task<PrintifyCatalogResult> LoadSelectedAsync(StoreCredentialScope scope, IReadOnlyCollection<int> blueprintIds, CancellationToken cancellationToken = default) =>
-        ExecuteAsync(scope, (key, shopId, token) => client.LoadSelectedBlueprintsAsync(key, shopId, blueprintIds, token), cancellationToken, blueprintScoped: true);
+        LoadSelectedAsync(scope, blueprintIds, cancellationToken, null);
+
+    public Task<PrintifyCatalogResult> LoadSelectedAsync(StoreCredentialScope scope, IReadOnlyCollection<int> blueprintIds, CancellationToken cancellationToken = default, IProgress<PrintifyCatalogImportProgress>? progress = null) =>
+        ExecuteAsync(scope, (key, shopId, token) => client.LoadSelectedBlueprintsAsync(key, shopId, blueprintIds, token, progress), cancellationToken, progress, blueprintScoped: true);
 
     private async Task<PrintifyCatalogResult> ExecuteAsync(
         StoreCredentialScope scope,
         Func<string, int, CancellationToken, Task<PrintifyCatalogResult>> operation,
         CancellationToken cancellationToken,
+        IProgress<PrintifyCatalogImportProgress>? progress,
         bool blueprintScoped)
     {
         var store = await stores.ResolveActiveStoreAsync(scope.WorkspaceId, scope.StoreId, cancellationToken).ConfigureAwait(false);
@@ -46,10 +57,12 @@ public sealed class PrintifyCatalogImportService(
         var read = await credentials.ReadAsync(scope, cancellationToken).ConfigureAwait(false);
         if (read.Status.Kind != PrintifyConfigurationKind.Available || string.IsNullOrWhiteSpace(read.Secret))
             return new(PrintifyCatalogResultKind.InvalidKey, "Add and verify a Printify key before loading the catalog.");
+        progress?.Report(new("Connecting to Printify"));
         var result = await operation(read.Secret, store.Context.PrintifyShopId.Value, cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded || repository is null || result.SelectedProducts is null)
             return result;
 
+        var failurePhase = "revalidating Store context";
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -60,11 +73,16 @@ public sealed class PrintifyCatalogImportService(
                 || !FulfillmentStrategyPolicy.RequiresPrintifyKey(currentStore.FulfillmentStrategy)
                 || currentStore.Context.PrintifyShopId != store.Context.PrintifyShopId)
                 return InvalidContext;
+            failurePhase = "loading the local workspace snapshot";
             var snapshot = await repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+            progress?.Report(new("Preparing local catalog changes"));
+            failurePhase = "mapping Printify catalog data into the local snapshot";
             var synchronized = blueprintScoped
                 ? ApplySelectedBlueprintCatalog(snapshot, scope.StoreId, result.SelectedProducts, _clock, _newId)
                 : ApplySelectedCatalog(snapshot, scope.StoreId, result.SelectedProducts, _clock, _newId);
             var (created, updated) = CountChanges(snapshot, synchronized);
+            progress?.Report(new("Saving local catalog changes"));
+            failurePhase = "saving the local workspace snapshot";
             await repository.SaveAsync(synchronized, cancellationToken).ConfigureAwait(false);
             return result with
             {
@@ -76,7 +94,8 @@ public sealed class PrintifyCatalogImportService(
         catch (InvalidOperationException exception)
         {
             TechnicalDiagnostics.RecordFailure("Printify catalog import", exception);
-            return new(PrintifyCatalogResultKind.UnexpectedResponse, $"Printify catalog data could not be imported safely: {exception.Message}");
+            await RecordFailureAsync(telemetry, failurePhase, exception, cancellationToken).ConfigureAwait(false);
+            return new(PrintifyCatalogResultKind.UnexpectedResponse, "Printify catalog data could not be imported safely. No imported records were committed.");
         }
         catch (OperationCanceledException)
         {
@@ -85,7 +104,27 @@ public sealed class PrintifyCatalogImportService(
         catch (Exception exception)
         {
             TechnicalDiagnostics.RecordFailure("Printify catalog import", exception);
+            await RecordFailureAsync(telemetry, failurePhase, exception, cancellationToken).ConfigureAwait(false);
             return new(PrintifyCatalogResultKind.UnexpectedResponse, "Printify catalog data could not be saved safely. No imported records were committed.");
+        }
+    }
+
+    private static async Task RecordFailureAsync(ITelemetryRecorder? telemetry, string phase, Exception exception, CancellationToken cancellationToken)
+    {
+        if (telemetry is null) return;
+        try
+        {
+            var request = new TelemetryEventRequest(
+                "Application.Printify",
+                "CatalogImportFailed",
+                "Error",
+                "Failed",
+                $"Catalog import failed while {phase}: {exception.GetType().Name}: {exception.Message}");
+            await telemetry.RecordAsync(TelemetrySecretRedactor.Sanitize(request), cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            // Diagnostics must never replace the recoverable import result.
         }
     }
 

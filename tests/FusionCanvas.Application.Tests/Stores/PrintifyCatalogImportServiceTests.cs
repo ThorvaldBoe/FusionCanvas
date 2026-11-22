@@ -4,6 +4,7 @@ using FusionCanvas.Application.Stores;
 using FusionCanvas.Application.Stores.Printify;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Application.Telemetry;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Mockups;
 using FusionCanvas.Domain.Products;
@@ -211,6 +212,39 @@ public sealed class PrintifyCatalogImportServiceTests
         Assert.Contains(messages, message =>
             message.Contains("Printify catalog import", StringComparison.Ordinal)
             && message.Contains(nameof(IOException), StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task RecordsLocalFailurePhaseAndSafeExceptionSummaryToTelemetry()
+    {
+        var store = TestStore();
+        var repository = TestRepository(store);
+        repository.SaveException = new IOException("simulated persistence failure, token=synthetic-secret");
+        var telemetry = new RecordingTelemetry();
+        var client = new ClientStub
+        {
+            SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [Product("product-a", "Tee")])
+        };
+        var service = new PrintifyCatalogImportService(
+            new StoresStub(store),
+            new CredentialsStub { Result = new(new(PrintifyConfigurationKind.Available, "available"), "key") },
+            client,
+            repository,
+            telemetry: telemetry);
+
+        var result = await service.LoadSelectedAsync(new(store.WorkspaceId, store.Id), [68], TestContext.Current.CancellationToken);
+
+        Assert.Equal(PrintifyCatalogResultKind.UnexpectedResponse, result.Kind);
+        Assert.Equal("Printify catalog data could not be saved safely. No imported records were committed.", result.Message);
+        var diagnostic = Assert.Single(telemetry.Events);
+        Assert.Equal("Application.Printify", diagnostic.Area);
+        Assert.Equal("CatalogImportFailed", diagnostic.Name);
+        Assert.Contains("saving the local workspace snapshot", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(IOException), diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("token=[REDACTED]", diagnostic.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("synthetic-secret", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(diagnostic.RequestBody);
+        Assert.Null(diagnostic.ResponseBody);
     }
 
     [Fact]
@@ -439,12 +473,15 @@ public sealed class PrintifyCatalogImportServiceTests
         {
             SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [new(new(68, "Tee", null, "Brand", "Model"), [duplicateProvider, duplicateProvider])])
         };
-        var service = new PrintifyCatalogImportService(new StoresStub(store), new CredentialsStub { Result = new(new(PrintifyConfigurationKind.Available, "available"), "key") }, client, repository);
+        var telemetry = new RecordingTelemetry();
+        var service = new PrintifyCatalogImportService(new StoresStub(store), new CredentialsStub { Result = new(new(PrintifyConfigurationKind.Available, "available"), "key") }, client, repository, telemetry: telemetry);
 
         var result = await service.LoadSelectedAsync(new(store.WorkspaceId, store.Id), [68], TestContext.Current.CancellationToken);
 
         Assert.Equal(PrintifyCatalogResultKind.UnexpectedResponse, result.Kind);
-        Assert.Contains("duplicate provider identities", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Printify catalog data could not be imported safely. No imported records were committed.", result.Message);
+        Assert.Contains("mapping Printify catalog data", Assert.Single(telemetry.Events).Message, StringComparison.Ordinal);
+        Assert.Contains("duplicate provider identities", telemetry.Events[0].Message, StringComparison.OrdinalIgnoreCase);
         Assert.Empty(repository.Snapshot.Blueprints);
         Assert.Empty(repository.Snapshot.PrintProviders);
     }
@@ -611,6 +648,17 @@ public sealed class PrintifyCatalogImportServiceTests
         public PrintifyCredentialReadResult Result { get; init; } = new(new(PrintifyConfigurationKind.Missing, "missing"));
         public Task<PrintifyCredentialReadResult> ReadAsync(StoreCredentialScope scope, CancellationToken cancellationToken = default) { Reads++; return Task.FromResult(Result); }
         public Task<PrintifyConfigurationResult> SaveAsync(StoreCredentialScope scope, string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    }
+
+    private sealed class RecordingTelemetry : ITelemetryRecorder
+    {
+        public bool IsCaptureEnabled => true;
+        public List<TelemetryEventRequest> Events { get; } = [];
+        public Task RecordAsync(TelemetryEventRequest request, CancellationToken cancellationToken = default)
+        {
+            Events.Add(request);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class ClientStub : IPrintifyCatalogClient

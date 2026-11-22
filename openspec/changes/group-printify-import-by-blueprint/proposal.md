@@ -7,6 +7,9 @@ The Store Editor's Printify import currently presents each product created in th
 - Group the selected Printify shop's products by stable Blueprint identity and present each distinct Blueprint once for selection.
 - For each selected Blueprint, import the distinct Print Providers used by that Blueprint in the selected shop.
 - For each imported Blueprint/Provider offering, import the provider's complete supported sellable Variant set and corresponding Option choices, using Printify's explicit combinations rather than generating combinations from option values.
+- Reuse option/value data already present in the paginated shop-product response instead of fetching each product a second time.
+- Show phase-aware import progress, including the number of shop products scanned, Provider catalogs loaded, and local save activity.
+- Record a user-visible, secret-redacted diagnostic event when local preparation or persistence fails after successful provider requests.
 - Keep the workflow in the Store Editor's Catalog & mockups surface and preserve Store scoping, explicit confirmation, cancellation, and draft-safety behavior.
 - Keep mockup-template readiness rules out of this module. Full variant coverage may increase template setup work; template validation and coverage are a separate follow-up.
 - Do not automatically merge or delete existing local catalog records created by earlier product-level imports.

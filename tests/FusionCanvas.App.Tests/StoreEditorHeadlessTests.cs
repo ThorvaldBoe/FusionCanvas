@@ -113,7 +113,7 @@ public class StoreEditorHeadlessTests
         Assert.True(IsEffectivelyVisible(panel!));
         Assert.NotNull(window.FindControl<VirtualDataGrid>("PrintifyBlueprintGrid"));
         Assert.Contains(panel!.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "Gildan 64000");
-        Assert.Contains(panel.GetVisualDescendants().OfType<TextBlock>(), text => text.Text!.Contains("Loading Spinner T-shirt | Minimal Tech Graphic", StringComparison.Ordinal));
+        Assert.Contains(panel.GetVisualDescendants().OfType<TextBlock>(), text => text.Text?.Contains("Loading Spinner T-shirt | Minimal Tech Graphic", StringComparison.Ordinal) == true);
         Assert.Empty(panel!.GetVisualDescendants().OfType<Image>());
         panel.Focus();
         Assert.True(panel.IsFocused);
