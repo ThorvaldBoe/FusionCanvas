@@ -125,7 +125,7 @@ None remain for product behavior in this module. During implementation, confirm 
 - Colors belong to Listing; artwork variants belong to Design.
 - Blueprint Offering and fixed Provider remain selected in Design for Design Area identity. Listing cannot switch provider.
 - Favorite scope is one Blueprint Offering; favorite is a shortcut, not an Item selection.
-- **More Options** selection is per Item. Row preview and inclusion are separate interactions.
+- **More Options** shows the complete active configured Color collection, including favorites. Favorite Colors remain the compact primary path; dialog selection is per Item, and row preview and inclusion are separate interactions.
 - Selecting a Color includes all active provider-enabled configured Sizes, including out-of-stock Variants.
 - First artwork variant is assigned to newly selected Colors; other assignments are explicit per Color.
 - Flat approximate swatches are sufficient; no fabric/heather simulation is included.
