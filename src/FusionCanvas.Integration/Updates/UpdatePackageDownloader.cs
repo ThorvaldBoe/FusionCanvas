@@ -35,14 +35,17 @@ public sealed class UpdatePackageDownloader : IUpdatePackageDownloader
             throw new InvalidOperationException("The update manifest is not supported by this application.");
         }
 
-        var temporaryPath = Path.Combine(_downloadDirectory, $"FusionCanvas-{Guid.NewGuid():N}.download");
-        var temporaryBundlePath = Path.Combine(_downloadDirectory, $"FusionCanvas-{Guid.NewGuid():N}.bundle.download");
+        var temporaryDirectory = Path.Combine(_downloadDirectory, $".download-{Guid.NewGuid():N}");
+        var installerFileName = Path.GetFileName(manifest.InstallerUri.LocalPath);
+        var temporaryPath = Path.Combine(temporaryDirectory, installerFileName);
+        var temporaryBundlePath = Path.Combine(temporaryDirectory, $"{installerFileName}.sigstore.json");
         var installerPath = Path.Combine(_downloadDirectory, $"FusionCanvas-{manifest.ProductVersion}-Setup.exe");
 
         var stage = "installer-download";
         try
         {
             Directory.CreateDirectory(_downloadDirectory);
+            Directory.CreateDirectory(temporaryDirectory);
             using var request = new HttpRequestMessage(HttpMethod.Get, manifest.InstallerUri);
             using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
                 .ConfigureAwait(false);
@@ -127,6 +130,7 @@ public sealed class UpdatePackageDownloader : IUpdatePackageDownloader
             TryDelete(temporaryPath);
             TryDelete(temporaryBundlePath);
             TryDelete(installerPath);
+            TryDeleteDirectory(temporaryDirectory);
             throw;
         }
         catch (Exception exception)
@@ -135,6 +139,7 @@ public sealed class UpdatePackageDownloader : IUpdatePackageDownloader
             TryDelete(temporaryPath);
             TryDelete(temporaryBundlePath);
             TryDelete(installerPath);
+            TryDeleteDirectory(temporaryDirectory);
             throw;
         }
     }
@@ -146,6 +151,23 @@ public sealed class UpdatePackageDownloader : IUpdatePackageDownloader
             if (File.Exists(path))
             {
                 File.Delete(path);
+            }
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
+
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
+            {
+                Directory.Delete(path, recursive: true);
             }
         }
         catch (IOException)
