@@ -85,6 +85,12 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         var hasDefaultRowWithSelectedColor = row is not null;
 
         var metadata = ItemMetadataCodec.ParseMetadata(item.MetadataJson);
+        var selectedStyle = Guid.TryParse(metadata.GetValueOrDefault(ItemMetadataCodec.ArtworkStyleIdKey), out var styleId)
+            ? snapshot.ArtworkStyles.SingleOrDefault(value => value.Id == styleId && value.WorkspaceId == snapshot.Stores.SingleOrDefault(store => store.Id == item.StoreId)?.WorkspaceId)
+            : null;
+        var styleReferences = selectedStyle is null
+            ? []
+            : snapshot.ArtworkStyleReferences.Where(value => value.StyleId == selectedStyle.Id).OrderBy(value => value.SortOrder).ToArray();
         var designTriangleComplete = DesignTriangleScore.FromValues(
             metadata.GetValueOrDefault(ItemMetadataCodec.ConceptIdeaKey),
             metadata.GetValueOrDefault(ItemMetadataCodec.PhraseKey),
@@ -98,7 +104,7 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         var selection = resolution.Availability == AiConfigurationAvailability.Ready
             && request.ArtworkProfile.ModelId is { Length: > 0 } modelId
             && area is not null
-            ? AiImageEndpointPolicy.SelectEndpoint(request.Endpoints, modelId, request.RequireZeroDataRetention,
+            ? AiImageEndpointPolicy.SelectEndpoint(request.EditExistingArtwork ? request.Endpoints : EndpointsForStyleReferences(request.Endpoints, styleReferences.Length), modelId, request.RequireZeroDataRetention,
                 request.TransparentBackground, area.Size, request.EditExistingArtwork)
             : null;
         var readiness = ArtworkGenerationReadinessPolicy.Evaluate(
@@ -110,7 +116,12 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
             designTriangleComplete,
             hasDefaultRowWithSelectedColor);
         if (!readiness.IsReady)
+        {
+            if (!request.EditExistingArtwork && styleReferences.Length > 0 && !request.Endpoints.Any(endpoint =>
+                    endpoint.ModelId == request.ArtworkProfile.ModelId && (endpoint.Parameters?.MaxInputReferences ?? 0) >= styleReferences.Length))
+                return DesignStageResult.Failure($"The selected image model cannot accept all {styleReferences.Length} reference images in this style. Choose a model with a higher image-reference limit or select another style.");
             return DesignStageResult.Failure(readiness.Blockers[0]);
+        }
 
         var readyArea = area!;
         var readySelection = selection!;
@@ -140,6 +151,20 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
             }
 
             inputReferences = [await ReadInputReferenceAsync(sourceArtwork, cancellationToken).ConfigureAwait(false)];
+        }
+        else if (styleReferences.Length > 0)
+        {
+            try
+            {
+                var references = new List<AiImageInputReference>(styleReferences.Length);
+                foreach (var reference in styleReferences)
+                    references.Add(await ReadStyleInputReferenceAsync(reference, cancellationToken).ConfigureAwait(false));
+                inputReferences = references;
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException or ArgumentException or InvalidOperationException or NotSupportedException)
+            {
+                return DesignStageResult.Failure($"A reference image in the selected style is unavailable for generation. {exception.Message}");
+            }
         }
 
         var prompt = request.EditExistingArtwork
@@ -327,6 +352,16 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
             return false;
         }
 
+        var expectedStyleId = Guid.TryParse(ItemMetadataCodec.ParseMetadata(expectedItem.MetadataJson).GetValueOrDefault(ItemMetadataCodec.ArtworkStyleIdKey), out var parsedExpectedStyleId) ? parsedExpectedStyleId : (Guid?)null;
+        var currentStyleId = Guid.TryParse(ItemMetadataCodec.ParseMetadata(currentItem.MetadataJson).GetValueOrDefault(ItemMetadataCodec.ArtworkStyleIdKey), out var parsedCurrentStyleId) ? parsedCurrentStyleId : (Guid?)null;
+        if (expectedStyleId != currentStyleId) return false;
+        var expectedStyle = expectedStyleId is Guid expectedId ? expected.ArtworkStyles.SingleOrDefault(value => value.Id == expectedId) : null;
+        var currentStyle = currentStyleId is Guid currentId ? current.ArtworkStyles.SingleOrDefault(value => value.Id == currentId) : null;
+        if (!Equals(expectedStyle, currentStyle)) return false;
+        var expectedReferences = expectedStyle is null ? [] : expected.ArtworkStyleReferences.Where(value => value.StyleId == expectedStyle.Id).OrderBy(value => value.SortOrder).ToArray();
+        var currentReferences = currentStyle is null ? [] : current.ArtworkStyleReferences.Where(value => value.StyleId == currentStyle.Id).OrderBy(value => value.SortOrder).ToArray();
+        if (!expectedReferences.SequenceEqual(currentReferences)) return false;
+
         var expectedConfiguration = expected.ItemListingConfigurations.SingleOrDefault(value => value.ItemId == request.ItemId);
         var currentConfiguration = current.ItemListingConfigurations.SingleOrDefault(value => value.ItemId == request.ItemId);
         if (!Equals(expectedConfiguration, currentConfiguration))
@@ -435,6 +470,25 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
 
         return new AiImageInputReference("image/png", buffer.ToArray());
     }
+
+    private async Task<AiImageInputReference> ReadStyleInputReferenceAsync(
+        FusionCanvas.Domain.ArtworkStyles.ArtworkStyleReference reference,
+        CancellationToken cancellationToken)
+    {
+        if (!AiImageEndpointPolicy.IsApprovedRasterFormat(reference.MediaType))
+            throw new NotSupportedException("The style image format is not supported by this image endpoint.");
+        await using var source = await _fileStore.OpenReadAsync(reference.WorkspaceRelativePath, cancellationToken).ConfigureAwait(false);
+        using var buffer = new MemoryStream();
+        await source.CopyToAsync(buffer, cancellationToken).ConfigureAwait(false);
+        if (buffer.Length == 0) throw new InvalidDataException("The style reference image is empty.");
+        return new AiImageInputReference(reference.MediaType, buffer.ToArray());
+    }
+
+    private static IReadOnlyList<AiImageEndpointCapabilities> EndpointsForStyleReferences(
+        IReadOnlyList<AiImageEndpointCapabilities> endpoints,
+        int referenceCount) => referenceCount == 0
+            ? endpoints
+            : endpoints.Where(endpoint => (endpoint.Parameters?.MaxInputReferences ?? 0) >= referenceCount).ToArray();
 
     private static DesignStageState BuildStateAfterSave(WorkspaceSnapshot snapshot, Guid itemId)
     {

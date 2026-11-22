@@ -138,6 +138,7 @@ public partial class MainWindow : Window
                     DispatcherPriority.Background);
             }
         };
+        viewModel.Settings.ArtworkStylesManagementRequested += OnSettingsArtworkStylesRequested;
         viewModel.Settings.Telemetry.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(WorkspaceTelemetrySettingsViewModel.IsDebugWindowOpen))
@@ -146,6 +147,7 @@ public partial class MainWindow : Window
             }
         };
         DataContext = viewModel;
+        viewModel.DesignTool.AddArtworkStyleRequested += OnDesignAddArtworkStyleRequested;
         viewModel.Settings.Updates.StartBackgroundCheck();
         _windowCoordinator.SyncSettingsWindow(viewModel.Settings);
         _windowCoordinator.SyncWorkspaceManagementWindow(viewModel.WorkspaceManagement);
@@ -660,7 +662,31 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnSettingsArtworkStylesRequested(object? sender, EventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel
+            || viewModel.ArtworkStyleManagement is not { } service
+            || viewModel.Settings.ActiveWorkspaceId is not Guid workspaceId) return;
+        await _windowCoordinator.OpenArtworkStyleManagementAsync(service, workspaceId);
+    }
+
+    private async void OnDesignAddArtworkStyleRequested(object? sender, EventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel
+            || viewModel.ArtworkStyleManagement is not { } service
+            || viewModel.Settings.ActiveWorkspaceId is not Guid workspaceId) return;
+        var styleId = await _windowCoordinator.OpenArtworkStyleManagementAsync(service, workspaceId, closeAfterSave: true);
+        if (styleId is Guid selectedStyleId)
+            await viewModel.DesignTool.SaveArtworkStyleSelectionAsync(selectedStyleId);
+    }
+
     // === Design Stage Tool event handlers ===
+
+    private void OnAddArtworkStyle(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel viewModel)
+            viewModel.DesignTool.RequestAddArtworkStyle();
+    }
 
     private async void OnConfirmConfigurationRecovery(object? sender, RoutedEventArgs e)
     {

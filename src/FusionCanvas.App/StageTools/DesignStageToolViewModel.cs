@@ -60,6 +60,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
     private readonly SemaphoreSlim _artworkPreferenceSaveGate = new(1, 1);
     private bool _isArtworkBusy;
     private Guid? _selectedArtworkTargetId;
+    private ArtworkStyleOption? _selectedArtworkStyle;
     private bool _transparentBackground;
     private ArtworkContrast _artworkContrast = ArtworkContrast.DarkOnLight;
     private string? _defaultArtworkPrompt;
@@ -525,6 +526,82 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
     public ObservableCollection<DesignRowViewModel> Rows { get; } = [];
     public ObservableCollection<DesignSlotViewModel> SupportingImages { get; } = [];
     public ObservableCollection<ArtworkTargetOption> ArtworkTargets { get; } = [];
+    public ObservableCollection<ArtworkStyleOption> ArtworkStyles { get; } = [];
+    public event EventHandler? AddArtworkStyleRequested;
+
+    public ArtworkStyleOption? SelectedArtworkStyle
+    {
+        get => _selectedArtworkStyle;
+        set
+        {
+            if (_selectedArtworkStyle?.Id == value?.Id) return;
+            _selectedArtworkStyle = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ArtworkStyleGuidance));
+            OnPropertyChanged(nameof(ArtworkGenerationGuidance));
+            OnPropertyChanged(nameof(CanGenerateArtwork));
+            GenerateArtworkCommand.NotifyCanExecuteChanged();
+            if (!_isApplyingState && value is not null)
+                _ = SaveArtworkStyleSelectionAsync(value.Id);
+        }
+    }
+
+    public void RequestAddArtworkStyle() => AddArtworkStyleRequested?.Invoke(this, EventArgs.Empty);
+
+    public async Task SaveArtworkStyleSelectionAsync(Guid? styleId, CancellationToken cancellationToken = default)
+    {
+        if (_isApplyingState || _itemId == Guid.Empty || IsReadOnly) return;
+        InvalidateArtworkOperation();
+        var result = await _designStageService.SaveArtworkStyleSelectionAsync(_itemId, styleId, cancellationToken).ConfigureAwait(true);
+        if (!result.Succeeded)
+        {
+            ErrorMessage = result.Error;
+            await LoadAsync(_itemId, _canEditContext, cancellationToken).ConfigureAwait(true);
+            return;
+        }
+        if (result.State is { } state)
+        {
+            _isApplyingState = true;
+            try
+            {
+                RefreshArtworkStyles(state);
+                _defaultArtworkPrompt = state.DefaultArtworkPrompt;
+                if (_artworkPromptOverride is null)
+                    ArtworkPrompt = _defaultArtworkPrompt ?? string.Empty;
+                SelectedArtworkStyle = GetArtworkStyleOption(state);
+            }
+            finally { _isApplyingState = false; }
+        }
+        OnPropertyChanged(nameof(ArtworkGenerationGuidance));
+        OnPropertyChanged(nameof(CanGenerateArtwork));
+        GenerateArtworkCommand.NotifyCanExecuteChanged();
+    }
+
+    private ArtworkStyleOption GetArtworkStyleOption(DesignStageState state)
+    {
+        var selected = state.AvailableArtworkStyles.SingleOrDefault(style => style.Id == state.SelectedArtworkStyleId);
+        if (selected is null) return ArtworkStyleOption.General;
+        return new ArtworkStyleOption(selected.Id, selected.Title, selected.Description,
+            state.SelectedArtworkStyleReferenceCount, state.MissingArtworkStyleReferenceCount);
+    }
+
+    private void RefreshArtworkStyles(DesignStageState state)
+    {
+        ArtworkStyles.Clear();
+        ArtworkStyles.Add(ArtworkStyleOption.General);
+        foreach (var style in state.AvailableArtworkStyles.OrderBy(value => value.Title, StringComparer.OrdinalIgnoreCase))
+            ArtworkStyles.Add(new ArtworkStyleOption(style.Id, style.Title, style.Description,
+                style.Id == state.SelectedArtworkStyleId ? state.SelectedArtworkStyleReferenceCount : 0,
+                style.Id == state.SelectedArtworkStyleId ? state.MissingArtworkStyleReferenceCount : 0));
+    }
+
+    public string ArtworkStyleGuidance => SelectedArtworkStyle is { MissingReferenceCount: > 0 }
+        ? $"{SelectedArtworkStyle.MissingReferenceCount} style reference image(s) are missing; generation is unavailable."
+        : SelectedArtworkStyle is { Id: not null, ReferenceCount: <= 0 }
+            ? "This style has no reference images; generation is unavailable."
+            : SelectedArtworkStyle is { ReferenceCount: > 0 } selected && _artworkCapabilitiesLoaded && !HasCompatibleStyleEndpoint(selected.ReferenceCount)
+                ? $"The selected image model cannot accept all {selected.ReferenceCount} style reference images. Choose a model with a higher image-reference limit or another style."
+                : string.Empty;
 
     public Guid? SelectedArtworkTargetId
     {
@@ -598,6 +675,11 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
                 return "Choose a Design Area before generating artwork.";
             }
 
+            if (!string.IsNullOrWhiteSpace(ArtworkStyleGuidance))
+            {
+                return ArtworkStyleGuidance;
+            }
+
             if (!_artworkCapabilitiesLoaded)
             {
                 return "Checking the selected image model's endpoint capabilities…";
@@ -647,7 +729,8 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         private set { if (_isArtworkBusy == value) return; _isArtworkBusy = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanGenerateArtwork)); OnPropertyChanged(nameof(CanAdjustExistingArtwork)); GenerateArtworkCommand.NotifyCanExecuteChanged(); AdjustExistingArtworkCommand.NotifyCanExecuteChanged(); CancelArtworkCommand.NotifyCanExecuteChanged(); }
     }
 
-    public bool CanGenerateArtwork => _artworkGenerationService is not null && !IsArtworkBusy && EvaluateArtworkReadiness().IsReady;
+    public bool CanGenerateArtwork => _artworkGenerationService is not null && !IsArtworkBusy
+        && string.IsNullOrWhiteSpace(ArtworkStyleGuidance) && EvaluateArtworkReadiness().IsReady;
     public bool HasCurrentArtwork => CurrentDefaultArtworkSlot()?.AssetId is Guid;
     public bool CanAdjustExistingArtwork => _artworkGenerationService is not null
         && !IsReadOnly && !IsArtworkBusy && SelectedArtworkTargetId is Guid targetId
@@ -1537,6 +1620,10 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
             SelectedBlueprintName = state.SelectedBlueprintName;
             ProviderNetworkWarning = state.ProviderNetworkWarning;
             ArtworkTargets.Clear();
+            RefreshArtworkStyles(state);
+            SelectedArtworkStyle = GetArtworkStyleOption(state);
+            OnPropertyChanged(nameof(ArtworkStyleGuidance));
+            OnPropertyChanged(nameof(ArtworkGenerationGuidance));
             var selectedBlueprint = state.SelectedOfferingId is Guid offeringId
                 ? state.AvailableBlueprintOfferings.FirstOrDefault(value => value.Id == offeringId)
                 : null;
@@ -1723,6 +1810,10 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
             OnPropertyChanged(nameof(SelectedOffering));
             SelectedRecoveryOffering = null;
             SelectedArtworkTargetId = null;
+            _selectedArtworkStyle = ArtworkStyleOption.General;
+            OnPropertyChanged(nameof(SelectedArtworkStyle));
+            ArtworkStyles.Clear();
+            ArtworkStyles.Add(ArtworkStyleOption.General);
             TransparentBackground = false;
 
             ArtworkTargets.Clear();
@@ -1807,6 +1898,18 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
             requireInputReference) is not null;
     }
 
+    private bool HasCompatibleStyleEndpoint(int referenceCount)
+    {
+        if (!_artworkCapabilitiesLoaded || _aiConfiguration?.Current.Artwork.ModelId is not { Length: > 0 } modelId) return false;
+        var target = ArtworkTargets.SingleOrDefault(candidate => candidate.Id == _selectedArtworkTargetId);
+        return target is not null && AiImageEndpointPolicy.SelectEndpoint(
+            _artworkEndpoints.Where(endpoint => (endpoint.Parameters?.MaxInputReferences ?? 0) >= referenceCount).ToArray(),
+            modelId,
+            _aiConfiguration.Current.RequireZeroDataRetention,
+            transparentBackground: false,
+            new AiImageSize(target.Width, target.Height)) is not null;
+    }
+
     private ArtworkGenerationReadiness EvaluateArtworkReadiness()
     {
         var artworkProfileReady = _aiConfiguration is not null
@@ -1825,6 +1928,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
 
     private void NotifyArtworkCapabilityState()
     {
+        OnPropertyChanged(nameof(ArtworkStyleGuidance));
         OnPropertyChanged(nameof(ArtworkGenerationGuidance));
         OnPropertyChanged(nameof(CanGenerateArtwork));
         OnPropertyChanged(nameof(CanAdjustExistingArtwork));

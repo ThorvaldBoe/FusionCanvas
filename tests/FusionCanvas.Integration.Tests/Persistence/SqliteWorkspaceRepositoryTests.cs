@@ -11,6 +11,7 @@ using FusionCanvas.Integration.Persistence;
 using Microsoft.Data.Sqlite;
 using FusionCanvas.Application.Groups;
 using FusionCanvas.Domain.Catalog;
+using FusionCanvas.Domain.ArtworkStyles;
 
 namespace FusionCanvas.Integration.Tests.Persistence;
 
@@ -37,6 +38,33 @@ public class SqliteWorkspaceRepositoryTests
         Assert.Equal(snapshot.Tags[0], Assert.Single(loaded.Tags));
         Assert.Equal(snapshot.ItemTags[0], Assert.Single(loaded.ItemTags));
         Assert.Equal(snapshot.AssetLinks[0], Assert.Single(loaded.AssetLinks));
+    }
+
+    [Fact]
+    public async Task SaveAndLoadAsync_RoundTripsWorkspaceArtworkStylesAndOrderedReferences()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var repository = new SqliteWorkspaceRepository(tempDirectory.GetPath("workspace.db"));
+        var now = new DateTimeOffset(2026, 11, 21, 12, 0, 0, TimeSpan.Zero);
+        var workspace = WorkspaceSnapshot.DefaultWorkspace(now);
+        var store = new Store(Guid.NewGuid(), workspace.Id, "Brand", null, false, now, now, "{}");
+        var style = new ArtworkStyle(Guid.NewGuid(), workspace.Id, "Risograph", "Limited colors with grain", now, now);
+        var refs = new[]
+        {
+            new ArtworkStyleReference(Guid.NewGuid(), style.Id, "artwork-styles/first.png", "image/png", 0, now),
+            new ArtworkStyleReference(Guid.NewGuid(), style.Id, "artwork-styles/second.webp", "image/webp", 1, now)
+        };
+        var snapshot = WorkspaceSnapshot.Empty with
+        {
+            Workspaces = [workspace], Stores = [store], ArtworkStyles = [style], ArtworkStyleReferences = refs
+        };
+
+        await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
+        var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(style, Assert.Single(loaded.ArtworkStyles));
+        Assert.Equal(refs, loaded.ArtworkStyleReferences.OrderBy(value => value.SortOrder));
+        Assert.Equal(26, await ReadUserVersionAsync(tempDirectory.GetPath("workspace.db")));
     }
 
     [Fact]

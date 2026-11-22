@@ -58,8 +58,13 @@ public class SettingsWindowTests
             PumpLayout(window);
 
             Assert.True(settings.IsWorkspaceDiagnosticsSection);
-            var heading = FindControl<TextBlock>(window, t => t.IsVisible && t.Text == "Workspace Diagnostics");
-            Assert.NotNull(heading);
+            Assert.True(settings.CanManageArtworkStyles);
+            var stylesButton = FindControl<Button>(window, b => (b.Content as string) == "Manage artwork styles" && b.IsVisible);
+            Assert.NotNull(stylesButton);
+            var managementRequested = false;
+            settings.ArtworkStylesManagementRequested += (_, _) => managementRequested = true;
+            stylesButton!.Command!.Execute(null);
+            Assert.True(managementRequested);
             var name = FindControl<TextBlock>(window, t => t.IsVisible && t.Text == "Active workspace: Personal");
             Assert.NotNull(name);
             Assert.DoesNotContain(window.GetVisualDescendants().OfType<Button>(),

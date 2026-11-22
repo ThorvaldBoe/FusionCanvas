@@ -10,6 +10,7 @@ using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Mockups;
 using FusionCanvas.Domain.ContentRisk;
+using FusionCanvas.Domain.ArtworkStyles;
  
 namespace FusionCanvas.Domain.Workspace;
 
@@ -86,6 +87,10 @@ public sealed record WorkspaceSnapshot(
     public IReadOnlyList<ContentRiskReview> ContentRiskReviews { get; init; } = [];
 
     public IReadOnlyList<ExternalListingMapping> ExternalListingMappings { get; init; } = [];
+
+    public IReadOnlyList<ArtworkStyle> ArtworkStyles { get; init; } = [];
+
+    public IReadOnlyList<ArtworkStyleReference> ArtworkStyleReferences { get; init; } = [];
 
     public WorkspaceSnapshot(
         IReadOnlyList<Store> Stores,

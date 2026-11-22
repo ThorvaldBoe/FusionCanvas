@@ -72,7 +72,7 @@ Fill this table during implementation. Use exact test names or command output an
 | Publish reminder, cancellation, republish, and non-persistence | Pass | `StageToolViewModelsTests.PrintifyTool_HeadlessShopifyJourneyPublishesUnpublishesAndReopensDeletionGate`. |
 | Avalonia headless view coverage | Pass | `FusionCanvas.App.Tests`: 1,053 passed in final solution run; focused dialog case included. |
 | Appium `listing-color-flexibility` scenario pack | Implemented; execution unavailable | Test source compiled. `127.0.0.1:4723` was not accepting connections, so the Windows desktop journey was not run. |
-| Workspace migration and Printify contract review | Pass | Migration rollback/reload assertions; query contract requires `show-out-of-stock=1`; catalog mapping keeps provider availability separate from local archival. |
+| Workspace migration and Printify contract review | Pass | Schema order is Artwork Styles v24, Listing Color assignments v25, provider availability v26. `ArtworkVariantMigrationPersistenceTests` covers failed v25 backfill rollback and retry; query contract requires `show-out-of-stock=1`; provider availability remains separate from local archival. |
 | Changed-scope OpenSpec drift review | Pass | Reviewed Domain/Application/Integration/App changes against all six delta specs; no remote mutation is performed by local migration. |
 | Strict OpenSpec validation | Pass | `openspec validate separate-artwork-variants-from-listing-colors --strict`. |
-| `dotnet test .\FusionCanvas.sln` | Pass | Final run: Domain 301, Application 731, Integration 470, App 1,053; 2,555 total passed, 0 failed. NuGet vulnerability-feed lookup emitted NU1900 because `api.nuget.org` was unreachable. |
+| `dotnet test .\FusionCanvas.sln` | Pass | Final run after merging current `main`: Domain 301, Application 740, Integration 473, App 1,055; 2,569 total passed, 0 failed. NuGet vulnerability-feed lookup emitted NU1900 because `api.nuget.org` was unreachable. |

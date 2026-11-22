@@ -1,4 +1,4 @@
-﻿using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Prompts;
 using FusionCanvas.Domain.Assets;
@@ -12,6 +12,8 @@ using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Mockups;
 using FusionCanvas.Domain.ContentRisk;
+using FusionCanvas.Domain.ArtworkStyles;
+using FusionCanvas.Integration.Files;
 using Microsoft.Data.Sqlite;
 using FusionCanvas.Application.Workspaces;
 using System.Text.Json;
@@ -33,7 +35,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         ValidateSnapshot(snapshot);
 
-        foreach (var table in new[] { "listing_color_selections", "item_listing_setup_history", "item_variant_listing_terms", "item_listing_details", "external_listing_mappings", "content_risk_reviews", "mockup_template_revision_source_image_values", "mockup_template_revision_source_images", "mockup_template_source_image_values", "mockup_template_source_images", "mockup_template_revision_colors", "mockup_template_revisions", "mockup_template_colors", "mockup_templates", "placeholder_variants", "offering_placeholders", "offering_variant_values", "offering_variants", "offering_option_values", "offering_options", "blueprint_offerings", "print_providers", "catalog_blueprints", "design_slot_assignments", "design_variant_row_colors", "design_variant_rows", "design_selected_colors", "item_listing_configuration", "asset_links", "design_areas", "product_variants", "item_tags", "fulfillment_offerings", "prompts", "assets", "product_blueprints", "items", "ideation_rejections", "groups", "niches", "tags", "stores", "workspaces" })
+        foreach (var table in new[] { "listing_color_selections", "artwork_style_references", "artwork_styles", "item_listing_setup_history", "item_variant_listing_terms", "item_listing_details", "external_listing_mappings", "content_risk_reviews", "mockup_template_revision_source_image_values", "mockup_template_revision_source_images", "mockup_template_source_image_values", "mockup_template_source_images", "mockup_template_revision_colors", "mockup_template_revisions", "mockup_template_colors", "mockup_templates", "placeholder_variants", "offering_placeholders", "offering_variant_values", "offering_variants", "offering_option_values", "offering_options", "blueprint_offerings", "print_providers", "catalog_blueprints", "design_slot_assignments", "design_variant_row_colors", "design_variant_rows", "design_selected_colors", "item_listing_configuration", "asset_links", "design_areas", "product_variants", "item_tags", "fulfillment_offerings", "prompts", "assets", "product_blueprints", "items", "ideation_rejections", "groups", "niches", "tags", "stores", "workspaces" })
         {
             await ExecuteAsync(connection, transaction, $"DELETE FROM {QuoteIdentifier(table)};", cancellationToken);
         }
@@ -42,6 +44,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         {
             await InsertWorkspaceAsync(connection, transaction, workspace, cancellationToken);
         }
+
+        foreach (var style in snapshot.ArtworkStyles)
+            await InsertArtworkStyleAsync(connection, transaction, style, cancellationToken);
+        foreach (var reference in snapshot.ArtworkStyleReferences)
+            await InsertArtworkStyleReferenceAsync(connection, transaction, reference, cancellationToken);
 
         foreach (var store in snapshot.Stores)
         {
@@ -251,6 +258,8 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             ,MockupTemplateRevisionSourceImageOptionValues = await LoadMockupTemplateRevisionSourceImageOptionValuesAsync(connection, cancellationToken)
             ,ContentRiskReviews = await LoadContentRiskReviewsAsync(connection, cancellationToken)
             ,ExternalListingMappings = await LoadExternalListingMappingsAsync(connection, cancellationToken)
+            ,ArtworkStyles = await LoadArtworkStylesAsync(connection, cancellationToken)
+            ,ArtworkStyleReferences = await LoadArtworkStyleReferencesAsync(connection, cancellationToken)
         };
     }
 
@@ -693,6 +702,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         await ApplyMigrationAsync(23, () => MigrateToVersion23Async(connection, cancellationToken));
         await ApplyMigrationAsync(24, () => MigrateToVersion24Async(connection, cancellationToken));
         await ApplyMigrationAsync(25, () => MigrateToVersion25Async(connection, cancellationToken));
+        await ApplyMigrationAsync(26, () => MigrateToVersion26Async(connection, cancellationToken));
 
         await SetPragmaUserVersionAsync(connection, currentSchemaVersion, cancellationToken);
     }
@@ -816,7 +826,32 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             CREATE INDEX IF NOT EXISTS ix_item_listing_history_item ON item_listing_setup_history(item_id, archived_at DESC);
             """, cancellationToken);
 
-    private static async Task MigrateToVersion24Async(SqliteConnection connection, CancellationToken cancellationToken)
+    private static Task MigrateToVersion24Async(SqliteConnection connection, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, null, """
+            CREATE TABLE IF NOT EXISTS artwork_styles (
+                id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+                title TEXT NOT NULL,
+                normalized_title TEXT NOT NULL,
+                description TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE (workspace_id, normalized_title)
+            );
+            CREATE TABLE IF NOT EXISTS artwork_style_references (
+                id TEXT PRIMARY KEY,
+                style_id TEXT NOT NULL REFERENCES artwork_styles(id) ON DELETE CASCADE,
+                workspace_relative_path TEXT NOT NULL,
+                media_type TEXT NOT NULL,
+                sort_order INTEGER NOT NULL CHECK(sort_order >= 0),
+                created_at TEXT NOT NULL,
+                UNIQUE (style_id, sort_order)
+            );
+            CREATE INDEX IF NOT EXISTS ix_artwork_styles_workspace ON artwork_styles(workspace_id);
+            CREATE INDEX IF NOT EXISTS ix_artwork_style_references_style ON artwork_style_references(style_id, sort_order);
+            """, cancellationToken);
+
+    private static async Task MigrateToVersion25Async(SqliteConnection connection, CancellationToken cancellationToken)
     {
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         try
@@ -915,7 +950,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         }
     }
 
-    private static async Task MigrateToVersion25Async(SqliteConnection connection, CancellationToken cancellationToken)
+    private static async Task MigrateToVersion26Async(SqliteConnection connection, CancellationToken cancellationToken)
     {
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         try
@@ -1801,6 +1836,31 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             VALUES ($id, $name, $description, $is_archived, $created_at, $updated_at, $metadata_json);
             """, cancellationToken, CommonParameters(workspace));
 
+    private static Task InsertArtworkStyleAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, ArtworkStyle style, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, """
+            INSERT INTO artwork_styles (id, workspace_id, title, normalized_title, description, created_at, updated_at)
+            VALUES ($id, $workspace_id, $title, $normalized_title, $description, $created_at, $updated_at);
+            """, cancellationToken,
+            ("$id", style.Id.ToString()),
+            ("$workspace_id", style.WorkspaceId.ToString()),
+            ("$title", style.Title.Trim()),
+            ("$normalized_title", NormalizeArtworkStyleTitle(style.Title)),
+            ("$description", style.Description.Trim()),
+            ("$created_at", style.CreatedAt.ToString("O")),
+            ("$updated_at", style.UpdatedAt.ToString("O")));
+
+    private static Task InsertArtworkStyleReferenceAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, ArtworkStyleReference reference, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, """
+            INSERT INTO artwork_style_references (id, style_id, workspace_relative_path, media_type, sort_order, created_at)
+            VALUES ($id, $style_id, $path, $media_type, $sort_order, $created_at);
+            """, cancellationToken,
+            ("$id", reference.Id.ToString()),
+            ("$style_id", reference.StyleId.ToString()),
+            ("$path", reference.WorkspaceRelativePath),
+            ("$media_type", reference.MediaType),
+            ("$sort_order", reference.SortOrder),
+            ("$created_at", reference.CreatedAt.ToString("O")));
+
     private static Task InsertStoreAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, Store store, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, """
             INSERT INTO stores (id, workspace_id, default_niche_id, name, description, is_archived, created_at, updated_at, metadata_json, fulfillment_strategy)
@@ -2096,6 +2156,26 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         ("$updated_at", entity.UpdatedAt.ToString("O")),
         ("$metadata_json", entity.MetadataJson)
     ];
+
+    private static async Task<IReadOnlyList<ArtworkStyle>> LoadArtworkStylesAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var result = new List<ArtworkStyle>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM artwork_styles ORDER BY normalized_title;", cancellationToken))
+            result.Add(new ArtworkStyle(ReadGuid(reader, "id"), ReadGuid(reader, "workspace_id"), ReadString(reader, "title"), ReadString(reader, "description"), ReadDate(reader, "created_at"), ReadDate(reader, "updated_at")));
+        return result;
+    }
+
+    private static async Task<IReadOnlyList<ArtworkStyleReference>> LoadArtworkStyleReferencesAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var result = new List<ArtworkStyleReference>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM artwork_style_references ORDER BY style_id, sort_order;", cancellationToken))
+            result.Add(new ArtworkStyleReference(ReadGuid(reader, "id"), ReadGuid(reader, "style_id"), ReadString(reader, "workspace_relative_path"), ReadString(reader, "media_type"), ReadInt(reader, "sort_order"), ReadDate(reader, "created_at")));
+        return result;
+    }
+
+    private static string NormalizeArtworkStyleTitle(string title) => title.Trim().ToUpperInvariant();
+
+    private static bool IsSupportedArtworkStyleMediaType(string mediaType) => mediaType is "image/png" or "image/jpeg" or "image/webp";
 
     private static async Task<IReadOnlyList<FusionCanvas.Domain.Workspace.Workspace>> LoadWorkspacesAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {
@@ -2741,6 +2821,28 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
     private static void ValidateSnapshot(WorkspaceSnapshot snapshot)
     {
         var workspaceIds = snapshot.Workspaces.Select(workspace => workspace.Id).ToHashSet();
+        var styleIds = snapshot.ArtworkStyles.Select(style => style.Id).ToHashSet();
+        if (snapshot.ArtworkStyles.Any(style => !workspaceIds.Contains(style.WorkspaceId)
+                || string.IsNullOrWhiteSpace(style.Title)
+                || string.IsNullOrWhiteSpace(style.Description)))
+            throw new InvalidOperationException("Every artwork style must have a workspace, title, and description.");
+        if (snapshot.ArtworkStyles.GroupBy(style => (style.WorkspaceId, NormalizeArtworkStyleTitle(style.Title))).Any(group => group.Count() > 1))
+            throw new InvalidOperationException("Artwork style titles must be unique within a workspace.");
+        if (snapshot.ArtworkStyleReferences.Any(reference => !styleIds.Contains(reference.StyleId)
+                || string.IsNullOrWhiteSpace(reference.WorkspaceRelativePath)
+                || string.IsNullOrWhiteSpace(reference.MediaType)
+                || !IsSupportedArtworkStyleMediaType(reference.MediaType)
+                || reference.SortOrder < 0))
+            throw new InvalidOperationException("Every artwork style reference must have a valid style, managed path, media type, and non-negative order.");
+        foreach (var reference in snapshot.ArtworkStyleReferences)
+            _ = ManagedWorkspacePath.Normalize(reference.WorkspaceRelativePath);
+        foreach (var style in snapshot.ArtworkStyles)
+        {
+            var references = snapshot.ArtworkStyleReferences.Where(reference => reference.StyleId == style.Id).OrderBy(reference => reference.SortOrder).ToArray();
+            if (references.Length == 0 || references.Select(reference => reference.SortOrder).Where((order, index) => order != index).Any())
+                throw new InvalidOperationException("Every artwork style must have at least one reference with contiguous ordering.");
+        }
+
         foreach (var store in snapshot.Stores)
         {
             if (!workspaceIds.Contains(store.WorkspaceId))

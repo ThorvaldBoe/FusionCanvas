@@ -116,7 +116,7 @@ public sealed class ArtworkVariantMigrationPersistenceTests
             command.CommandText = "DROP TRIGGER fail_listing_color_backfill; PRAGMA user_version;";
             await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
             command.CommandText = "PRAGMA user_version;";
-            Assert.Equal(23, Convert.ToInt32(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken)));
+            Assert.Equal(24, Convert.ToInt32(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken)));
             command.CommandText = "SELECT COUNT(*) FROM design_selected_colors;";
             Assert.Equal(3, Convert.ToInt32(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken)));
             command.CommandText = "SELECT COUNT(*) FROM listing_color_selections;";

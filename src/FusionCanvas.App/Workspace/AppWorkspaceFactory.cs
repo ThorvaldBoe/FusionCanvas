@@ -7,6 +7,7 @@ using FusionCanvas.Application.Workspaces.Transfer;
 using FusionCanvas.Application.Mockups;
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.DesignFiles;
+using FusionCanvas.Application.ArtworkStyles;
 using FusionCanvas.Application.Groups;
 using FusionCanvas.Application.Items;
 using FusionCanvas.Application.Assets;
@@ -150,6 +151,7 @@ public static class AppWorkspaceFactory
             mockupInvalidation: mockupInvalidation,
             outputStore: fileStore,
             artworkImageProcessor: new ImageSharpArtworkImageProcessor());
+        var artworkStyleManagement = new ArtworkStyleManagementService(repository, fileStore);
         var globalColorRemoval = new GlobalColorRemovalService(
             repository,
             fileStore,
@@ -219,7 +221,8 @@ public static class AppWorkspaceFactory
             new FusionCanvas.Integration.Stores.StoreContextMapper(),
             new FusionCanvas.Application.Listings.ManualListingDetailsService(repository),
             new PrintifyListingImportService(storeManagement, printifyImportCredentials, printifyImportClient, repository, fileStore, printifyCatalogClient),
-            listingColorSelection);
+            listingColorSelection,
+            artworkStyleManagement);
         return new AppWorkspaceRuntime(
             repository,
             new WorkspaceManagementService(
@@ -250,7 +253,8 @@ public static class AppWorkspaceFactory
             sllDocumentCodec,
             new MockupGenerationService(repository, fileStore, mockupTemplateSetup, new ImageSharpMockupRasterCompositor(), invalidation: mockupInvalidation),
             mainWindowServices,
-            artworkProvider is null ? null : new ArtworkGenerationService(repository, fileStore, aiImageProvenanceCodec, artworkProvider, new ImageSharpArtworkNormalizer(), telemetry: telemetry, contentRiskReviews: contentRiskReviews));
+            artworkProvider is null ? null : new ArtworkGenerationService(repository, fileStore, aiImageProvenanceCodec, artworkProvider, new ImageSharpArtworkNormalizer(), telemetry: telemetry, contentRiskReviews: contentRiskReviews),
+            artworkStyleManagement);
     }
 
     private static string DefaultWorkspaceRoot(string databasePath)

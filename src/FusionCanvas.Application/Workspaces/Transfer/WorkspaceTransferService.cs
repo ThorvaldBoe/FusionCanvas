@@ -298,7 +298,9 @@ public sealed class WorkspaceTransferService(
             MockupTemplateColorVariants = [.. live.MockupTemplateColorVariants, .. imported.MockupTemplateColorVariants],
             MockupTemplateRevisions = [.. live.MockupTemplateRevisions, .. imported.MockupTemplateRevisions],
             MockupTemplateRevisionColors = [.. live.MockupTemplateRevisionColors, .. imported.MockupTemplateRevisionColors],
-            ContentRiskReviews = [.. live.ContentRiskReviews, .. imported.ContentRiskReviews]
+            ContentRiskReviews = [.. live.ContentRiskReviews, .. imported.ContentRiskReviews],
+            ArtworkStyles = [.. live.ArtworkStyles, .. imported.ArtworkStyles],
+            ArtworkStyleReferences = [.. live.ArtworkStyleReferences, .. imported.ArtworkStyleReferences]
         };
 
     internal static IReadOnlyDictionary<string, int> CountEntities(WorkspaceSnapshot snapshot) =>
@@ -312,6 +314,8 @@ public sealed class WorkspaceTransferService(
             ["assets"] = snapshot.Assets.Count,
             ["prompts"] = snapshot.Prompts.Count,
             ["tags"] = snapshot.Tags.Count,
+            ["artworkStyles"] = snapshot.ArtworkStyles.Count,
+            ["artworkStyleReferences"] = snapshot.ArtworkStyleReferences.Count,
             ["itemTags"] = snapshot.ItemTags.Count,
             ["assetLinks"] = snapshot.AssetLinks.Count,
             ["ideationRejections"] = snapshot.IdeationRejections.Count,

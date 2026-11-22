@@ -16,6 +16,7 @@ using FusionCanvas.Application.Catalog.Compatibility;
 using FusionCanvas.Application.Items.Import;
 using FusionCanvas.Application.TitleOptimization;
 using FusionCanvas.Application.DesignFiles;
+using FusionCanvas.Application.ArtworkStyles;
 
 namespace FusionCanvas.App.Workspace;
 
@@ -46,4 +47,5 @@ public sealed record AppWorkspaceRuntime(
     ISllDocumentCodec SllDocumentCodec,
     IMockupGenerationService MockupGeneration,
     MainWindowApplicationServices MainWindowServices,
-    IArtworkGenerationService? ArtworkGeneration = null);
+    IArtworkGenerationService? ArtworkGeneration = null,
+    IArtworkStyleManagementService? ArtworkStyleManagement = null);

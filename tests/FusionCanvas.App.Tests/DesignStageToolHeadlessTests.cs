@@ -1,5 +1,7 @@
+using System.Text.Json;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
@@ -10,13 +12,18 @@ using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using FusionCanvas.App.Assets;
+using FusionCanvas.App.ArtworkStyles;
 using FusionCanvas.App.StageTools;
 using FusionCanvas.Application.AI;
+using FusionCanvas.Application.ArtworkStyles;
+using FusionCanvas.Application.Items;
+using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Assets;
 using FusionCanvas.Application.DesignFiles;
 using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.App.Views;
 using FusionCanvas.Domain.Assets;
+using FusionCanvas.Domain.ArtworkStyles;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Mockups;
@@ -74,7 +81,9 @@ public class DesignStageToolHeadlessTests
     /// </summary>
     private static MainWindowViewModel CreateConfiguredDesignViewModel(
         bool withAssignedArtwork = false,
-        string secondSelectedColor = "White")
+        string secondSelectedColor = "White",
+        Func<IWorkspaceRepository, IArtworkStyleManagementService>? artworkStyleManagementFactory = null,
+        Action<InMemoryWorkspaceRepository>? repositoryCreated = null)
     {
         var baseSnapshot = SampleWorkspace.Create();
         var designItem = baseSnapshot.Items.First(i => i.Id == SampleWorkspace.DesignNodeId);
@@ -1017,6 +1026,28 @@ public class DesignStageToolHeadlessTests
     }
 
     [AvaloniaFact]
+    public void AddArtworkStyleButtonRaisesManagerRequest()
+    {
+        var viewModel = CreateConfiguredDesignViewModel();
+        NavigateToDesign(viewModel);
+        var window = ShowDesignWindow(viewModel);
+        var requested = false;
+        viewModel.DesignTool.AddArtworkStyleRequested += (_, _) => requested = true;
+
+        try
+        {
+            var addNew = window.GetVisualDescendants().OfType<Button>()
+                .Single(control => (control.Content as string) == "Add new…");
+            addNew.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+            Assert.True(requested);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+    [AvaloniaFact]
     public async Task ClosingMainWindowDisposesConceptAndSllSessionCancellationSources()
     {
         var snapshot = SampleWorkspace.Create();
@@ -1060,4 +1091,3 @@ internal sealed class DesignWindowScope(MainWindow window) : IDisposable
         Window.Close();
     }
 }
-
