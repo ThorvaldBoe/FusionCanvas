@@ -826,6 +826,13 @@ public partial class MainWindow : Window
 
     private static DesignSlotViewModel? FindSlotViewModel(object? sender)
     {
+        // The slot actions carry their item explicitly in Tag. Prefer that over
+        // walking the visual tree, since templated controls may be hosted under
+        // presenters that do not expose the slot on a Border ancestor.
+        if (sender is Control { Tag: DesignSlotViewModel taggedSlot })
+            return taggedSlot;
+        if (sender is Control { DataContext: DesignSlotViewModel contextualSlot })
+            return contextualSlot;
         if (sender is Border { DataContext: DesignSlotViewModel slot })
             return slot;
         // Walk visual tree
