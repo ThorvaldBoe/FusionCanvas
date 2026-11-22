@@ -118,11 +118,34 @@ public sealed class WorkspaceTelemetryService : ITelemetryService, IDisposable
         return _store.SearchAsync(workspaceId, query, cancellationToken);
     }
 
+    public async Task<TelemetryReportBatch> ReadReportWindowAsync(
+        Guid workspaceId,
+        DateTimeOffset fromInclusive,
+        DateTimeOffset toExclusive,
+        int maxEntries = 200,
+        CancellationToken cancellationToken = default)
+    {
+        if (fromInclusive >= toExclusive) throw new ArgumentException("The start time must be before the end time.", nameof(fromInclusive));
+        if (maxEntries is < 1 or > 999) throw new ArgumentOutOfRangeException(nameof(maxEntries));
+        var entries = await _store.SearchAsync(
+            workspaceId,
+            new TelemetryQuery(fromInclusive, toExclusive, PageSize: maxEntries + 1),
+            cancellationToken).ConfigureAwait(false);
+        var truncated = entries.Count > maxEntries;
+        return new TelemetryReportBatch(truncated ? entries.Take(maxEntries).ToArray() : entries, truncated);
+    }
+
     public Task<IReadOnlyList<TelemetryEntry>> ReadAllAsync(Guid workspaceId, CancellationToken cancellationToken = default) =>
         _store.ReadAllAsync(workspaceId, cancellationToken);
 
     public Task<int> DeleteAllAsync(Guid workspaceId, CancellationToken cancellationToken = default) =>
         _store.DeleteAllAsync(workspaceId, cancellationToken);
+
+    public Task<int> DeleteRangeAsync(Guid workspaceId, DateTimeOffset fromInclusive, DateTimeOffset toExclusive, CancellationToken cancellationToken = default)
+    {
+        if (fromInclusive >= toExclusive) throw new ArgumentException("The start time must be before the end time.", nameof(fromInclusive));
+        return _store.DeleteRangeAsync(workspaceId, fromInclusive, toExclusive, cancellationToken);
+    }
 
     public async Task<string> ExportJsonAsync(Guid workspaceId, CancellationToken cancellationToken = default)
     {

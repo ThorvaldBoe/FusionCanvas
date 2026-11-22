@@ -246,7 +246,7 @@ public class SettingsWindowTests
         Assert.True(railUpdateButton.IsVisible);
         Assert.Equal("Updates.Available", AutomationProperties.GetAutomationId(railUpdateButton));
         Assert.Same(settings.Updates.UpdateCommand, railUpdateButton.Command);
-        Assert.Equal(1, Grid.GetRow(railUpdateButton));
+        Assert.Equal(2, Grid.GetRow(railUpdateButton));
     }
 
     [AvaloniaFact]

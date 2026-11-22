@@ -105,6 +105,18 @@ public sealed class SqliteTelemetryStore(string databasePath) : ITelemetryStore
     public Task<int> DeleteAllAsync(Guid workspaceId, CancellationToken cancellationToken = default) =>
         ExecuteCountAsync("DELETE FROM telemetry_entries WHERE workspace_id = $workspace_id;", workspaceId, null, cancellationToken);
 
+    public async Task<int> DeleteRangeAsync(Guid workspaceId, DateTimeOffset fromInclusive, DateTimeOffset toExclusive, CancellationToken cancellationToken = default)
+    {
+        if (fromInclusive >= toExclusive) throw new ArgumentException("The start time must be before the end time.", nameof(fromInclusive));
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM telemetry_entries WHERE workspace_id = $workspace_id AND occurred_at >= $from AND occurred_at < $to;";
+        command.Parameters.AddWithValue("$workspace_id", workspaceId.ToString("D"));
+        command.Parameters.AddWithValue("$from", fromInclusive.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$to", toExclusive.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        return await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public Task<int> DeleteExpiredAsync(Guid workspaceId, DateTimeOffset cutoff, CancellationToken cancellationToken = default) =>
         ExecuteCountAsync("DELETE FROM telemetry_entries WHERE workspace_id = $workspace_id AND occurred_at < $cutoff;", workspaceId, cutoff, cancellationToken);
 

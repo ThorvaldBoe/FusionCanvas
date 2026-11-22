@@ -1,0 +1,86 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:report="clr-namespace:FusionCanvas.App.IssueReporting"
+        x:Class="FusionCanvas.App.IssueReporting.IssueReportingWindow"
+        x:DataType="report:IssueReportingViewModel"
+        Title="Report an issue"
+        Width="620" Height="700" MinWidth="480" MinHeight="540"
+        CanResize="True" WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ApplicationBackgroundBrush}">
+  <Grid RowDefinitions="*,Auto" Margin="{DynamicResource Token.Layout.Margin.Uniform.Group}" RowSpacing="{DynamicResource Token.Spacing.ControlGap}">
+    <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+      <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
+        <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
+          <TextBlock Text="Help improve FusionCanvas" FontSize="{DynamicResource Token.Typography.SurfaceHeading}" FontWeight="SemiBold" />
+          <TextBlock Text="A clear report helps us understand and fix the problem. In GitHub, describe where it happened, what you were trying to do, what happened, and what you expected instead. Include steps to reproduce it when you can."
+                     TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+        </StackPanel>
+
+        <Border Padding="{DynamicResource Token.Layout.Padding.Uniform.Group}" Background="{DynamicResource WarningBackgroundBrush}" BorderBrush="{DynamicResource WarningBorderBrush}" BorderThickness="1" CornerRadius="4">
+          <TextBlock Text="GitHub issues and uploaded screenshots are public. Review everything before submitting. Do not include credentials, personal information, or private workspace data."
+                     TextWrapping="Wrap" />
+        </Border>
+
+        <Border Padding="{DynamicResource Token.Layout.Padding.Uniform.Group}" Background="{DynamicResource ElevatedSurfaceBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="4">
+          <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
+            <TextBlock Text="Optional diagnostics" FontWeight="SemiBold" />
+            <TextBlock Text="For a harder-to-explain issue, turn on Debug Mode for the active workspace, reproduce the problem, copy the last ten minutes of diagnostics, then turn Debug Mode off. Nothing is sent automatically. Review the copied text before pasting it into the public issue."
+                       TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+            <TextBlock Text="{Binding WorkspaceName, StringFormat='Active workspace: {0}'}" Foreground="{DynamicResource SecondaryTextBrush}" />
+            <ToggleSwitch Content="Debug Mode for this workspace"
+                          IsChecked="{Binding DebugModeEnabled, Mode=TwoWay}"
+                          IsEnabled="{Binding HasWorkspace}"
+                          OffContent="Off" OnContent="On"
+                          AutomationProperties.AutomationId="IssueReporting.DebugMode" />
+            <TextBlock IsVisible="{Binding HasNoWorkspace}" Text="Select a workspace to capture diagnostics. You can still report an issue or attach a screenshot."
+                       TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
+              <Button Content="{Binding CopyButtonText}" Command="{Binding CopyDiagnosticsCommand}"
+                      AutomationProperties.AutomationId="IssueReporting.CopyDiagnostics" />
+              <Button Content="Clear captured diagnostics" Command="{Binding RequestClearCaptureCommand}"
+                      IsVisible="{Binding HasCapture}" Classes="danger" />
+            </StackPanel>
+            <Border IsVisible="{Binding IsClearConfirmationVisible}" Padding="{DynamicResource Token.Layout.Padding.Uniform.Group}"
+                    Background="{DynamicResource WarningBackgroundBrush}" BorderBrush="{DynamicResource WarningBorderBrush}" BorderThickness="1" CornerRadius="4">
+              <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
+                <TextBlock Text="Clear only the telemetry collected since this report capture started? Earlier workspace diagnostics will be kept."
+                           TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
+                  <Button Content="Clear this capture" Command="{Binding ConfirmClearCaptureCommand}" Classes="danger" />
+                  <Button Content="Keep diagnostics" Command="{Binding CancelClearCaptureCommand}" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </Border>
+
+        <Border Padding="{DynamicResource Token.Layout.Padding.Uniform.Group}" Background="{DynamicResource ElevatedSurfaceBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="4">
+          <StackPanel Spacing="{DynamicResource Token.Spacing.ControlGap}">
+            <TextBlock Text="Optional screenshot" FontWeight="SemiBold" />
+            <TextBlock Text="Take a screenshot with Win+Shift+S, return here, and paste it. FusionCanvas keeps it separately so copying diagnostics will not replace it. Review the image for private information before attaching it to GitHub."
+                       TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.ControlGap}">
+              <Button Content="Paste screenshot" Command="{Binding PasteScreenshotCommand}" AutomationProperties.AutomationId="IssueReporting.PasteScreenshot" />
+              <Button Content="Open screenshot folder" Command="{Binding OpenScreenshotLocationCommand}" IsVisible="{Binding HasScreenshot}" />
+              <Button Content="Remove" Command="{Binding RemoveScreenshotCommand}" IsVisible="{Binding HasScreenshot}" />
+            </StackPanel>
+            <Border IsVisible="{Binding HasScreenshot}" Padding="{DynamicResource Token.Layout.Padding.Uniform.Group}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="4">
+              <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
+                <Image Source="{Binding ScreenshotPreview}" MaxHeight="220" Stretch="Uniform" />
+                <TextBlock Text="{Binding ScreenshotFileName}" TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Caption}" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </Border>
+
+        <ProgressBar IsVisible="{Binding IsBusy}" IsIndeterminate="True" Height="4" AutomationProperties.Name="Preparing issue report" />
+        <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+      </StackPanel>
+    </ScrollViewer>
+
+    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="{DynamicResource Token.Spacing.ControlGap}">
+      <Button Content="Close" Click="OnCloseClick" />
+      <Button Content="Report Issue" Command="{Binding OpenIssueFormCommand}" Classes="primary" AutomationProperties.AutomationId="IssueReporting.OpenGitHub" />
+    </StackPanel>
+  </Grid>
+</Window>

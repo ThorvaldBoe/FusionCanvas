@@ -48,6 +48,7 @@ public sealed class WorkspaceTelemetrySettingsViewModel : INotifyPropertyChanged
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
+    public event EventHandler<TelemetryEntry>? ReportTelemetryRecorded;
 
     public IReadOnlyList<TelemetryRetentionPeriod> RetentionPeriods { get; } =
         [TelemetryRetentionPeriod.OneHour, TelemetryRetentionPeriod.OneDay, TelemetryRetentionPeriod.OneWeek];
@@ -162,6 +163,47 @@ public sealed class WorkspaceTelemetrySettingsViewModel : INotifyPropertyChanged
     }
 
     public void CloseDebugWindow() => SetShowDebugWindow(false);
+
+    public async Task SetDebugModeAsync(bool enabled)
+    {
+        if (_settings.DebugModeEnabled == enabled) return;
+        _settings = _settings with { DebugModeEnabled = enabled, ShowDebugWindow = enabled && _settings.ShowDebugWindow };
+        RaiseSettingsChanged();
+        await SaveSettingsAsync().ConfigureAwait(false);
+    }
+
+    public async Task SetDebugModeForWorkspaceAsync(Guid workspaceId, bool enabled)
+    {
+        if (_service is null) return;
+        var settings = await _service.GetSettingsAsync(workspaceId).ConfigureAwait(false);
+        if (settings.DebugModeEnabled == enabled) return;
+        await _service.SaveSettingsAsync(
+            workspaceId,
+            settings with { DebugModeEnabled = enabled, ShowDebugWindow = enabled && settings.ShowDebugWindow }).ConfigureAwait(false);
+    }
+
+    public async Task RefreshSettingsAsync()
+    {
+        if (_workspaceId is not { } id || _service is null) return;
+        await LoadSettingsAsync(id, _workspaceGeneration).ConfigureAwait(false);
+    }
+
+    public Task<TelemetryReportBatch> ReadReportWindowAsync(
+        Guid workspaceId,
+        DateTimeOffset fromInclusive,
+        DateTimeOffset toExclusive,
+        int maxEntries = 200,
+        CancellationToken cancellationToken = default) =>
+        _service?.ReadReportWindowAsync(workspaceId, fromInclusive, toExclusive, maxEntries, cancellationToken)
+        ?? Task.FromResult(new TelemetryReportBatch([], false));
+
+    public Task<int> ClearReportWindowAsync(
+        Guid workspaceId,
+        DateTimeOffset fromInclusive,
+        DateTimeOffset toExclusive,
+        CancellationToken cancellationToken = default) =>
+        _service?.DeleteRangeAsync(workspaceId, fromInclusive, toExclusive, cancellationToken)
+        ?? Task.FromResult(0);
 
     public Task RecordAsync(TelemetryEventRequest request) =>
         _service?.RecordAsync(request) ?? Task.CompletedTask;
@@ -367,6 +409,7 @@ public sealed class WorkspaceTelemetrySettingsViewModel : INotifyPropertyChanged
     {
         void Append()
         {
+            ReportTelemetryRecorded?.Invoke(this, entry);
             if (entry.WorkspaceId != _workspaceId || !IsDebugWindowOpen) return;
             WindowText = string.IsNullOrEmpty(WindowText)
                 ? entry.FormatForDisplay()
