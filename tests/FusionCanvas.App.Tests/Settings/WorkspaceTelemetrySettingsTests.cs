@@ -90,6 +90,38 @@ public sealed class WorkspaceTelemetrySettingsTests
     }
 
     [AvaloniaFact]
+    public async Task WorkspaceChange_IgnoresSettingsLoadThatCompletesForPreviousWorkspace()
+    {
+        var firstId = Guid.NewGuid();
+        var secondId = Guid.NewGuid();
+        var firstSettings = WorkspaceTelemetrySettings.Default with { DebugModeEnabled = true };
+        var secondSettings = WorkspaceTelemetrySettings.Default with { RetentionPeriod = TelemetryRetentionPeriod.OneHour };
+        var service = new DeferredSettingsTelemetryService(firstId, firstSettings, secondId, secondSettings);
+        var viewModel = new WorkspaceTelemetrySettingsViewModel(service, null, NullClipboardService.Instance);
+        var secondSettingsApplied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(WorkspaceTelemetrySettingsViewModel.RetentionPeriod)
+                && viewModel.RetentionPeriod == TelemetryRetentionPeriod.OneHour)
+            {
+                secondSettingsApplied.TrySetResult();
+            }
+        };
+
+        viewModel.SetWorkspace(firstId, "First");
+        await service.FirstLoadStarted.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        viewModel.SetWorkspace(secondId, "Second");
+        await secondSettingsApplied.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        service.CompleteFirstLoad();
+        await service.FirstLoadCompleted.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        await Task.Delay(30);
+
+        Assert.Equal("Second", viewModel.WorkspaceName);
+        Assert.Equal(TelemetryRetentionPeriod.OneHour, viewModel.RetentionPeriod);
+        Assert.False(viewModel.DebugModeEnabled);
+    }
+
+    [AvaloniaFact]
     public async Task DeleteRequiresConfirmationAndCancelPreservesRecordsAndSettings()
     {
         using var temp = new TemporaryDirectory();
@@ -230,7 +262,7 @@ public sealed class WorkspaceTelemetrySettingsTests
     {
         private readonly TaskCompletionSource<string> _export = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public event EventHandler<TelemetryEntry>? EntryRecorded;
+        public event EventHandler<TelemetryEntry>? EntryRecorded { add { } remove { } }
         public bool IsCaptureEnabled => false;
         public Task<WorkspaceTelemetrySettings> GetSettingsAsync(Guid workspaceId, CancellationToken cancellationToken = default) =>
             Task.FromResult(WorkspaceTelemetrySettings.Default);
@@ -253,6 +285,51 @@ public sealed class WorkspaceTelemetrySettingsTests
         }
         public Task<int> CleanupExpiredAsync(Guid workspaceId, CancellationToken cancellationToken = default) => Task.FromResult(0);
         public void CompleteExport(string json) => _export.TrySetResult(json);
+    }
+
+    private sealed class DeferredSettingsTelemetryService(
+        Guid firstWorkspaceId,
+        WorkspaceTelemetrySettings firstSettings,
+        Guid secondWorkspaceId,
+        WorkspaceTelemetrySettings secondSettings) : ITelemetryService
+    {
+        private readonly TaskCompletionSource<WorkspaceTelemetrySettings> _firstSettings =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public event EventHandler<TelemetryEntry>? EntryRecorded { add { } remove { } }
+        public TaskCompletionSource FirstLoadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource FirstLoadCompleted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public bool IsCaptureEnabled => false;
+        public Task<WorkspaceTelemetrySettings> GetSettingsAsync(Guid workspaceId, CancellationToken cancellationToken = default)
+        {
+            if (workspaceId == firstWorkspaceId)
+            {
+                FirstLoadStarted.TrySetResult();
+                return CompleteFirstLoadAsync();
+            }
+            return Task.FromResult(workspaceId == secondWorkspaceId ? secondSettings : firstSettings);
+        }
+        public Task SaveSettingsAsync(Guid workspaceId, WorkspaceTelemetrySettings settings, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task RecordAsync(TelemetryEventRequest request, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<IReadOnlyList<TelemetryEntry>> SearchAsync(Guid workspaceId, TelemetryQuery query, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<TelemetryEntry>>([]);
+        public Task<IReadOnlyList<TelemetryEntry>> ReadAllAsync(Guid workspaceId, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<TelemetryEntry>>([]);
+        public Task<int> DeleteAllAsync(Guid workspaceId, CancellationToken cancellationToken = default) => Task.FromResult(0);
+        public Task<string> ExportJsonAsync(Guid workspaceId, CancellationToken cancellationToken = default) => Task.FromResult("{}\n");
+        public Task ExportAsync(Guid workspaceId, Stream destination, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<int> CleanupExpiredAsync(Guid workspaceId, CancellationToken cancellationToken = default) => Task.FromResult(0);
+        public void CompleteFirstLoad() => _firstSettings.TrySetResult(firstSettings);
+
+        private async Task<WorkspaceTelemetrySettings> CompleteFirstLoadAsync()
+        {
+            try
+            {
+                return await _firstSettings.Task;
+            }
+            finally
+            {
+                FirstLoadCompleted.TrySetResult();
+            }
+        }
     }
 
     private sealed class TemporaryDirectory : IDisposable

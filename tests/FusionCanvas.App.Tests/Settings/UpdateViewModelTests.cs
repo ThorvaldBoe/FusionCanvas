@@ -1,5 +1,6 @@
 using FusionCanvas.App.Commands;
 using FusionCanvas.App.Settings;
+using FusionCanvas.Application.Telemetry;
 using FusionCanvas.Application.Updates;
 using System.Windows.Input;
 
@@ -60,6 +61,57 @@ public sealed class UpdateViewModelTests
         Assert.True(vm.CheckCommand.CanExecute(null));
         Assert.Equal("We couldn't check for updates. Check your internet connection and try again.", vm.ErrorMessage);
         Assert.DoesNotContain(rawMessage, vm.ErrorMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CheckFailure_RecordsSafeUpdaterTelemetryWithoutChangingError()
+    {
+        const string secret = "https://updates.example.test/?token=private";
+        var recorder = new RecordingTelemetryRecorder();
+        var vm = new UpdateViewModel(
+            new FakeUpdateService { CheckException = new HttpRequestException(secret, null, System.Net.HttpStatusCode.ServiceUnavailable) },
+            currentVersion: "0.2.0-preview.14",
+            telemetryRecorder: recorder);
+
+        await ExecuteAsync(vm.CheckCommand);
+
+        var record = Assert.Single(recorder.Events);
+        Assert.Equal("Updates", record.Area);
+        Assert.Equal("UpdateCheckFailed", record.Name);
+        Assert.Contains("HttpRequestException", record.Message, StringComparison.Ordinal);
+        Assert.Contains("currentVersion", record.MetadataJson, StringComparison.Ordinal);
+        Assert.Contains("httpStatus", record.MetadataJson, StringComparison.Ordinal);
+        Assert.Contains("503", record.MetadataJson, StringComparison.Ordinal);
+        Assert.DoesNotContain(secret, record.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(secret, record.MetadataJson, StringComparison.Ordinal);
+        Assert.Equal("We couldn't check for updates. Check your internet connection and try again.", vm.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task CheckFailure_TelemetryRecorderFailureDoesNotChangeUpdateResult()
+    {
+        var vm = new UpdateViewModel(
+            new FakeUpdateService { CheckException = new IOException("offline") },
+            telemetryRecorder: new RecordingTelemetryRecorder { ThrowOnRecord = true });
+
+        await ExecuteAsync(vm.CheckCommand);
+
+        Assert.Equal(UpdatePresentationStatus.Error, vm.Status);
+        Assert.Equal("We couldn't check for updates. Try again later.", vm.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task CheckFailure_DebugModeDisabledDoesNotRecordTelemetry()
+    {
+        var recorder = new RecordingTelemetryRecorder { IsCaptureEnabledValue = false };
+        var vm = new UpdateViewModel(
+            new FakeUpdateService { CheckException = new IOException("offline") },
+            telemetryRecorder: recorder);
+
+        await ExecuteAsync(vm.CheckCommand);
+
+        Assert.Empty(recorder.Events);
+        Assert.Equal(UpdatePresentationStatus.Error, vm.Status);
     }
 
     [Fact]
@@ -220,5 +272,20 @@ public sealed class UpdateViewModelTests
 
         public Task ApplyAsync(VerifiedUpdatePackage package, CancellationToken cancellationToken = default) =>
             ApplyException is null ? Task.CompletedTask : Task.FromException(ApplyException);
+    }
+
+    private sealed class RecordingTelemetryRecorder : ITelemetryRecorder
+    {
+        public bool IsCaptureEnabledValue { get; init; } = true;
+        public bool IsCaptureEnabled => IsCaptureEnabledValue;
+        public bool ThrowOnRecord { get; init; }
+        public List<TelemetryEventRequest> Events { get; } = [];
+
+        public Task RecordAsync(TelemetryEventRequest request, CancellationToken cancellationToken = default)
+        {
+            if (ThrowOnRecord) throw new IOException("telemetry unavailable");
+            Events.Add(request);
+            return Task.CompletedTask;
+        }
     }
 }

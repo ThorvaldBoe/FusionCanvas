@@ -9,6 +9,11 @@
               SelectedItem="{Binding ModelId, Mode=TwoWay}"
               MinWidth="320"
               HorizontalAlignment="Stretch" />
+    <TextBlock IsVisible="{Binding HasUnavailableSelectedModel}"
+               Text="The saved model is not in the current list. Clear search, adjust privacy settings, refresh the catalog, or choose another model."
+               TextWrapping="Wrap"
+               FontSize="{DynamicResource Token.Typography.Label}"
+               Foreground="{DynamicResource WarningTextBrush}" />
     <Expander Header="Provider routing" IsVisible="{Binding HasSelectedModel}">
       <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.InlinePlus}" Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_Control.Right_None.Bottom_None}">
         <TextBlock Text="Choose the model and the route separately."

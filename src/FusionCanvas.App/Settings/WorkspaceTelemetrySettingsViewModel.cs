@@ -26,6 +26,7 @@ public sealed class WorkspaceTelemetrySettingsViewModel : INotifyPropertyChanged
     private bool _isBusy;
     private bool _confirmDelete;
     private ITelemetryExportFilePicker? _filePicker;
+    private long _workspaceGeneration;
 
     public WorkspaceTelemetrySettingsViewModel(
         ITelemetryService? service,
@@ -136,6 +137,7 @@ public sealed class WorkspaceTelemetrySettingsViewModel : INotifyPropertyChanged
     {
         if (_workspaceId == workspaceId && _workspaceName == (workspaceName ?? "No workspace")) return;
         var wasOpen = IsDebugWindowOpen;
+        _workspaceGeneration++;
         _workspaceId = workspaceId;
         _workspaceName = workspaceName ?? "No workspace";
         _workspaceContext?.SetActiveWorkspace(workspaceId);
@@ -143,6 +145,8 @@ public sealed class WorkspaceTelemetrySettingsViewModel : INotifyPropertyChanged
         ResultText = string.Empty;
         WindowText = string.Empty;
         StatusMessage = null;
+        ConfirmDelete = false;
+        IsBusy = false;
         OnPropertyChanged(nameof(WorkspaceId));
         OnPropertyChanged(nameof(WorkspaceName));
         OnPropertyChanged(nameof(HasWorkspace));
@@ -154,7 +158,7 @@ public sealed class WorkspaceTelemetrySettingsViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(IsDebugWindowOpen));
         NotifyCommandState();
         if (wasOpen) OnPropertyChanged(nameof(IsDebugWindowOpen));
-        if (workspaceId is { } id && _service is not null) Run(LoadSettingsAsync(id));
+        if (workspaceId is { } id && _service is not null) Run(LoadSettingsAsync(id, _workspaceGeneration));
     }
 
     public void CloseDebugWindow() => SetShowDebugWindow(false);
@@ -174,14 +178,14 @@ public sealed class WorkspaceTelemetrySettingsViewModel : INotifyPropertyChanged
         Run(SaveSettingsAsync(recordWindowOpened: value));
     }
 
-    private async Task LoadSettingsAsync(Guid workspaceId)
+    private async Task LoadSettingsAsync(Guid workspaceId, long generation)
     {
         try
         {
             var settings = await _service!.GetSettingsAsync(workspaceId).ConfigureAwait(false);
             Dispatch(() =>
             {
-                if (_workspaceId != workspaceId) return;
+                if (_workspaceId != workspaceId || _workspaceGeneration != generation) return;
                 _settings = settings;
                 OnPropertyChanged(nameof(DebugModeEnabled));
                 OnPropertyChanged(nameof(RetentionPeriod));
@@ -192,13 +196,20 @@ public sealed class WorkspaceTelemetrySettingsViewModel : INotifyPropertyChanged
         }
         catch (Exception)
         {
-            Dispatch(() => StatusMessage = "Workspace diagnostics settings could not be loaded.");
+            Dispatch(() =>
+            {
+                if (_workspaceId == workspaceId && _workspaceGeneration == generation)
+                {
+                    StatusMessage = "Workspace diagnostics settings could not be loaded.";
+                }
+            });
         }
     }
 
     private async Task SaveSettingsAsync(bool recordWindowOpened = false)
     {
         if (_workspaceId is not { } id || _service is null) return;
+        var generation = _workspaceGeneration;
         var settings = _settings;
         try
         {
@@ -209,17 +220,27 @@ public sealed class WorkspaceTelemetrySettingsViewModel : INotifyPropertyChanged
                     "Workspace", "DebugWindowOpened", "Information", "Succeeded",
                     "Opened the live telemetry window.")).ConfigureAwait(false);
             }
-            Dispatch(() => StatusMessage = null);
+            Dispatch(() =>
+            {
+                if (_workspaceId == id && _workspaceGeneration == generation) StatusMessage = null;
+            });
         }
         catch (Exception)
         {
-            Dispatch(() => StatusMessage = "Workspace diagnostics settings could not be saved.");
+            Dispatch(() =>
+            {
+                if (_workspaceId == id && _workspaceGeneration == generation)
+                {
+                    StatusMessage = "Workspace diagnostics settings could not be saved.";
+                }
+            });
         }
     }
 
     private async Task SearchAsync()
     {
         if (_workspaceId is not { } id || _service is null) return;
+        var generation = _workspaceGeneration;
         if (!TryParseInstant(FromText, out var from) || !TryParseInstant(ToText, out var to))
         {
             StatusMessage = "Enter valid UTC timestamps in ISO 8601 format, or leave either field blank.";
@@ -234,41 +255,62 @@ public sealed class WorkspaceTelemetrySettingsViewModel : INotifyPropertyChanged
             var text = string.Join(Environment.NewLine + Environment.NewLine, entries.Select(entry => entry.FormatForDisplay()));
             Dispatch(() =>
             {
+                if (_workspaceId != id || _workspaceGeneration != generation) return;
                 ResultText = text;
                 StatusMessage = entries.Count == 0 ? "No telemetry records match this search." : $"Showing {entries.Count} telemetry records.";
             });
         }
         catch (Exception)
         {
-            Dispatch(() => StatusMessage = "Telemetry search could not be completed.");
+            Dispatch(() =>
+            {
+                if (_workspaceId == id && _workspaceGeneration == generation)
+                {
+                    StatusMessage = "Telemetry search could not be completed.";
+                }
+            });
         }
         finally
         {
-            Dispatch(() => IsBusy = false);
+            Dispatch(() =>
+            {
+                if (_workspaceId == id && _workspaceGeneration == generation) IsBusy = false;
+            });
         }
     }
 
     private async Task ExportAsync()
     {
         if (_workspaceId is not { } id || _service is null || _filePicker is null) return;
+        var generation = _workspaceGeneration;
         var stream = await _filePicker.OpenExportAsync();
         if (stream is null) return;
 
         await using (stream)
         {
+            if (_workspaceId != id || _workspaceGeneration != generation) return;
             IsBusy = true;
             try
             {
                 await _service.ExportAsync(id, stream).ConfigureAwait(false);
-                Dispatch(() => StatusMessage = "Telemetry export completed.");
+                Dispatch(() =>
+                {
+                    if (_workspaceId == id && _workspaceGeneration == generation) StatusMessage = "Telemetry export completed.";
+                });
             }
             catch (Exception)
             {
-                Dispatch(() => StatusMessage = "Telemetry export could not be completed.");
+                Dispatch(() =>
+                {
+                    if (_workspaceId == id && _workspaceGeneration == generation) StatusMessage = "Telemetry export could not be completed.";
+                });
             }
             finally
             {
-                Dispatch(() => IsBusy = false);
+                Dispatch(() =>
+                {
+                    if (_workspaceId == id && _workspaceGeneration == generation) IsBusy = false;
+                });
             }
         }
     }
@@ -276,12 +318,14 @@ public sealed class WorkspaceTelemetrySettingsViewModel : INotifyPropertyChanged
     private async Task DeleteAsync()
     {
         if (_workspaceId is not { } id || _service is null) return;
+        var generation = _workspaceGeneration;
         IsBusy = true;
         try
         {
             var count = await _service.DeleteAllAsync(id).ConfigureAwait(false);
             Dispatch(() =>
             {
+                if (_workspaceId != id || _workspaceGeneration != generation) return;
                 ConfirmDelete = false;
                 ResultText = string.Empty;
                 StatusMessage = $"Deleted {count} telemetry records from {_workspaceName}.";
@@ -289,11 +333,20 @@ public sealed class WorkspaceTelemetrySettingsViewModel : INotifyPropertyChanged
         }
         catch (Exception)
         {
-            Dispatch(() => StatusMessage = "Telemetry records could not be deleted.");
+            Dispatch(() =>
+            {
+                if (_workspaceId == id && _workspaceGeneration == generation)
+                {
+                    StatusMessage = "Telemetry records could not be deleted.";
+                }
+            });
         }
         finally
         {
-            Dispatch(() => IsBusy = false);
+            Dispatch(() =>
+            {
+                if (_workspaceId == id && _workspaceGeneration == generation) IsBusy = false;
+            });
         }
     }
 

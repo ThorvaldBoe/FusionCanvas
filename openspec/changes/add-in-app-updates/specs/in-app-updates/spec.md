@@ -20,12 +20,13 @@ FusionCanvas SHALL check the configured stable Windows update source in the back
 - **AND** the About/settings surface exposes a retryable, actionable failure state
 
 ### Requirement: Update controls remain compact and explicit
-The application SHALL keep update discovery out of the permanent workspace footprint until an update exists, SHALL place the visible `Update available` action in the global shell beside existing application controls, and SHALL expose a manual check in About/settings.
+The application SHALL keep update discovery out of the permanent workspace footprint until an update exists, SHALL place the visible `Update available` action in the global utility rail above Settings, and SHALL expose a manual check in About/settings.
 
 #### Scenario: User sees the available update action
 - **WHEN** a newer compatible release has been discovered
 - **THEN** the user can activate a compact button labeled `Update available`
 - **AND** the button has an accessible name and does not obscure navigation or the active work surface
+- **AND** workspace-scoped actions remain outside the global utility rail
 
 #### Scenario: User manually checks for updates
 - **WHEN** the user activates the About/settings update check

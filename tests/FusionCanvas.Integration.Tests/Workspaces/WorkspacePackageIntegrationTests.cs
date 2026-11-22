@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO.Compression;
 using System.Text.Json;
 using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Application.Items;
 using FusionCanvas.Application.Workspaces.Transfer;
 using FusionCanvas.Application.Snowclones;
 using FusionCanvas.Application.Telemetry;
@@ -9,6 +10,8 @@ using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.ArtworkStyles;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Ideation;
+using FusionCanvas.Domain.Items;
+using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Mockups;
 using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Snowclones;
@@ -38,7 +41,28 @@ public class WorkspacePackageIntegrationTests
             new ArtworkStyleReference(Guid.NewGuid(), artworkStyle.Id, "artwork-styles/first.png", "image/png", 0, Now),
             new ArtworkStyleReference(Guid.NewGuid(), artworkStyle.Id, "artwork-styles/second.webp", "image/webp", 1, Now)
         };
-        snapshot = snapshot with { ArtworkStyles = [artworkStyle], ArtworkStyleReferences = artworkStyleReferences };
+        var selectedItem = new Item(
+            Guid.NewGuid(),
+            snapshot.Stores[0].Id,
+            null,
+            null,
+            "Style-selected item",
+            null,
+            ItemStatus.Draft,
+            WorkflowStage.Design,
+            false,
+            Now,
+            Now,
+            JsonSerializer.Serialize(new Dictionary<string, string>
+            {
+                ["design.artworkStyleId"] = artworkStyle.Id.ToString()
+            }));
+        snapshot = snapshot with
+        {
+            ArtworkStyles = [artworkStyle],
+            ArtworkStyleReferences = artworkStyleReferences,
+            Items = [selectedItem]
+        };
         await sourceRepository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
         using var sourceContent = new MemoryStream([1, 2, 3, 4]);
         await sourceFiles.RestoreAsync("assets/design.png", sourceContent, TestContext.Current.CancellationToken);
@@ -67,6 +91,8 @@ public class WorkspacePackageIntegrationTests
         Assert.Equal(snapshot.Stores, restored.Stores);
         Assert.Equal(snapshot.ArtworkStyles, restored.ArtworkStyles);
         Assert.Equal(artworkStyleReferences, restored.ArtworkStyleReferences.OrderBy(reference => reference.SortOrder));
+        using var restoredMetadata = JsonDocument.Parse(Assert.Single(restored.Items).MetadataJson);
+        Assert.Equal(artworkStyle.Id.ToString(), restoredMetadata.RootElement.GetProperty("design.artworkStyleId").GetString());
         Assert.Equal(snapshot.Niches, restored.Niches);
         Assert.Equal(snapshot.Groups, restored.Groups);
         Assert.Equal(snapshot.Items, restored.Items);
@@ -221,6 +247,31 @@ public class WorkspacePackageIntegrationTests
     }
 
     [Fact]
+    public async Task Export_MissingStyleReferenceIsRecordedAndImportKeepsTheStyleUnavailable()
+    {
+        using var temp = new TemporaryDirectory();
+        var snapshot = CreateSnapshot("Missing style reference", "assets/design.png");
+        var style = new ArtworkStyle(Guid.NewGuid(), snapshot.Workspaces[0].Id, "Linocut", "Carved high contrast", Now, Now);
+        var reference = new ArtworkStyleReference(Guid.NewGuid(), style.Id, "artwork-styles/missing.png", "image/png", 0, Now);
+        snapshot = snapshot with { ArtworkStyles = [style], ArtworkStyleReferences = [reference] };
+        var sourceRepository = new SqliteWorkspaceRepository(temp.GetPath("source.db"));
+        await sourceRepository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
+        var packagePath = temp.GetPath("missing-style-reference.fcworkspace");
+        var exported = await NewService(sourceRepository, new LocalWorkspaceFileStore(temp.GetPath("source-files")))
+            .ExportWorkspaceAsync(new WorkspaceExportRequest(snapshot.Workspaces[0].Id, packagePath), cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.True(exported.Succeeded, exported.Error);
+        Assert.Contains(reference.WorkspaceRelativePath, exported.Summary!.MissingFiles);
+
+        var destinationRepository = new SqliteWorkspaceRepository(temp.GetPath("destination.db"));
+        var imported = await NewService(destinationRepository, new LocalWorkspaceFileStore(temp.GetPath("destination-files")))
+            .ImportWorkspaceAsync(new WorkspaceImportRequest(packagePath), cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.True(imported.Succeeded, imported.Error);
+        Assert.Equal(style, Assert.Single((await destinationRepository.LoadAsync(TestContext.Current.CancellationToken)).ArtworkStyles));
+        Assert.Contains(reference.WorkspaceRelativePath, imported.Summary!.MissingFiles);
+    }
+    [Fact]
     public async Task ExportSuccess_ReplacesExistingDestinationOnlyWithCompletePackage()
     {
         using var temp = new TemporaryDirectory();
@@ -241,6 +292,41 @@ public class WorkspacePackageIntegrationTests
         Assert.NotNull(archive.GetEntry("workspace.db"));
     }
 
+    [Fact]
+    public async Task Import_MalformedStyleReferenceDoesNotPartiallySaveWorkspaceOrFiles()
+    {
+        using var temp = new TemporaryDirectory();
+        var snapshot = CreateSnapshot("Malformed style reference", "assets/design.png");
+        var style = new ArtworkStyle(Guid.NewGuid(), snapshot.Workspaces[0].Id, "Woodcut", "Hard-edged print", Now, Now);
+        var reference = new ArtworkStyleReference(Guid.NewGuid(), style.Id, "artwork-styles/reference.png", "image/png", 0, Now);
+        snapshot = snapshot with { ArtworkStyles = [style], ArtworkStyleReferences = [reference] };
+        var sourceRepository = new SqliteWorkspaceRepository(temp.GetPath("source.db"));
+        await sourceRepository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
+        var sourceFiles = new LocalWorkspaceFileStore(temp.GetPath("source-files"));
+        await sourceFiles.RestoreAsync(reference.WorkspaceRelativePath, new MemoryStream([1, 2, 3]), TestContext.Current.CancellationToken);
+        var packagePath = temp.GetPath("malformed-style-reference.fcworkspace");
+        var exported = await NewService(sourceRepository, sourceFiles).ExportWorkspaceAsync(
+            new WorkspaceExportRequest(snapshot.Workspaces[0].Id, packagePath), cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(exported.Succeeded, exported.Error);
+        await RewriteWorkspaceDatabaseAsync(packagePath, temp.GetPath("malformed-workspace.db"), async databasePath =>
+        {
+            await using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = databasePath, Pooling = false }.ToString());
+            await connection.OpenAsync(TestContext.Current.CancellationToken);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE artwork_style_references SET workspace_relative_path = '../escape.png' WHERE id = $id;";
+            command.Parameters.AddWithValue("$id", reference.Id.ToString());
+            await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+        });
+
+        var destinationRepository = new SqliteWorkspaceRepository(temp.GetPath("destination.db"));
+        var destinationFiles = new LocalWorkspaceFileStore(temp.GetPath("destination-files"));
+        var imported = await NewService(destinationRepository, destinationFiles).ImportWorkspaceAsync(
+            new WorkspaceImportRequest(packagePath), cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.False(imported.Succeeded);
+        Assert.Empty((await destinationRepository.LoadAsync(TestContext.Current.CancellationToken)).Workspaces);
+        Assert.False(destinationFiles.Exists(reference.WorkspaceRelativePath));
+    }
     [Fact]
     public async Task Reader_RefusesTraversalEntryAndCorruptPackage()
     {
@@ -623,6 +709,25 @@ public class WorkspacePackageIntegrationTests
         return buffer.ToArray();
     }
 
+    private static async Task RewriteWorkspaceDatabaseAsync(string packagePath, string databasePath, Func<string, Task> updateAsync)
+    {
+        using (var archive = ZipFile.OpenRead(packagePath))
+        {
+            await using var input = archive.GetEntry("workspace.db")!.Open();
+            await using var output = File.Create(databasePath);
+            await input.CopyToAsync(output, TestContext.Current.CancellationToken);
+        }
+
+        await updateAsync(databasePath);
+        using (var archive = ZipFile.Open(packagePath, ZipArchiveMode.Update))
+        {
+            archive.GetEntry("workspace.db")!.Delete();
+            var entry = archive.CreateEntry("workspace.db", CompressionLevel.Optimal);
+            await using var output = entry.Open();
+            await using var input = File.OpenRead(databasePath);
+            await input.CopyToAsync(output, TestContext.Current.CancellationToken);
+        }
+    }
     private static async Task UpdateManifestAsync(
         string packagePath,
         Func<WorkspacePackageManifest, WorkspacePackageManifest> update)

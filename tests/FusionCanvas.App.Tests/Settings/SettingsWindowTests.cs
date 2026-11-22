@@ -11,6 +11,7 @@ using FusionCanvas.Application.Versioning;
 using FusionCanvas.Application.Updates;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Application.Workspaces;
+using FusionCanvas.App.Tests.TestSupport;
 
 namespace FusionCanvas.App.Tests.Settings;
 
@@ -41,7 +42,7 @@ public class SettingsWindowTests
     }
 
     [AvaloniaFact]
-    public void SettingsWindow_SelectingWorkspaceShowsWorkspacePaneAndManageButton()
+    public void SettingsWindow_SelectingWorkspaceDiagnosticsShowsItsActiveScope()
     {
         var management = NewWorkspaceManagement(new WorkspaceSnapshot([NewWorkspace("Personal")], [], [], [], [], [], [], [], [], []));
         var settings = NewSettingsViewModel(management);
@@ -53,17 +54,21 @@ public class SettingsWindowTests
             window.Show();
             PumpLayout(window);
 
-            settings.SelectedSection = SettingsSection.Workspace;
+            settings.SelectedSection = SettingsSection.WorkspaceDiagnostics;
             PumpLayout(window);
 
-            Assert.True(settings.IsWorkspaceSection);
-            var manageButton = FindControl<Button>(window, b => (b.Content as string) == "Manage workspaces" && b.IsVisible);
-            Assert.NotNull(manageButton);
+            Assert.True(settings.IsWorkspaceDiagnosticsSection);
             Assert.True(settings.CanManageArtworkStyles);
             var stylesButton = FindControl<Button>(window, b => (b.Content as string) == "Manage artwork styles" && b.IsVisible);
             Assert.NotNull(stylesButton);
-            var name = FindControl<TextBlock>(window, t => t.IsVisible && t.Text == "Personal");
+            var managementRequested = false;
+            settings.ArtworkStylesManagementRequested += (_, _) => managementRequested = true;
+            stylesButton!.Command!.Execute(null);
+            Assert.True(managementRequested);
+            var name = FindControl<TextBlock>(window, t => t.IsVisible && t.Text == "Active workspace: Personal");
             Assert.NotNull(name);
+            Assert.DoesNotContain(window.GetVisualDescendants().OfType<Button>(),
+                b => (b.Content as string) == "Manage workspaces" && b.IsVisible);
         }
         finally { window.Close(); }
     }
@@ -73,7 +78,7 @@ public class SettingsWindowTests
     {
         var settings = NewSettingsViewModel();
         settings.OpenCommand.Execute(null);
-        settings.SelectedSection = SettingsSection.Workspace;
+        settings.SelectedSection = SettingsSection.WorkspaceDiagnostics;
         settings.CloseCommand.Execute(null);
 
         settings.OpenCommand.Execute(null);
@@ -134,12 +139,12 @@ public class SettingsWindowTests
     }
 
     [AvaloniaFact]
-    public void WorkspaceSection_ShowsNoWorkspaceWhenNoneActive()
+    public void WorkspaceDiagnostics_ShowsNoWorkspaceWhenNoneActive()
     {
         var management = NewWorkspaceManagement(WorkspaceSnapshot.Empty);
         var settings = NewSettingsViewModel(management);
         settings.OpenCommand.Execute(null);
-        settings.SelectedSection = SettingsSection.Workspace;
+        settings.SelectedSection = SettingsSection.WorkspaceDiagnostics;
 
         var window = new SettingsWindow { DataContext = settings };
         try
@@ -147,14 +152,15 @@ public class SettingsWindowTests
             window.Show();
             PumpLayout(window);
 
-            var noWorkspace = FindControl<TextBlock>(window, t => t.IsVisible && t.Text == "No workspace");
+            var noWorkspace = FindControl<TextBlock>(window, t =>
+                t.IsVisible && t.Text == "No workspace selected. Select an active workspace to manage diagnostics.");
             Assert.NotNull(noWorkspace);
         }
         finally { window.Close(); }
     }
 
     [AvaloniaFact]
-    public void ShellHeader_ShowsSettingsButtonAndIndicatorTooltipWithoutOldWorkspacesRow()
+    public void MainShell_ShowsGlobalSettingsRailAndWorkspaceContextControl()
     {
         using var fixture = new MainWindowFixture(width: 900, height: 600);
 
@@ -162,11 +168,13 @@ public class SettingsWindowTests
             AutomationProperties.GetName(b) == "Settings" && b.IsVisible);
         Assert.NotNull(settingsButton);
         Assert.True(settingsButton!.Command?.CanExecute(null) ?? false);
+        Assert.Equal("Settings", ToolTip.GetTip(settingsButton));
 
-        var indicatorBorder = fixture.Window.GetVisualDescendants()
-            .OfType<Border>()
-            .FirstOrDefault(b => ToolTip.GetTip(b) is string tip && tip == "Manage workspaces in settings");
-        Assert.NotNull(indicatorBorder);
+        var rail = FindControl<Border>(fixture.Window, b => Grid.GetColumn(b) == 0 && b.IsVisible);
+        Assert.NotNull(rail);
+        Assert.Equal("Workspace: Personal", AutomationProperties.GetName(
+            FindControl<Button>(fixture.Window, b => AutomationProperties.GetName(b)?.StartsWith("Workspace:", StringComparison.Ordinal) == true)!));
+        Assert.NotNull(FindControl<Button>(fixture.Window, b => ToolTip.GetTip(b) is string tip && tip == "Switch workspace or manage workspaces"));
 
         var oldLabel = fixture.Window.GetVisualDescendants()
             .OfType<TextBlock>()
@@ -175,7 +183,7 @@ public class SettingsWindowTests
     }
 
     [AvaloniaFact]
-    public void ShellHeader_ControlsStayWithinHeaderAtMinimumWidth()
+    public void MainShell_RailAndWorkspaceControlFitAtMinimumWidth()
     {
         using var fixture = new MainWindowFixture(width: 900, height: 600);
 
@@ -185,14 +193,108 @@ public class SettingsWindowTests
         var settingsButton = fixture.Window.GetVisualDescendants()
             .OfType<Button>()
             .First(b => AutomationProperties.GetName(b) == "Settings" && b.IsVisible);
-        var indicator = fixture.Window.GetVisualDescendants()
+        var workspaceButton = fixture.Window.GetVisualDescendants()
+            .OfType<Button>()
+            .First(b => ToolTip.GetTip(b) is string tip && tip == "Switch workspace or manage workspaces");
+        var rail = fixture.Window.GetVisualDescendants()
             .OfType<Border>()
-            .First(b => ToolTip.GetTip(b) is string tip && tip == "Manage workspaces in settings");
+            .First(b => Grid.GetColumn(b) == 0 && b.IsVisible);
 
-        Assert.True(settingsButton.Bounds.Right <= header.Bounds.Width + 1,
-            $"Settings button extends beyond header: {settingsButton.Bounds.Right} > {header.Bounds.Width}");
-        Assert.True(indicator.Bounds.Right <= header.Bounds.Width + 1,
-            $"Workspace indicator extends beyond header: {indicator.Bounds.Right} > {header.Bounds.Width}");
+        Assert.True(settingsButton.Bounds.Right <= rail.Bounds.Width + 1,
+            $"Settings button extends beyond rail: {settingsButton.Bounds.Right} > {rail.Bounds.Width}");
+        Assert.True(workspaceButton.Bounds.Right <= header.Bounds.Right + 1,
+            $"Workspace control extends beyond header: {workspaceButton.Bounds.Right} > {header.Bounds.Right}");
+        var documentArea = fixture.Window.GetVisualDescendants()
+            .OfType<Grid>()
+            .First(g => Grid.GetColumn(g) == 3 && g.IsVisible);
+        Assert.True(documentArea.Bounds.Width >= 480,
+            $"Document area is too narrow at minimum window size: {documentArea.Bounds.Width} < 480");
+    }
+
+    [AvaloniaFact]
+    public async Task UtilityRail_UpdateActionIsHiddenUntilAnUpdateIsAvailable()
+    {
+        using var fixture = new MainWindowFixture();
+        var settings = fixture.ViewModel.Settings;
+        var updateService = new FakeUpdateService
+        {
+            CheckResult = new UpdateCheckResult(UpdateCheckStatus.UpdateAvailable, new UpdateManifest(
+                UpdateManifestValidator.CurrentSchemaVersion,
+                "0.3.0",
+                UpdatePlatform.WindowsX64,
+                UpdateTrack.Stable,
+                "v0.3.0",
+                new string('C', 40),
+                new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-0.3.0-win-x64-Setup.exe"),
+                new string('A', 64),
+                new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.3.0"),
+                new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-0.3.0-win-x64-Setup.exe.sigstore.json")))
+        };
+        settings.ReplaceUpdateService(updateService);
+        var updateButton = FindControl<Button>(fixture.Window, b => AutomationProperties.GetName(b) == "Update available");
+        Assert.NotNull(updateButton);
+        var railUpdateButton = updateButton!;
+
+        Assert.False(railUpdateButton.IsVisible);
+        Assert.NotNull(FindControl<Button>(fixture.Window, b => AutomationProperties.GetName(b) == "Settings" && b.IsVisible));
+
+        settings.Updates.CheckCommand.Execute(null);
+        await ((FusionCanvas.App.Commands.AsyncRelayCommand)settings.Updates.CheckCommand).ExecutionTask!
+            .WaitAsync(TimeSpan.FromSeconds(3));
+        fixture.PumpLayout();
+
+        Assert.True(railUpdateButton.IsVisible);
+        Assert.Equal("Updates.Available", AutomationProperties.GetAutomationId(railUpdateButton));
+        Assert.Same(settings.Updates.UpdateCommand, railUpdateButton.Command);
+        Assert.Equal(1, Grid.GetRow(railUpdateButton));
+    }
+
+    [AvaloniaFact]
+    public void WorkspaceSelector_OffersWorkspaceChoicesAndSeparateManagementAction()
+    {
+        using var fixture = new MainWindowFixture();
+        var selector = FindControl<Button>(fixture.Window, b =>
+            ToolTip.GetTip(b) is string tip && tip == "Switch workspace or manage workspaces");
+        Assert.NotNull(selector);
+        var workspaceSelector = selector!;
+
+        Assert.Equal("Workspace: Personal", AutomationProperties.GetName(workspaceSelector));
+        Assert.NotNull(workspaceSelector.Flyout);
+
+        workspaceSelector.Flyout!.ShowAt(workspaceSelector);
+        fixture.PumpLayout();
+
+        var workspaceChoice = FindControl<Button>(fixture.Window, b => (b.Content as string) == "Personal" && b.IsVisible);
+        var manage = FindControl<Button>(fixture.Window, b => (b.Content as string) == "Manage workspaces" && b.IsVisible);
+        Assert.NotNull(workspaceChoice);
+        Assert.NotNull(manage);
+        Assert.DoesNotContain(
+            fixture.ViewModel.WorkspaceManagement.SelectorWorkspaces,
+            entry => fixture.ViewModel.WorkspaceManagement.ArchivedWorkspaces.Any(archived => archived.Id == entry.Id));
+
+        manage!.Command!.Execute(null);
+        Assert.True(fixture.ViewModel.WorkspaceManagement.IsWorkspaceManagementOpen);
+    }
+
+    [AvaloniaFact]
+    public void WorkspaceSelector_NoWorkspaceStillOffersManagement()
+    {
+        var snapshot = WorkspaceSnapshot.Empty;
+        using var fixture = new MainWindowFixture(snapshot: snapshot, repository: new InMemoryWorkspaceRepository(snapshot));
+        var selector = FindControl<Button>(fixture.Window, b =>
+            ToolTip.GetTip(b) is string tip && tip == "Switch workspace or manage workspaces");
+        Assert.NotNull(selector);
+        var workspaceSelector = selector!;
+
+        Assert.Equal("Workspace: No workspace", AutomationProperties.GetName(workspaceSelector));
+        workspaceSelector.Flyout!.ShowAt(workspaceSelector);
+        fixture.PumpLayout();
+
+        var manage = FindControl<Button>(fixture.Window, b => (b.Content as string) == "Manage workspaces" && b.IsVisible);
+        Assert.NotNull(manage);
+        Assert.Empty(fixture.ViewModel.WorkspaceManagement.SelectorWorkspaces);
+        manage!.Command!.Execute(null);
+        Assert.True(fixture.ViewModel.WorkspaceManagement.IsWorkspaceManagementOpen);
     }
 
     [AvaloniaFact]

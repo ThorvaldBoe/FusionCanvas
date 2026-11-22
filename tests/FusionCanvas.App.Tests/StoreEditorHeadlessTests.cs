@@ -314,6 +314,45 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void StoreEditorTabs_KeepContentInsetFromTheSharedBoundary()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        var tabContent = window.GetVisualDescendants().OfType<Border>()
+            .Single(border => AutomationProperties.GetAutomationId(border) == "StoreEditor.TabContent");
+
+        Assert.True(tabContent.Padding.Left > 0);
+        Assert.Equal(tabContent.Padding.Left, tabContent.Padding.Top);
+        Assert.Equal(tabContent.Padding.Left, tabContent.Padding.Right);
+        Assert.Equal(tabContent.Padding.Left, tabContent.Padding.Bottom);
+
+        var tabs = new (string Name, Action<object?> Select, string? FirstButton, string? FirstTextBoxId)[]
+        {
+            ("Basic info", viewModel.SelectBasicInfoTabCommand.Execute, null, "StoreEditor.Name"),
+            ("Niches", viewModel.SelectNichesTabCommand.Execute, "New niche", null),
+            ("Tags", viewModel.SelectTagsTabCommand.Execute, "New tag", null),
+            ("Catalog & mockups", viewModel.SelectProductsTabCommand.Execute, "New Blueprint", null)
+        };
+
+        foreach (var tab in tabs)
+        {
+            tab.Select(null);
+            window.UpdateLayout();
+            Control? firstContent = tab.FirstButton is not null
+                ? FindButton(window, tab.FirstButton)
+                : window.GetVisualDescendants().OfType<TextBox>()
+                    .SingleOrDefault(textBox => AutomationProperties.GetAutomationId(textBox) == tab.FirstTextBoxId);
+            Assert.NotNull(firstContent);
+            Assert.True(IsEffectivelyVisible(firstContent!));
+            var origin = firstContent!.TranslatePoint(new Point(0, 0), tabContent);
+            Assert.True(origin is { } point && point.X >= tabContent.Padding.Left && point.Y >= tabContent.Padding.Top,
+                $"The {tab.Name} tab must keep its first content row inside the shared tab-content inset.");
+        }
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void OfferingContext_SeparatesTabNavigationContextHeaderAndActiveContent()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);

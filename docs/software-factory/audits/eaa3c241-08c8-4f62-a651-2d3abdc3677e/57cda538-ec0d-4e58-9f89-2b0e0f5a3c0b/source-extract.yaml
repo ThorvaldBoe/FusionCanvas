@@ -1,0 +1,60 @@
+extract:
+  standard: FusionCanvas UI Standard
+  standard_version: "1.5"
+  extract_definition_version: "1.5"
+  extract_revision: 1
+  repository_revision: c5f8c79c0d1f86da526856e4f1e5a15e3a8f82de
+  extracted_at: 2026-11-21T17:02:16Z
+  working_tree: modified
+  included_projects:
+    - src/FusionCanvas.App
+  exclusions:
+    - Non-UI QA axes; this is a single-axis UI audit.
+    - Unrelated application Surfaces; the requested scope is the Store Editor's tab-content boundary and three reported tabs.
+  discovery_limits: []
+  surfaces:
+    - surface_id: UI-SURF-STORE-EDITOR-TAB-CONTENT
+      name: Store Editor tabbed content
+      kind: view
+      owner: src/FusionCanvas.App/Stores
+      source_locations:
+        - src/FusionCanvas.App/Stores/StoreEditorWindow.axaml
+        - src/FusionCanvas.App/Stores/StoreEditorWindow.axaml.cs
+        - src/FusionCanvas.App/Stores/StoreManagementViewModel.cs
+      entry_points:
+        - Store Management editor window, tab-selection commands
+      auditable_patterns:
+        - kind: tabs
+          source_locations:
+            - src/FusionCanvas.App/Stores/StoreEditorWindow.axaml:104-136
+          capabilities:
+            - Four selectable tabs with selected-state bindings
+            - Shared bounded active-tab content region
+          notes:
+            - Basic info assessed as a shared-container regression case.
+            - Niches, Tags, and Catalog & mockups are the requested review scope.
+        - kind: tab_content_boundary
+          source_locations:
+            - src/FusionCanvas.App/Stores/StoreEditorWindow.axaml:131-137
+          capabilities:
+            - Shared 14 DIP CardPadding inset
+            - Distinct content layouts for each selectable tab
+          notes:
+            - Catalog & mockups includes overview, Blueprint, offering, variants, design-area, and mockup-template content roots.
+      shared_dependencies:
+        themes:
+          - Light and Dark theme dictionaries
+        resources_and_styles:
+          - src/FusionCanvas.App/DesignSystem/DesignTokens.axaml
+          - Shared field, button, panel, and tab styles in StoreEditorWindow.axaml
+        components:
+          - Avalonia Border, StackPanel, Grid, Button, TextBox
+        patterns:
+          - Bounded tabbed editor content
+        tokens:
+          - Token.Layout.CardPadding
+          - Token.Layout.Padding.Uniform.Panel
+          - Token.Layout.PageInset
+      discovery: Static XAML and code-behind inventory; test evidence in StoreEditorHeadlessTests.cs.
+      notes:
+        - Distinct tab content roots are assessed independently under FC-UI-100.

@@ -15,6 +15,7 @@ using FusionCanvas.Application.ToolContexts;
 using FusionCanvas.Application.StageTools;
 using FusionCanvas.Application.TitleOptimization;
 using FusionCanvas.Application.Assets;
+using FusionCanvas.Application.ArtworkStyles;
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.DesignFiles;
 using FusionCanvas.Application.Groups;
@@ -148,7 +149,8 @@ internal static class MainWindowViewModelFactory
             new SllDocumentCodec(),
             null,
             new WorkspaceBatchRollbackService(repository),
-            MockupPlacementPreviewReader: new LocalMockupPlacementPreviewReader());
+            MockupPlacementPreviewReader: new LocalMockupPlacementPreviewReader(),
+            ArtworkStyleManagement: new ArtworkStyleManagementService(repository, fileStore));
 
         return new(
             new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),

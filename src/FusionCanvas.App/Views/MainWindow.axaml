@@ -24,7 +24,7 @@
         MinHeight="600"
         Background="{DynamicResource ApplicationBackgroundBrush}">
   <Grid x:Name="MainLayoutGrid">
-    <Border Grid.ColumnSpan="3"
+    <Border Grid.ColumnSpan="4"
             VerticalAlignment="Top"
             HorizontalAlignment="Stretch"
             IsVisible="{Binding IsBusy}"
@@ -42,11 +42,41 @@
       </StackPanel>
     </Border>
     <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="52" MinWidth="52" MaxWidth="52" />
       <ColumnDefinition Width="300" MinWidth="240" MaxWidth="560" />
       <ColumnDefinition Width="5" />
       <ColumnDefinition Width="*" MinWidth="480" />
     </Grid.ColumnDefinitions>
     <Border Grid.Column="0"
+            Background="{DynamicResource PanelSurfaceBrush}"
+            BorderBrush="{DynamicResource ControlBorderBrush}"
+            BorderThickness="0,0,1,0"
+            Padding="5">
+      <Grid RowDefinitions="*,Auto,Auto">
+        <Button x:Name="UpdateRailButton"
+                Grid.Row="1"
+                IsVisible="{Binding Settings.Updates.IsUpdateActionVisible}"
+                Command="{Binding Settings.Updates.UpdateCommand}"
+                ToolTip.Tip="Download the available FusionCanvas update"
+                AutomationProperties.Name="Update available"
+                AutomationProperties.AutomationId="Updates.Available"
+                Classes="utilityRailButton">
+          <PathIcon Data="M11,2 H13 V11.17 L15.59,8.59 L17,10 L12,15 L7,10 L8.41,8.59 L11,11.17 Z M4,14 H6 V18 H18 V14 H20 V20 H4 Z"
+                    Width="18" Height="18"
+                    Foreground="{DynamicResource StrongTextBrush}" />
+        </Button>
+        <Button x:Name="SettingsRailButton"
+                Grid.Row="2"
+                Content="⚙"
+                ToolTip.Tip="Settings"
+                Command="{Binding Settings.OpenCommand}"
+                Click="OnSettingsRailClick"
+                Classes="utilityRailButton"
+                AutomationProperties.Name="Settings"
+                AutomationProperties.AutomationId="Settings.Open" />
+      </Grid>
+    </Border>
+    <Border Grid.Column="1"
             Background="{DynamicResource ElevatedSurfaceBrush}"
             BorderBrush="{DynamicResource ControlBorderBrush}"
             BorderThickness="0,0,1,0"
@@ -54,7 +84,7 @@
       <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
         <Grid x:Name="NavigationHeader"
               Grid.Row="0"
-              ColumnDefinitions="Auto,*,Auto,Auto"
+              ColumnDefinitions="Auto,*"
               ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}"
               Margin="{DynamicResource Token.Layout.Margin.Sides.Left_None.Top_None.Right_None.Bottom_Large}">
           <TextBlock Grid.Column="0"
@@ -63,11 +93,16 @@
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource PrimaryTextBrush}"
                      VerticalAlignment="Center" />
-          <Border Grid.Column="1"
-                  ToolTip.Tip="Manage workspaces in settings"
+          <Button x:Name="WorkspaceSelectorButton"
+                  Grid.Column="1"
+                  ToolTip.Tip="Switch workspace or manage workspaces"
+                  AutomationProperties.Name="{Binding Settings.WorkspaceName, StringFormat='Workspace: {0}'}"
                   MinWidth="0"
                   HorizontalAlignment="Stretch"
-                  VerticalAlignment="Center">
+                  VerticalAlignment="Center"
+                  HorizontalContentAlignment="Stretch"
+                  Classes="workspaceContextButton">
+            <Button.Content>
             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{DynamicResource Token.Spacing.InlineGap}">
               <PathIcon Data="M3,5 H10 L12,7 H21 V19 H3 Z"
                         Width="16" Height="16"
@@ -81,22 +116,38 @@
                          Foreground="{DynamicResource SecondaryTextBrush}"
                          VerticalAlignment="Center" />
             </Grid>
-          </Border>
-          <Button Grid.Column="2"
-                  IsVisible="{Binding Settings.Updates.IsUpdateActionVisible}"
-                  Content="{Binding Settings.Updates.UpdateActionText}"
-                  ToolTip.Tip="Download the available FusionCanvas update"
-                  Command="{Binding Settings.Updates.UpdateCommand}"
-                  Classes="updateButton"
-                  AutomationProperties.Name="Update available"
-                  AutomationProperties.AutomationId="Updates.Available" />
-          <Button Grid.Column="3"
-                  Content="⚙"
-                  ToolTip.Tip="Settings"
-                  Command="{Binding Settings.OpenCommand}"
-                  Classes="iconButton"
-                  AutomationProperties.Name="Settings"
-                  AutomationProperties.AutomationId="Settings.Open" />
+            </Button.Content>
+            <Button.Flyout>
+              <Flyout Placement="BottomEdgeAlignedRight" ShowMode="Standard">
+                <Border Width="240" Padding="{DynamicResource Token.Layout.Padding.Uniform.Panel}"
+                        Background="{DynamicResource ElevatedSurfaceBrush}"
+                        BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1">
+                  <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
+                    <TextBlock Text="Workspaces" FontWeight="SemiBold"
+                               Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <ItemsControl ItemsSource="{Binding WorkspaceManagement.SelectorWorkspaces}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="workspace:WorkspaceSelectorEntry">
+                          <Button Content="{Binding Name}"
+                                  Command="{Binding $parent[ItemsControl].DataContext.WorkspaceManagement.SelectWorkspaceCommand}"
+                                  CommandParameter="{Binding Workspace}"
+                                  Click="OnWorkspaceChoiceClick"
+                                  Classes="storeSelector"
+                                  Classes.selected="{Binding IsSelected}"
+                                  HorizontalContentAlignment="Left" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Button Content="Manage workspaces"
+                            Command="{Binding WorkspaceManagement.OpenWorkspaceManagementCommand}"
+                            Click="OnManageWorkspacesClick"
+                            Classes="storeSecondary"
+                            HorizontalAlignment="Left" />
+                  </StackPanel>
+                </Border>
+              </Flyout>
+            </Button.Flyout>
+          </Button>
         </Grid>
 
         <StackPanel Grid.Row="1"
@@ -479,14 +530,14 @@
       </Grid>
     </Border>
 
-    <GridSplitter Grid.Column="1"
+    <GridSplitter Grid.Column="2"
                   ResizeDirection="Columns"
                   Background="Transparent"
                   Cursor="SizeWestEast"
                   ToolTip.Tip="Drag to resize navigation"
                   AutomationProperties.Name="Resize navigation panel" />
 
-    <Grid Grid.Column="2"
+    <Grid Grid.Column="3"
           RowDefinitions="Auto,Auto,*">
       <Border Grid.Row="0"
               Background="{DynamicResource TabBarBackgroundBrush}"
@@ -2600,7 +2651,7 @@
         </Grid>
       </Border>
     </Grid>
-    <Border Grid.ColumnSpan="2"
+    <Border Grid.Column="1" Grid.ColumnSpan="2"
             IsVisible="{Binding WorkspaceManagement.ShouldShowNoWorkspaceState}"
             Background="{DynamicResource OverlayScrimBrush}">
       <Border Width="420"
@@ -2635,7 +2686,7 @@
         </StackPanel>
       </Border>
     </Border>
-    <Border Grid.ColumnSpan="2"
+    <Border Grid.Column="1" Grid.ColumnSpan="2"
             IsVisible="{Binding ShouldShowFirstStorePrompt}"
             Background="{DynamicResource OverlayScrimBrush}">
       <Border Width="420"
@@ -2669,6 +2720,31 @@
     </Border>
   </Grid>
   <Window.Styles>
+    <Style Selector="Button.utilityRailButton">
+      <Setter Property="Width" Value="40" />
+      <Setter Property="Height" Value="40" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource StrongTextBrush}" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="FontSize" Value="18" />
+    </Style>
+    <Style Selector="Button.utilityRailButton:pointerover">
+      <Setter Property="Background" Value="{DynamicResource PanelSurfaceBrush}" />
+    </Style>
+    <Style Selector="Button.workspaceContextButton">
+      <Setter Property="Padding" Value="6,4" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="4" />
+    </Style>
+    <Style Selector="Button.workspaceContextButton:pointerover">
+      <Setter Property="Background" Value="{DynamicResource PanelSurfaceBrush}" />
+    </Style>
     <Style Selector="TreeViewItem" x:DataType="nav:WorkspaceTreeNodeViewModel">
       <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
       <Setter Property="Padding" Value="0" />

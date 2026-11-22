@@ -84,6 +84,31 @@ public sealed class ArtworkStyleManagementServiceTests
         Assert.True(files.Exists(referencePath));
     }
 
+    [Fact]
+    public async Task LoadAsync_FiltersStylesByWorkspaceAndReportsUnavailableReferences()
+    {
+        var (service, repository, _, workspaceId) = Create();
+        var now = DateTimeOffset.UtcNow;
+        var otherWorkspaceId = Guid.NewGuid();
+        var activeStyle = new ArtworkStyle(Guid.NewGuid(), workspaceId, "Ink", "Bold linework", now, now);
+        var otherStyle = new ArtworkStyle(Guid.NewGuid(), otherWorkspaceId, "Pastel", "Soft colors", now, now);
+        var activeReference = new ArtworkStyleReference(Guid.NewGuid(), activeStyle.Id, "styles/missing.png", "image/png", 0, now);
+        var otherReference = new ArtworkStyleReference(Guid.NewGuid(), otherStyle.Id, "styles/other.png", "image/png", 0, now);
+        await repository.SaveAsync(repository.Snapshot with
+        {
+            Workspaces = [.. repository.Snapshot.Workspaces, new(otherWorkspaceId, "Other", null, false, now, now, "{}")],
+            ArtworkStyles = [activeStyle, otherStyle],
+            ArtworkStyleReferences = [activeReference, otherReference]
+        }, TestContext.Current.CancellationToken);
+
+        var state = await service.LoadAsync(workspaceId, TestContext.Current.CancellationToken);
+
+        Assert.Equal([activeStyle], state.Styles);
+        var reference = Assert.Single(state.References[activeStyle.Id]);
+        Assert.Equal(activeReference, reference.Reference);
+        Assert.False(reference.IsAvailable);
+        Assert.DoesNotContain(otherStyle.Id, state.References.Keys);
+    }
     private static (ArtworkStyleManagementService Service, MemoryRepository Repository, MemoryFileStore Files, Guid WorkspaceId) Create(bool withItem = false)
     {
         var now = DateTimeOffset.UtcNow;
