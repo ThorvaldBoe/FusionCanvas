@@ -18,7 +18,7 @@
     </StackPanel>
     <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
       <ScrollViewer Grid.Column="0" MaxHeight="480">
-        <ItemsControl ItemsSource="{Binding FilteredListingOtherColors}">
+        <ItemsControl ItemsSource="{Binding FilteredListingColorsForMoreOptions}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="stageTools:ListingColorChoiceViewModel">
               <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto"

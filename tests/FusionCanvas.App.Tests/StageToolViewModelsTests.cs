@@ -1,5 +1,6 @@
 using Avalonia.Headless.XUnit;
 using Avalonia.Controls;
+using Avalonia.VisualTree;
 using FusionCanvas.App.StageTools;
 using FusionCanvas.Application.Mockups;
 using FusionCanvas.Domain.Mockups;
@@ -54,13 +55,14 @@ public class StageToolViewModelsTests
         var option = new FusionCanvas.Domain.Catalog.OfferingOption(Guid.NewGuid(), offering.Id, FusionCanvas.Domain.Catalog.OptionKind.Color, "Color", 0);
         var black = new FusionCanvas.Domain.Catalog.OfferingOptionValue(Guid.NewGuid(), option.Id, offering.Id, "Black", 0, isFavorite: true);
         var teal = new FusionCanvas.Domain.Catalog.OfferingOptionValue(Guid.NewGuid(), option.Id, offering.Id, "Teal", 1, metadataJson: "{\"hex\":\"#008080\"}");
-        var sellable = new FusionCanvas.Domain.Catalog.OfferingVariant(Guid.NewGuid(), offering.Id, "Teal", [teal.Id], false, now, now);
+        var blackSellable = new FusionCanvas.Domain.Catalog.OfferingVariant(Guid.NewGuid(), offering.Id, "Black", [black.Id], false, now, now);
+        var tealSellable = new FusionCanvas.Domain.Catalog.OfferingVariant(Guid.NewGuid(), offering.Id, "Teal", [teal.Id], false, now, now);
         var artwork = new DesignVariantRow(Guid.NewGuid(), itemId, true, 0);
         var snapshot = WorkspaceSnapshot.Empty with
         {
             Workspaces = [workspace], Stores = [store], Items = [item], Blueprints = [blueprint], PrintProviders = [provider],
             BlueprintOfferings = [offering], OfferingOptions = [option], OfferingOptionValues = [black, teal],
-            OfferingVariants = [sellable], ItemListingConfigurations = [new ItemListingConfiguration(itemId, offering.Id)],
+            OfferingVariants = [blackSellable, tealSellable], ItemListingConfigurations = [new ItemListingConfiguration(itemId, offering.Id)],
             DesignVariantRows = [artwork]
         };
         var repository = new MemoryRepository(snapshot);
@@ -76,6 +78,9 @@ public class StageToolViewModelsTests
 
         viewModel.ShowMoreOptionsCommand.Execute(null);
         var choice = Assert.Single(viewModel.ListingOtherColors);
+        var favorite = Assert.Single(viewModel.ListingFavoriteColors);
+        Assert.Equal(new[] { "Black", "Teal" }, viewModel.FilteredListingColorsForMoreOptions.Select(color => color.Name).Order().ToArray());
+        Assert.False(favorite.IsDraftSelected);
         choice.IsDraftSelected = true;
         viewModel.PreviewListingColorCommand.Execute(choice);
         await HeadlessUiWait.UntilAsync(() => viewModel.PreviewColorName == "Teal", "flat Color preview");
@@ -86,6 +91,8 @@ public class StageToolViewModelsTests
         var searchBox = dialog.FindControl<Avalonia.Controls.TextBox>("SearchColorsBox");
         Assert.NotNull(searchBox);
         await HeadlessUiWait.UntilAsync(() => searchBox!.IsFocused, "More Options search focus");
+        var colorRows = Assert.Single(dialog.GetVisualDescendants().OfType<ItemsControl>().Where(control => control is not ComboBox));
+        Assert.Equal(new[] { "Black", "Teal" }, colorRows.Items.Cast<ListingColorChoiceViewModel>().Select(color => color.Name).Order().ToArray());
         dialog.RaiseEvent(new Avalonia.Input.KeyEventArgs
         {
             RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent,
@@ -94,7 +101,18 @@ public class StageToolViewModelsTests
 
         Assert.False(viewModel.IsMoreOptionsVisible);
         Assert.False(choice.IsDraftSelected);
+        Assert.False(favorite.IsDraftSelected);
         Assert.Empty(repository.Snapshot.ListingColorSelections);
+
+        viewModel.ShowMoreOptionsCommand.Execute(null);
+        favorite.IsDraftSelected = true;
+        choice.IsDraftSelected = true;
+        viewModel.ApplyMoreOptionsCommand.Execute(null);
+        await HeadlessUiWait.UntilAsync(() => !viewModel.IsMoreOptionsVisible, "More Options selection confirmation");
+
+        Assert.Equal(2, repository.Snapshot.ListingColorSelections.Count(selection => selection.ItemId == itemId));
+        Assert.Contains(repository.Snapshot.ListingColorSelections, selection => selection.ItemId == itemId && selection.ColorOptionValueId == black.Id);
+        Assert.Contains(repository.Snapshot.ListingColorSelections, selection => selection.ItemId == itemId && selection.ColorOptionValueId == teal.Id);
     }
 
     [Fact]

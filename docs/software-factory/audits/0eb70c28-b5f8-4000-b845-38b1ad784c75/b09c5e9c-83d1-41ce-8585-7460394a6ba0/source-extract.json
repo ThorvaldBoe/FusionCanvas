@@ -1,0 +1,787 @@
+{
+  "extract": {
+    "extract_id": "0eb70c28-b5f8-4000-b845-38b1ad784c75/b09c5e9c-83d1-41ce-8585-7460394a6ba0",
+    "standard": "FC-ARCH",
+    "standard_version": "2.0.0",
+    "definition_version": "2.0",
+    "extract_revision": 1,
+    "repository_revision": "09d3089f734e99025056cfdfeeb36101de702d9d",
+    "working_tree": "clean at audit start",
+    "generated_at": "2026-11-22T17:03:32Z",
+    "change_summary": "Source types declared in the 69-file PR #984 diff; direct caller and dependency context reviewed.",
+    "exclusions": [
+      "Unchanged types outside direct dependency context",
+      "Test types as primary architecture units; tests reviewed as supporting evidence"
+    ],
+    "discovery_limits": [
+      "Parser inventories top-level class, record, interface, enum, and struct declarations in changed src .cs files. Nested helper types are recorded as relationships unless independently public."
+    ]
+  },
+  "entries": [
+    {
+      "item_id": "FusionCanvas.App::FusionCanvas.App.StageTools.DesignRowViewModel",
+      "extract_entry_id": "FusionCanvas.App::FusionCanvas.App.StageTools.DesignRowViewModel@1",
+      "project": "FusionCanvas.App",
+      "fully_qualified_type": "FusionCanvas.App.StageTools.DesignRowViewModel",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.App/StageTools/DesignRowViewModel.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.App.StageTools / src/FusionCanvas.App/StageTools",
+      "declared_role": "UI/presentation/composition",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.App::FusionCanvas.App.StageTools.DesignStageToolViewModel",
+      "extract_entry_id": "FusionCanvas.App::FusionCanvas.App.StageTools.DesignStageToolViewModel@1",
+      "project": "FusionCanvas.App",
+      "fully_qualified_type": "FusionCanvas.App.StageTools.DesignStageToolViewModel",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.App/StageTools/DesignStageToolViewModel.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.App.StageTools / src/FusionCanvas.App/StageTools",
+      "declared_role": "UI/presentation/composition",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.App::FusionCanvas.App.StageTools.ArtworkContrastChoice",
+      "extract_entry_id": "FusionCanvas.App::FusionCanvas.App.StageTools.ArtworkContrastChoice@1",
+      "project": "FusionCanvas.App",
+      "fully_qualified_type": "FusionCanvas.App.StageTools.ArtworkContrastChoice",
+      "type_kind": "record",
+      "source_files": [
+        "src/FusionCanvas.App/StageTools/DesignStageToolViewModel.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.App.StageTools / src/FusionCanvas.App/StageTools",
+      "declared_role": "UI/presentation/composition",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.App::FusionCanvas.App.StageTools.ListingColorChoiceViewModel",
+      "extract_entry_id": "FusionCanvas.App::FusionCanvas.App.StageTools.ListingColorChoiceViewModel@1",
+      "project": "FusionCanvas.App",
+      "fully_qualified_type": "FusionCanvas.App.StageTools.ListingColorChoiceViewModel",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.App/StageTools/ListingColorChoiceViewModel.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.App.StageTools / src/FusionCanvas.App/StageTools",
+      "declared_role": "UI/presentation/composition",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.App::FusionCanvas.App.StageTools.ListingColorOptionsWindow",
+      "extract_entry_id": "FusionCanvas.App::FusionCanvas.App.StageTools.ListingColorOptionsWindow@1",
+      "project": "FusionCanvas.App",
+      "fully_qualified_type": "FusionCanvas.App.StageTools.ListingColorOptionsWindow",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.App/StageTools/ListingColorOptionsWindow.axaml.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.App.StageTools / src/FusionCanvas.App/StageTools",
+      "declared_role": "UI/presentation/composition",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.App::FusionCanvas.App.StageTools.PrintifyListingStageToolViewModel",
+      "extract_entry_id": "FusionCanvas.App::FusionCanvas.App.StageTools.PrintifyListingStageToolViewModel@1",
+      "project": "FusionCanvas.App",
+      "fully_qualified_type": "FusionCanvas.App.StageTools.PrintifyListingStageToolViewModel",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.App/StageTools/PrintifyListingStageToolViewModel.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.App.StageTools / src/FusionCanvas.App/StageTools",
+      "declared_role": "UI/presentation/composition",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.App::FusionCanvas.App.StageTools.UnresolvedListingColorViewModel",
+      "extract_entry_id": "FusionCanvas.App::FusionCanvas.App.StageTools.UnresolvedListingColorViewModel@1",
+      "project": "FusionCanvas.App",
+      "fully_qualified_type": "FusionCanvas.App.StageTools.UnresolvedListingColorViewModel",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.App/StageTools/UnresolvedListingColorViewModel.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.App.StageTools / src/FusionCanvas.App/StageTools",
+      "declared_role": "UI/presentation/composition",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.App::FusionCanvas.App.StageTools.WorkspaceListingProjectionSource",
+      "extract_entry_id": "FusionCanvas.App::FusionCanvas.App.StageTools.WorkspaceListingProjectionSource@1",
+      "project": "FusionCanvas.App",
+      "fully_qualified_type": "FusionCanvas.App.StageTools.WorkspaceListingProjectionSource",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.App/StageTools/WorkspaceListingProjectionSource.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.App.StageTools / src/FusionCanvas.App/StageTools",
+      "declared_role": "UI/presentation/composition",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.App::FusionCanvas.App.Stores.CatalogSetupViewModel",
+      "extract_entry_id": "FusionCanvas.App::FusionCanvas.App.Stores.CatalogSetupViewModel@1",
+      "project": "FusionCanvas.App",
+      "fully_qualified_type": "FusionCanvas.App.Stores.CatalogSetupViewModel",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.App/Stores/CatalogSetupViewModel.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.App.Stores / src/FusionCanvas.App/Stores",
+      "declared_role": "UI/presentation/composition",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.App::FusionCanvas.App.Views.MainWindow",
+      "extract_entry_id": "FusionCanvas.App::FusionCanvas.App.Views.MainWindow@1",
+      "project": "FusionCanvas.App",
+      "fully_qualified_type": "FusionCanvas.App.Views.MainWindow",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.App/Views/MainWindow.axaml.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.App.Views / src/FusionCanvas.App/Views",
+      "declared_role": "UI/presentation/composition",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.App::FusionCanvas.App.Views.MainWindowViewModel",
+      "extract_entry_id": "FusionCanvas.App::FusionCanvas.App.Views.MainWindowViewModel@1",
+      "project": "FusionCanvas.App",
+      "fully_qualified_type": "FusionCanvas.App.Views.MainWindowViewModel",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.App/Views/MainWindowViewModel.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.App.Views / src/FusionCanvas.App/Views",
+      "declared_role": "UI/presentation/composition",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.App::FusionCanvas.App.Workspace.AppWorkspaceFactory",
+      "extract_entry_id": "FusionCanvas.App::FusionCanvas.App.Workspace.AppWorkspaceFactory@1",
+      "project": "FusionCanvas.App",
+      "fully_qualified_type": "FusionCanvas.App.Workspace.AppWorkspaceFactory",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.App/Workspace/AppWorkspaceFactory.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.App.Workspace / src/FusionCanvas.App/Workspace",
+      "declared_role": "UI/presentation/composition",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.App::FusionCanvas.App.Workspace.MainWindowApplicationServices",
+      "extract_entry_id": "FusionCanvas.App::FusionCanvas.App.Workspace.MainWindowApplicationServices@1",
+      "project": "FusionCanvas.App",
+      "fully_qualified_type": "FusionCanvas.App.Workspace.MainWindowApplicationServices",
+      "type_kind": "record",
+      "source_files": [
+        "src/FusionCanvas.App/Workspace/MainWindowApplicationServices.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.App.Workspace / src/FusionCanvas.App/Workspace",
+      "declared_role": "UI/presentation/composition",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.App::FusionCanvas.App.Workspace.UiTestPrintifyCatalogClient",
+      "extract_entry_id": "FusionCanvas.App::FusionCanvas.App.Workspace.UiTestPrintifyCatalogClient@1",
+      "project": "FusionCanvas.App",
+      "fully_qualified_type": "FusionCanvas.App.Workspace.UiTestPrintifyCatalogClient",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.App/Workspace/UiTestPrintifyCatalogClient.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.App.Workspace / src/FusionCanvas.App/Workspace",
+      "declared_role": "UI/presentation/composition",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Application::FusionCanvas.Application.Catalog.CatalogSetupService",
+      "extract_entry_id": "FusionCanvas.Application::FusionCanvas.Application.Catalog.CatalogSetupService@1",
+      "project": "FusionCanvas.Application",
+      "fully_qualified_type": "FusionCanvas.Application.Catalog.CatalogSetupService",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.Application/Catalog/CatalogSetupService.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Application.Catalog / src/FusionCanvas.Application/Catalog",
+      "declared_role": "Application contract/use case",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Application::FusionCanvas.Application.Catalog.ICatalogSetupService",
+      "extract_entry_id": "FusionCanvas.Application::FusionCanvas.Application.Catalog.ICatalogSetupService@1",
+      "project": "FusionCanvas.Application",
+      "fully_qualified_type": "FusionCanvas.Application.Catalog.ICatalogSetupService",
+      "type_kind": "interface",
+      "source_files": [
+        "src/FusionCanvas.Application/Catalog/ICatalogSetupService.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Application.Catalog / src/FusionCanvas.Application/Catalog",
+      "declared_role": "Application contract/use case",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Application::FusionCanvas.Application.DesignFiles.ArtworkGenerationService",
+      "extract_entry_id": "FusionCanvas.Application::FusionCanvas.Application.DesignFiles.ArtworkGenerationService@1",
+      "project": "FusionCanvas.Application",
+      "fully_qualified_type": "FusionCanvas.Application.DesignFiles.ArtworkGenerationService",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.Application/DesignFiles/ArtworkGenerationService.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Application.DesignFiles / src/FusionCanvas.Application/DesignFiles",
+      "declared_role": "Application contract/use case",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Application::FusionCanvas.Application.DesignFiles.DesignRowSummary",
+      "extract_entry_id": "FusionCanvas.Application::FusionCanvas.Application.DesignFiles.DesignRowSummary@1",
+      "project": "FusionCanvas.Application",
+      "fully_qualified_type": "FusionCanvas.Application.DesignFiles.DesignRowSummary",
+      "type_kind": "record",
+      "source_files": [
+        "src/FusionCanvas.Application/DesignFiles/DesignRowSummary.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Application.DesignFiles / src/FusionCanvas.Application/DesignFiles",
+      "declared_role": "Application contract/use case",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Application::FusionCanvas.Application.DesignFiles.DesignStageService",
+      "extract_entry_id": "FusionCanvas.Application::FusionCanvas.Application.DesignFiles.DesignStageService@1",
+      "project": "FusionCanvas.Application",
+      "fully_qualified_type": "FusionCanvas.Application.DesignFiles.DesignStageService",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.Application/DesignFiles/DesignStageService.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Application.DesignFiles / src/FusionCanvas.Application/DesignFiles",
+      "declared_role": "Application contract/use case",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Application::FusionCanvas.Application.DesignFiles.IDesignStageService",
+      "extract_entry_id": "FusionCanvas.Application::FusionCanvas.Application.DesignFiles.IDesignStageService@1",
+      "project": "FusionCanvas.Application",
+      "fully_qualified_type": "FusionCanvas.Application.DesignFiles.IDesignStageService",
+      "type_kind": "interface",
+      "source_files": [
+        "src/FusionCanvas.Application/DesignFiles/IDesignStageService.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Application.DesignFiles / src/FusionCanvas.Application/DesignFiles",
+      "declared_role": "Application contract/use case",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Application::FusionCanvas.Application.Listings.IListingColorSelectionService",
+      "extract_entry_id": "FusionCanvas.Application::FusionCanvas.Application.Listings.IListingColorSelectionService@1",
+      "project": "FusionCanvas.Application",
+      "fully_qualified_type": "FusionCanvas.Application.Listings.IListingColorSelectionService",
+      "type_kind": "interface",
+      "source_files": [
+        "src/FusionCanvas.Application/Listings/IListingColorSelectionService.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Application.Listings / src/FusionCanvas.Application/Listings",
+      "declared_role": "Application contract/use case",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Application::FusionCanvas.Application.Listings.ListingArtworkProjection",
+      "extract_entry_id": "FusionCanvas.Application::FusionCanvas.Application.Listings.ListingArtworkProjection@1",
+      "project": "FusionCanvas.Application",
+      "fully_qualified_type": "FusionCanvas.Application.Listings.ListingArtworkProjection",
+      "type_kind": "record",
+      "source_files": [
+        "src/FusionCanvas.Application/Listings/ListingArtworkProjection.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Application.Listings / src/FusionCanvas.Application/Listings",
+      "declared_role": "Application contract/use case",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Application::FusionCanvas.Application.Listings.ListingColorChoice",
+      "extract_entry_id": "FusionCanvas.Application::FusionCanvas.Application.Listings.ListingColorChoice@1",
+      "project": "FusionCanvas.Application",
+      "fully_qualified_type": "FusionCanvas.Application.Listings.ListingColorChoice",
+      "type_kind": "record",
+      "source_files": [
+        "src/FusionCanvas.Application/Listings/ListingColorSelectionService.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Application.Listings / src/FusionCanvas.Application/Listings",
+      "declared_role": "Application contract/use case",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Application::FusionCanvas.Application.Listings.ListingArtworkVariantChoice",
+      "extract_entry_id": "FusionCanvas.Application::FusionCanvas.Application.Listings.ListingArtworkVariantChoice@1",
+      "project": "FusionCanvas.Application",
+      "fully_qualified_type": "FusionCanvas.Application.Listings.ListingArtworkVariantChoice",
+      "type_kind": "record",
+      "source_files": [
+        "src/FusionCanvas.Application/Listings/ListingColorSelectionService.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Application.Listings / src/FusionCanvas.Application/Listings",
+      "declared_role": "Application contract/use case",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Application::FusionCanvas.Application.Listings.ListingUnresolvedColorChoice",
+      "extract_entry_id": "FusionCanvas.Application::FusionCanvas.Application.Listings.ListingUnresolvedColorChoice@1",
+      "project": "FusionCanvas.Application",
+      "fully_qualified_type": "FusionCanvas.Application.Listings.ListingUnresolvedColorChoice",
+      "type_kind": "record",
+      "source_files": [
+        "src/FusionCanvas.Application/Listings/ListingColorSelectionService.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Application.Listings / src/FusionCanvas.Application/Listings",
+      "declared_role": "Application contract/use case",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Application::FusionCanvas.Application.Listings.ListingColorSelectionState",
+      "extract_entry_id": "FusionCanvas.Application::FusionCanvas.Application.Listings.ListingColorSelectionState@1",
+      "project": "FusionCanvas.Application",
+      "fully_qualified_type": "FusionCanvas.Application.Listings.ListingColorSelectionState",
+      "type_kind": "record",
+      "source_files": [
+        "src/FusionCanvas.Application/Listings/ListingColorSelectionService.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Application.Listings / src/FusionCanvas.Application/Listings",
+      "declared_role": "Application contract/use case",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Application::FusionCanvas.Application.Listings.ListingColorSelectionService",
+      "extract_entry_id": "FusionCanvas.Application::FusionCanvas.Application.Listings.ListingColorSelectionService@1",
+      "project": "FusionCanvas.Application",
+      "fully_qualified_type": "FusionCanvas.Application.Listings.ListingColorSelectionService",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.Application/Listings/ListingColorSelectionService.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Application.Listings / src/FusionCanvas.Application/Listings",
+      "declared_role": "Application contract/use case",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Application::FusionCanvas.Application.Listings.ListingProjectionBuilder",
+      "extract_entry_id": "FusionCanvas.Application::FusionCanvas.Application.Listings.ListingProjectionBuilder@1",
+      "project": "FusionCanvas.Application",
+      "fully_qualified_type": "FusionCanvas.Application.Listings.ListingProjectionBuilder",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.Application/Listings/ListingProjectionBuilder.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Application.Listings / src/FusionCanvas.Application/Listings",
+      "declared_role": "Application contract/use case",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Application::FusionCanvas.Application.Listings.ListingProjectionRequest",
+      "extract_entry_id": "FusionCanvas.Application::FusionCanvas.Application.Listings.ListingProjectionRequest@1",
+      "project": "FusionCanvas.Application",
+      "fully_qualified_type": "FusionCanvas.Application.Listings.ListingProjectionRequest",
+      "type_kind": "record",
+      "source_files": [
+        "src/FusionCanvas.Application/Listings/ListingProjectionRequest.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Application.Listings / src/FusionCanvas.Application/Listings",
+      "declared_role": "Application contract/use case",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Application::FusionCanvas.Application.Mockups.MockupGenerationService",
+      "extract_entry_id": "FusionCanvas.Application::FusionCanvas.Application.Mockups.MockupGenerationService@1",
+      "project": "FusionCanvas.Application",
+      "fully_qualified_type": "FusionCanvas.Application.Mockups.MockupGenerationService",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.Application/Mockups/MockupGenerationService.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Application.Mockups / src/FusionCanvas.Application/Mockups",
+      "declared_role": "Application contract/use case",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Application::FusionCanvas.Application.Stores.Printify.PrintifyCatalogImportService",
+      "extract_entry_id": "FusionCanvas.Application::FusionCanvas.Application.Stores.Printify.PrintifyCatalogImportService@1",
+      "project": "FusionCanvas.Application",
+      "fully_qualified_type": "FusionCanvas.Application.Stores.Printify.PrintifyCatalogImportService",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.Application/Stores/Printify/PrintifyCatalogImportService.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Application.Stores.Printify / src/FusionCanvas.Application/Stores/Printify",
+      "declared_role": "Application contract/use case",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Application::FusionCanvas.Application.Stores.Printify.PrintifyCatalogOptionValue",
+      "extract_entry_id": "FusionCanvas.Application::FusionCanvas.Application.Stores.Printify.PrintifyCatalogOptionValue@1",
+      "project": "FusionCanvas.Application",
+      "fully_qualified_type": "FusionCanvas.Application.Stores.Printify.PrintifyCatalogOptionValue",
+      "type_kind": "record",
+      "source_files": [
+        "src/FusionCanvas.Application/Stores/Printify/PrintifyCatalogOptionValue.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Application.Stores.Printify / src/FusionCanvas.Application/Stores/Printify",
+      "declared_role": "Application contract/use case",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Application::FusionCanvas.Application.Stores.Printify.PrintifyListingImportService",
+      "extract_entry_id": "FusionCanvas.Application::FusionCanvas.Application.Stores.Printify.PrintifyListingImportService@1",
+      "project": "FusionCanvas.Application",
+      "fully_qualified_type": "FusionCanvas.Application.Stores.Printify.PrintifyListingImportService",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.Application/Stores/Printify/PrintifyListingImportService.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Application.Stores.Printify / src/FusionCanvas.Application/Stores/Printify",
+      "declared_role": "Application contract/use case",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Domain::FusionCanvas.Domain.Catalog.OfferingOptionValue",
+      "extract_entry_id": "FusionCanvas.Domain::FusionCanvas.Domain.Catalog.OfferingOptionValue@1",
+      "project": "FusionCanvas.Domain",
+      "fully_qualified_type": "FusionCanvas.Domain.Catalog.OfferingOptionValue",
+      "type_kind": "record",
+      "source_files": [
+        "src/FusionCanvas.Domain/Catalog/OfferingOptionValue.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Domain.Catalog / src/FusionCanvas.Domain/Catalog",
+      "declared_role": "Domain policy/value",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Domain::FusionCanvas.Domain.Catalog.OfferingVariant",
+      "extract_entry_id": "FusionCanvas.Domain::FusionCanvas.Domain.Catalog.OfferingVariant@1",
+      "project": "FusionCanvas.Domain",
+      "fully_qualified_type": "FusionCanvas.Domain.Catalog.OfferingVariant",
+      "type_kind": "record",
+      "source_files": [
+        "src/FusionCanvas.Domain/Catalog/OfferingVariant.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Domain.Catalog / src/FusionCanvas.Domain/Catalog",
+      "declared_role": "Domain policy/value",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Domain::FusionCanvas.Domain.Products.ArtworkContrastIntent",
+      "extract_entry_id": "FusionCanvas.Domain::FusionCanvas.Domain.Products.ArtworkContrastIntent@1",
+      "project": "FusionCanvas.Domain",
+      "fully_qualified_type": "FusionCanvas.Domain.Products.ArtworkContrastIntent",
+      "type_kind": "enum",
+      "source_files": [
+        "src/FusionCanvas.Domain/Products/ArtworkContrastIntent.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Domain.Products / src/FusionCanvas.Domain/Products",
+      "declared_role": "Domain policy/value",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Domain::FusionCanvas.Domain.Products.DesignStagePolicy",
+      "extract_entry_id": "FusionCanvas.Domain::FusionCanvas.Domain.Products.DesignStagePolicy@1",
+      "project": "FusionCanvas.Domain",
+      "fully_qualified_type": "FusionCanvas.Domain.Products.DesignStagePolicy",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.Domain/Products/DesignStagePolicy.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Domain.Products / src/FusionCanvas.Domain/Products",
+      "declared_role": "Domain policy/value",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Domain::FusionCanvas.Domain.Products.DesignVariantRow",
+      "extract_entry_id": "FusionCanvas.Domain::FusionCanvas.Domain.Products.DesignVariantRow@1",
+      "project": "FusionCanvas.Domain",
+      "fully_qualified_type": "FusionCanvas.Domain.Products.DesignVariantRow",
+      "type_kind": "record",
+      "source_files": [
+        "src/FusionCanvas.Domain/Products/DesignVariantRow.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Domain.Products / src/FusionCanvas.Domain/Products",
+      "declared_role": "Domain policy/value",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Domain::FusionCanvas.Domain.Products.ListingColorSelection",
+      "extract_entry_id": "FusionCanvas.Domain::FusionCanvas.Domain.Products.ListingColorSelection@1",
+      "project": "FusionCanvas.Domain",
+      "fully_qualified_type": "FusionCanvas.Domain.Products.ListingColorSelection",
+      "type_kind": "record",
+      "source_files": [
+        "src/FusionCanvas.Domain/Products/ListingColorSelection.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Domain.Products / src/FusionCanvas.Domain/Products",
+      "declared_role": "Domain policy/value",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Domain::FusionCanvas.Domain.Workspace.Transfer.WorkspaceSnapshotFilter",
+      "extract_entry_id": "FusionCanvas.Domain::FusionCanvas.Domain.Workspace.Transfer.WorkspaceSnapshotFilter@1",
+      "project": "FusionCanvas.Domain",
+      "fully_qualified_type": "FusionCanvas.Domain.Workspace.Transfer.WorkspaceSnapshotFilter",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.Domain/Workspace/Transfer/WorkspaceSnapshotFilter.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Domain.Workspace.Transfer / src/FusionCanvas.Domain/Workspace/Transfer",
+      "declared_role": "Domain policy/value",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Domain::FusionCanvas.Domain.Workspace.WorkspaceSnapshot",
+      "extract_entry_id": "FusionCanvas.Domain::FusionCanvas.Domain.Workspace.WorkspaceSnapshot@1",
+      "project": "FusionCanvas.Domain",
+      "fully_qualified_type": "FusionCanvas.Domain.Workspace.WorkspaceSnapshot",
+      "type_kind": "record",
+      "source_files": [
+        "src/FusionCanvas.Domain/Workspace/WorkspaceSnapshot.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Domain.Workspace / src/FusionCanvas.Domain/Workspace",
+      "declared_role": "Domain policy/value",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Integration::FusionCanvas.Integration.Persistence.SqliteDatabaseSchema",
+      "extract_entry_id": "FusionCanvas.Integration::FusionCanvas.Integration.Persistence.SqliteDatabaseSchema@1",
+      "project": "FusionCanvas.Integration",
+      "fully_qualified_type": "FusionCanvas.Integration.Persistence.SqliteDatabaseSchema",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.Integration/Persistence/SqliteDatabaseSchema.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Integration.Persistence / src/FusionCanvas.Integration/Persistence",
+      "declared_role": "Persistence/provider adapter",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Integration::FusionCanvas.Integration.Persistence.SqliteWorkspaceRepository",
+      "extract_entry_id": "FusionCanvas.Integration::FusionCanvas.Integration.Persistence.SqliteWorkspaceRepository@1",
+      "project": "FusionCanvas.Integration",
+      "fully_qualified_type": "FusionCanvas.Integration.Persistence.SqliteWorkspaceRepository",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.Integration/Persistence/SqliteWorkspaceRepository.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Integration.Persistence / src/FusionCanvas.Integration/Persistence",
+      "declared_role": "Persistence/provider adapter",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Integration::FusionCanvas.Integration.Stores.Printify.PrintifyCatalogClient",
+      "extract_entry_id": "FusionCanvas.Integration::FusionCanvas.Integration.Stores.Printify.PrintifyCatalogClient@1",
+      "project": "FusionCanvas.Integration",
+      "fully_qualified_type": "FusionCanvas.Integration.Stores.Printify.PrintifyCatalogClient",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.Integration/Stores/Printify/PrintifyCatalogClient.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Integration.Stores.Printify / src/FusionCanvas.Integration/Stores/Printify",
+      "declared_role": "Persistence/provider adapter",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    },
+    {
+      "item_id": "FusionCanvas.Integration::FusionCanvas.Integration.Stores.Printify.PrintifyListingClient",
+      "extract_entry_id": "FusionCanvas.Integration::FusionCanvas.Integration.Stores.Printify.PrintifyListingClient@1",
+      "project": "FusionCanvas.Integration",
+      "fully_qualified_type": "FusionCanvas.Integration.Stores.Printify.PrintifyListingClient",
+      "type_kind": "class",
+      "source_files": [
+        "src/FusionCanvas.Integration/Stores/Printify/PrintifyListingClient.cs"
+      ],
+      "namespace_and_folder": "FusionCanvas.Integration.Stores.Printify / src/FusionCanvas.Integration/Stores/Printify",
+      "declared_role": "Persistence/provider adapter",
+      "architectural_signals": [
+        "changed in PR #984"
+      ],
+      "direct_relationships": "Callers, registrations, implementation contracts, and focused tests reviewed in the axis run; details summarized there.",
+      "change_type": "ADDED_OR_CHANGED"
+    }
+  ]
+}

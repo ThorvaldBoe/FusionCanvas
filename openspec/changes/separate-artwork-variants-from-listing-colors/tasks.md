@@ -50,3 +50,4 @@
 - [x] 8.1 Complete `verification.md` with results and evidence for every acceptance scenario, including migration and the isolated UI scenario pack.
 - [x] 8.2 Review changed-scope OpenSpec drift, migration safety, provider request semantics, keyboard/focus behavior, and preservation of remote mappings; correct artifacts or implementation for every failed criterion.
 - [x] 8.3 Run strict OpenSpec validation and `dotnet test .\FusionCanvas.sln`; record the exact commands and results in `verification.md`.
+- [x] 8.4 Correct More Options to include favorite Colors in its full collection, reconcile the requirement wording, and add a headless regression test for viewing, canceling, and confirming favorite and nonfavorite selections together.

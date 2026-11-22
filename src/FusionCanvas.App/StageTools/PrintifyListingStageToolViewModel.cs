@@ -168,9 +168,9 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
     public string ListingColorSearchText
     {
         get => _listingColorSearchText;
-        set { if (SetField(ref _listingColorSearchText, value ?? string.Empty)) OnPropertyChanged(nameof(FilteredListingOtherColors)); }
+        set { if (SetField(ref _listingColorSearchText, value ?? string.Empty)) OnPropertyChanged(nameof(FilteredListingColorsForMoreOptions)); }
     }
-    public IReadOnlyList<ListingColorChoiceViewModel> FilteredListingOtherColors => ListingOtherColors
+    public IReadOnlyList<ListingColorChoiceViewModel> FilteredListingColorsForMoreOptions => ListingFavoriteColors.Concat(ListingOtherColors)
         .Where(value => string.IsNullOrWhiteSpace(ListingColorSearchText)
             || value.Name.Contains(ListingColorSearchText.Trim(), StringComparison.OrdinalIgnoreCase)).ToArray();
     public string PreviewColorName { get => _previewColorName; private set => SetField(ref _previewColorName, value); }
@@ -406,28 +406,29 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         }
         OnPropertyChanged(nameof(HasListingColors));
         OnPropertyChanged(nameof(CanShowMoreOptions));
-        OnPropertyChanged(nameof(FilteredListingOtherColors));
+        OnPropertyChanged(nameof(FilteredListingColorsForMoreOptions));
         NotifyActions();
     }
 
     private void OpenMoreOptions()
     {
-        foreach (var color in ListingOtherColors) color.IsDraftSelected = color.IsSelected;
+        foreach (var color in ListingFavoriteColors.Concat(ListingOtherColors)) color.IsDraftSelected = color.IsSelected;
         IsMoreOptionsVisible = true;
         ListingColorSearchText = string.Empty;
     }
 
     private void CancelMoreOptions()
     {
-        foreach (var color in ListingOtherColors) color.IsDraftSelected = color.IsSelected;
+        foreach (var color in ListingFavoriteColors.Concat(ListingOtherColors)) color.IsDraftSelected = color.IsSelected;
         IsMoreOptionsVisible = false;
     }
 
     private async Task ApplyMoreOptionsAsync()
     {
         if (_listingColors is null || !IsMoreOptionsVisible || IsBusy) return;
-        var selected = ListingFavoriteColors.Where(value => value.IsSelected).Select(value => value.OptionValueId)
-            .Concat(ListingOtherColors.Where(value => value.IsDraftSelected).Select(value => value.OptionValueId))
+        var selected = ListingFavoriteColors.Concat(ListingOtherColors)
+            .Where(value => value.IsDraftSelected)
+            .Select(value => value.OptionValueId)
             .Distinct().ToArray();
         IsBusy = true;
         try

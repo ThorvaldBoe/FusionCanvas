@@ -65,7 +65,8 @@ Fill this table during implementation. Use exact test names or command output an
 | --- | --- | --- |
 | Artwork variants and contrast intent | Pass | `ArtworkVariantListingColorTests`; `DesignStageServiceTests`; `DesignStageToolHeadlessTests`. |
 | Listing favorite, Color selection, artwork mapping, all Sizes, and availability | Pass | `ListingColorSelectionServiceTests`; `ListingLifecycleTests`; `ListingProjectionBuilder` and Printify serializer tests. |
-| More Options preview/select/cancel and search focus | Pass | `StageToolViewModelsTests.ListingColorOptionsWindow_PreviewDoesNotSelectAndEscapeDiscardsDraft` (headless). |
+| More Options preview/select/cancel and search focus | Pass | `FusionCanvas.App.Tests.StageToolViewModelsTests.ListingColorOptionsWindow_PreviewDoesNotSelectAndEscapeDiscardsDraft` (Avalonia headless). |
+| More Options lists all active configured Colors, including favorites, and applies mixed favorite/nonfavorite checks | Pass | `StageToolViewModelsTests.ListingColorOptionsWindow_PreviewDoesNotSelectAndEscapeDiscardsDraft` asserts the rendered dialog's color rows contain favorite and nonfavorite Colors, cancel discards both drafts, and confirmation persists both selections; included in the full App suite below. |
 | Migration, idempotence, unresolved resolution, and rollback | Pass | `ArtworkVariantMigrationPersistenceTests` migration, round-trip, and `Migration_RollsBackListingSelectionsWhenBackfillFails`; remote mapping equality asserted after migration. |
 | Printify catalog query, swatch, and availability behavior | Pass | `PrintifyCatalogClientTests`; Printify catalog import Application tests; Integration suite. |
 | Mockup assignment and partial success | Pass | `MockupGenerationApplicabilityRegressionTests.Apply_generates_ready_color_with_its_assigned_art_and_keeps_unready_color_selected`. |
@@ -75,4 +76,4 @@ Fill this table during implementation. Use exact test names or command output an
 | Workspace migration and Printify contract review | Pass | Schema order is Artwork Styles v24, Listing Color assignments v25, provider availability v26. `ArtworkVariantMigrationPersistenceTests` covers failed v25 backfill rollback and retry; query contract requires `show-out-of-stock=1`; provider availability remains separate from local archival. |
 | Changed-scope OpenSpec drift review | Pass | Reviewed Domain/Application/Integration/App changes against all six delta specs; no remote mutation is performed by local migration. |
 | Strict OpenSpec validation | Pass | `openspec validate separate-artwork-variants-from-listing-colors --strict`. |
-| `dotnet test .\FusionCanvas.sln` | Pass | Final run after merging current `main`: Domain 301, Application 740, Integration 473, App 1,055; 2,569 total passed, 0 failed. NuGet vulnerability-feed lookup emitted NU1900 because `api.nuget.org` was unreachable. |
+| `dotnet test .\FusionCanvas.sln -m:1 --no-restore` after issue #985 fix | Pass | Domain 301, Application 740, Integration 473, App 1,055, UI Description 29; 2,598 passed, 0 failed. NU1900 was emitted because `api.nuget.org` was unreachable. |
