@@ -57,6 +57,19 @@ public class MainWindowConstructionTests
     }
 
     [AvaloniaFact]
+    public void ReportIssueRailAction_HasAccessibleIdentity()
+    {
+        using var fixture = new MainWindowFixture();
+
+        var reportButton = fixture.FindControl<Button>(button =>
+            AutomationProperties.GetAutomationId(button) == "IssueReporting.Open");
+
+        Assert.NotNull(reportButton);
+        Assert.Equal("Report an issue", AutomationProperties.GetName(reportButton));
+        Assert.True(reportButton.IsVisible);
+    }
+
+    [AvaloniaFact]
     public void ItemInspectorTagRemovalButton_HasCompactTargetAndAccessibleName()
     {
         using var fixture = new MainWindowFixture();

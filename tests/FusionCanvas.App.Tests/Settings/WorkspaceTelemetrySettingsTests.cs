@@ -270,9 +270,12 @@ public sealed class WorkspaceTelemetrySettingsTests
         public Task RecordAsync(TelemetryEventRequest request, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<IReadOnlyList<TelemetryEntry>> SearchAsync(Guid workspaceId, TelemetryQuery query, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<TelemetryEntry>>([]);
+        public Task<TelemetryReportBatch> ReadReportWindowAsync(Guid workspaceId, DateTimeOffset fromInclusive, DateTimeOffset toExclusive, int maxEntries = 200, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new TelemetryReportBatch([], false));
         public Task<IReadOnlyList<TelemetryEntry>> ReadAllAsync(Guid workspaceId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<TelemetryEntry>>([]);
         public Task<int> DeleteAllAsync(Guid workspaceId, CancellationToken cancellationToken = default) => Task.FromResult(0);
+        public Task<int> DeleteRangeAsync(Guid workspaceId, DateTimeOffset fromInclusive, DateTimeOffset toExclusive, CancellationToken cancellationToken = default) => Task.FromResult(0);
         public async Task<string> ExportJsonAsync(Guid workspaceId, CancellationToken cancellationToken = default)
         {
             return await _export.Task.WaitAsync(cancellationToken);
@@ -312,8 +315,10 @@ public sealed class WorkspaceTelemetrySettingsTests
         public Task SaveSettingsAsync(Guid workspaceId, WorkspaceTelemetrySettings settings, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task RecordAsync(TelemetryEventRequest request, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<IReadOnlyList<TelemetryEntry>> SearchAsync(Guid workspaceId, TelemetryQuery query, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<TelemetryEntry>>([]);
+        public Task<TelemetryReportBatch> ReadReportWindowAsync(Guid workspaceId, DateTimeOffset fromInclusive, DateTimeOffset toExclusive, int maxEntries = 200, CancellationToken cancellationToken = default) => Task.FromResult(new TelemetryReportBatch([], false));
         public Task<IReadOnlyList<TelemetryEntry>> ReadAllAsync(Guid workspaceId, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<TelemetryEntry>>([]);
         public Task<int> DeleteAllAsync(Guid workspaceId, CancellationToken cancellationToken = default) => Task.FromResult(0);
+        public Task<int> DeleteRangeAsync(Guid workspaceId, DateTimeOffset fromInclusive, DateTimeOffset toExclusive, CancellationToken cancellationToken = default) => Task.FromResult(0);
         public Task<string> ExportJsonAsync(Guid workspaceId, CancellationToken cancellationToken = default) => Task.FromResult("{}\n");
         public Task ExportAsync(Guid workspaceId, Stream destination, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<int> CleanupExpiredAsync(Guid workspaceId, CancellationToken cancellationToken = default) => Task.FromResult(0);

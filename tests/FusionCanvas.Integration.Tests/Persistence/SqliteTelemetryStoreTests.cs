@@ -76,6 +76,28 @@ public sealed class SqliteTelemetryStoreTests
         Assert.Equal("other", Assert.Single(await store.ReadAllAsync(otherWorkspace)).Message);
     }
 
+    [Fact]
+    public async Task Store_DeleteRange_IsWorkspaceScopedAndUsesHalfOpenTimeBounds()
+    {
+        using var temp = new TemporaryDirectory();
+        var store = new SqliteTelemetryStore(temp.GetPath("telemetry.db"));
+        var workspace = Guid.NewGuid();
+        var otherWorkspace = Guid.NewGuid();
+        var start = new DateTimeOffset(2026, 1, 2, 12, 0, 0, TimeSpan.Zero);
+        var end = start.AddMinutes(10);
+        await store.AddAsync(Entry(workspace, start.AddTicks(-1), "Workspace", "before"));
+        await store.AddAsync(Entry(workspace, start, "Workspace", "start"));
+        await store.AddAsync(Entry(workspace, end.AddTicks(-1), "Workspace", "inside"));
+        await store.AddAsync(Entry(workspace, end, "Workspace", "end"));
+        await store.AddAsync(Entry(otherWorkspace, start, "Workspace", "other"));
+
+        var deleted = await store.DeleteRangeAsync(workspace, start, end);
+
+        Assert.Equal(2, deleted);
+        Assert.Equal(["end", "before"], (await store.ReadAllAsync(workspace)).Select(entry => entry.Message));
+        Assert.Equal("other", Assert.Single(await store.ReadAllAsync(otherWorkspace)).Message);
+    }
+
     private static TelemetryEntry Entry(Guid workspace, DateTimeOffset time, string area, string message) =>
         new(Guid.NewGuid(), workspace, time, area, "Test", "Information", "Succeeded", message, null, null, null, null, null, null);
 

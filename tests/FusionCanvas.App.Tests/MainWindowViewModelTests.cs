@@ -1102,6 +1102,14 @@ public class MainWindowViewModelTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<TelemetryEntry>>([]);
 
+        public Task<TelemetryReportBatch> ReadReportWindowAsync(
+            Guid workspaceId,
+            DateTimeOffset fromInclusive,
+            DateTimeOffset toExclusive,
+            int maxEntries = 200,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new TelemetryReportBatch([], false));
+
         public Task<IReadOnlyList<TelemetryEntry>> ReadAllAsync(
             Guid workspaceId,
             CancellationToken cancellationToken = default) =>
@@ -1109,6 +1117,13 @@ public class MainWindowViewModelTests
 
         public Task<int> DeleteAllAsync(
             Guid workspaceId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(0);
+
+        public Task<int> DeleteRangeAsync(
+            Guid workspaceId,
+            DateTimeOffset fromInclusive,
+            DateTimeOffset toExclusive,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(0);
 

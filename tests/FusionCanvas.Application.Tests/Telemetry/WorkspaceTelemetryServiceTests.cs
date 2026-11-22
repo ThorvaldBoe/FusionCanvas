@@ -84,6 +84,49 @@ public sealed class WorkspaceTelemetryServiceTests
     }
 
     [Fact]
+    public async Task ReadReportWindowAsync_CapsNewestFirstAndReportsTruncation()
+    {
+        var workspace = Guid.NewGuid();
+        var otherWorkspace = Guid.NewGuid();
+        var now = new DateTimeOffset(2026, 1, 2, 12, 0, 0, TimeSpan.Zero);
+        var store = new MemoryTelemetryStore();
+        var context = new TestWorkspaceContext(workspace);
+        using var service = new WorkspaceTelemetryService(store, context, () => now);
+        store.Entries.Add(Entry(workspace, now.AddMinutes(-3), "old"));
+        store.Entries.Add(Entry(workspace, now.AddMinutes(-2), "middle"));
+        store.Entries.Add(Entry(workspace, now.AddMinutes(-1), "new"));
+        store.Entries.Add(Entry(otherWorkspace, now.AddSeconds(-30), "other workspace"));
+
+        var batch = await service.ReadReportWindowAsync(workspace, now.AddMinutes(-4), now, maxEntries: 2);
+
+        Assert.True(batch.IsTruncated);
+        Assert.Equal(["new", "middle"], batch.Entries.Select(entry => entry.Message));
+    }
+
+    [Fact]
+    public async Task DeleteRangeAsync_DeletesOnlyWorkspaceAndHalfOpenTimeWindow()
+    {
+        var workspace = Guid.NewGuid();
+        var otherWorkspace = Guid.NewGuid();
+        var start = new DateTimeOffset(2026, 1, 2, 12, 0, 0, TimeSpan.Zero);
+        var end = start.AddMinutes(10);
+        var store = new MemoryTelemetryStore();
+        var context = new TestWorkspaceContext(workspace);
+        using var service = new WorkspaceTelemetryService(store, context, () => end);
+        store.Entries.Add(Entry(workspace, start.AddTicks(-1), "before"));
+        store.Entries.Add(Entry(workspace, start, "start"));
+        store.Entries.Add(Entry(workspace, end.AddTicks(-1), "inside"));
+        store.Entries.Add(Entry(workspace, end, "end"));
+        store.Entries.Add(Entry(otherWorkspace, start, "other workspace"));
+
+        var deleted = await service.DeleteRangeAsync(workspace, start, end);
+
+        Assert.Equal(2, deleted);
+        Assert.Equal(["before", "end"], store.Entries.Where(entry => entry.WorkspaceId == workspace).Select(entry => entry.Message));
+        Assert.Contains(store.Entries, entry => entry.WorkspaceId == otherWorkspace);
+    }
+
+    [Fact]
     public async Task Dispose_CancelsScheduledCleanup()
     {
         var workspace = Guid.NewGuid();
@@ -151,6 +194,9 @@ public sealed class WorkspaceTelemetryServiceTests
     private static TelemetryEventRequest Event(string message, string? response = null) =>
         new("Workspace", "TestEvent", "Information", "Succeeded", message, ResponseBody: response);
 
+    private static TelemetryEntry Entry(Guid workspace, DateTimeOffset occurredAt, string message) =>
+        new(Guid.NewGuid(), workspace, occurredAt, "Workspace", "ReportTest", "Information", "Succeeded", message, null, null, null, null, null, null);
+
     private sealed class TestWorkspaceContext(Guid? activeWorkspaceId) : ITelemetryWorkspaceContext
     {
         public Guid? ActiveWorkspaceId { get; private set; } = activeWorkspaceId;
@@ -180,13 +226,24 @@ public sealed class WorkspaceTelemetryServiceTests
             Entries.Add(entry);
             return Task.CompletedTask;
         }
-        public Task<IReadOnlyList<TelemetryEntry>> SearchAsync(Guid workspaceId, TelemetryQuery query, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<TelemetryEntry>>(Entries.Where(entry => entry.WorkspaceId == workspaceId).ToArray());
+        public Task<IReadOnlyList<TelemetryEntry>> SearchAsync(Guid workspaceId, TelemetryQuery query, CancellationToken cancellationToken = default)
+        {
+            IEnumerable<TelemetryEntry> selected = Entries.Where(entry => entry.WorkspaceId == workspaceId);
+            if (query.FromInclusive is { } from) selected = selected.Where(entry => entry.OccurredAt >= from);
+            if (query.ToExclusive is { } to) selected = selected.Where(entry => entry.OccurredAt < to);
+            if (query.Areas is { Count: > 0 }) selected = selected.Where(entry => query.Areas.Contains(entry.Area));
+            return Task.FromResult<IReadOnlyList<TelemetryEntry>>(selected.OrderByDescending(entry => entry.OccurredAt).Skip(query.Offset).Take(query.PageSize).ToArray());
+        }
         public Task<IReadOnlyList<TelemetryEntry>> ReadAllAsync(Guid workspaceId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<TelemetryEntry>>(Entries.Where(entry => entry.WorkspaceId == workspaceId).ToArray());
         public Task<int> DeleteAllAsync(Guid workspaceId, CancellationToken cancellationToken = default)
         {
             var count = Entries.RemoveAll(entry => entry.WorkspaceId == workspaceId);
+            return Task.FromResult(count);
+        }
+        public Task<int> DeleteRangeAsync(Guid workspaceId, DateTimeOffset fromInclusive, DateTimeOffset toExclusive, CancellationToken cancellationToken = default)
+        {
+            var count = Entries.RemoveAll(entry => entry.WorkspaceId == workspaceId && entry.OccurredAt >= fromInclusive && entry.OccurredAt < toExclusive);
             return Task.FromResult(count);
         }
         public Task<int> DeleteExpiredAsync(Guid workspaceId, DateTimeOffset cutoff, CancellationToken cancellationToken = default)

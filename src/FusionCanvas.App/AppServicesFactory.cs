@@ -10,6 +10,7 @@ using FusionCanvas.Application.TermsConsent;
 using FusionCanvas.Application.Updates;
 using FusionCanvas.Integration.Updates;
 using FusionCanvas.App.Updates;
+using FusionCanvas.App.IssueReporting;
 using System.Runtime.InteropServices;
 
 namespace FusionCanvas.App;
@@ -30,6 +31,7 @@ public static class AppServicesFactory
         Action? requestShutdown = null)
     {
         ArgumentNullException.ThrowIfNull(settingsStore);
+        AvaloniaReportScreenshotStager.RemoveStaleFiles();
         var load = initialSettings is null
             ? StartupTaskRunner.Run(token => settingsStore.LoadAsync(token), cancellationToken)
             : new ApplicationSettingsLoadResult(initialSettings, UsedDefault: false, loadWarning);

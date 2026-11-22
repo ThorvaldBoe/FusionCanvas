@@ -9,7 +9,10 @@ using FusionCanvas.App.StageTools;
 using FusionCanvas.App.Stores;
 using FusionCanvas.App.Workspace;
 using FusionCanvas.App.ArtworkStyles;
+using FusionCanvas.App.IssueReporting;
 using FusionCanvas.Application.ArtworkStyles;
+using FusionCanvas.App.TermsConsent;
+using FusionCanvas.App.Versioning;
 
 namespace FusionCanvas.App.Views;
 
@@ -24,11 +27,13 @@ internal sealed class MainWindowWindowCoordinator
     private readonly Control _workspaceTreeControl;
     private readonly Control _settingsFocusTarget;
     private readonly Control _workspaceFocusTarget;
+    private readonly Control _issueReportFocusTarget;
     private SettingsViewModel? _settings;
     private StoreEditorWindow? _storeEditorWindow;
     private WorkspaceManagementWindow? _workspaceManagementWindow;
     private SettingsWindow? _settingsWindow;
     private TelemetryDebugWindow? _telemetryDebugWindow;
+    private IssueReportingWindow? _issueReportingWindow;
     private AssetsWindow? _assetsWindow;
     private IdeationWindow? _ideationWindow;
     private Window? _designPreviewWindow;
@@ -40,17 +45,58 @@ internal sealed class MainWindowWindowCoordinator
         Window owner,
         Control workspaceTreeControl,
         Control settingsFocusTarget,
-        Control workspaceFocusTarget)
+        Control workspaceFocusTarget,
+        Control issueReportFocusTarget)
     {
         _owner = owner ?? throw new ArgumentNullException(nameof(owner));
         _workspaceTreeControl = workspaceTreeControl ?? throw new ArgumentNullException(nameof(workspaceTreeControl));
         _settingsFocusTarget = settingsFocusTarget ?? throw new ArgumentNullException(nameof(settingsFocusTarget));
         _workspaceFocusTarget = workspaceFocusTarget ?? throw new ArgumentNullException(nameof(workspaceFocusTarget));
+        _issueReportFocusTarget = issueReportFocusTarget ?? throw new ArgumentNullException(nameof(issueReportFocusTarget));
     }
 
     public void SetSettings(SettingsViewModel? settings) => _settings = settings;
 
     public void SetDesignPreviewFocusTarget(Control? control) => _designPreviewFocusTarget = control;
+
+    public void SyncIssueReportingWindow(WorkspaceTelemetrySettingsViewModel telemetry, bool shouldBeOpen = true)
+    {
+        if (shouldBeOpen && _issueReportingWindow is null)
+        {
+            var clipboard = _owner.Clipboard;
+            if (clipboard is null) return;
+            AvaloniaReportScreenshotStager.RemoveStaleFiles();
+            var viewModel = new IssueReportingViewModel(
+                telemetry,
+                AvaloniaClipboardService.Instance,
+                new AvaloniaReportScreenshotStager(clipboard),
+                new ProcessExternalLinkLauncher());
+            var window = new IssueReportingWindow { DataContext = viewModel };
+            _issueReportingWindow = window;
+            window.Opened += (_, _) => _ = viewModel.InitializeAsync();
+            window.Closed += async (_, _) =>
+            {
+                await viewModel.CloseAsync();
+                if (ReferenceEquals(_issueReportingWindow, window)) _issueReportingWindow = null;
+                if (CanFocusOwner(_owner))
+                {
+                    _owner.Activate();
+                    _issueReportFocusTarget.Focus();
+                }
+            };
+            window.Show(_owner);
+            return;
+        }
+
+        if (shouldBeOpen && _issueReportingWindow is { IsVisible: true } existing)
+        {
+            existing.Activate();
+        }
+        else if (!shouldBeOpen && _issueReportingWindow is not null)
+        {
+            _issueReportingWindow.Close();
+        }
+    }
 
     public Task<Guid?> OpenArtworkStyleManagementAsync(IArtworkStyleManagementService service, Guid workspaceId, bool closeAfterSave = false)
     {

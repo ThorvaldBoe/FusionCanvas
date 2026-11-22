@@ -13,6 +13,7 @@ using AvaloniaVirtualDataGrid.Core;
 using FusionCanvas.App.Assets;
 using FusionCanvas.App.Groups;
 using FusionCanvas.App.Ideation;
+using FusionCanvas.App.IssueReporting;
 using FusionCanvas.App.Items;
 using FusionCanvas.App.Items.Import;
 using FusionCanvas.App.Navigation;
@@ -54,7 +55,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         ManualListingVariantsGrid.ItemsSource = _manualListingVariantRows;
-        _windowCoordinator = new MainWindowWindowCoordinator(this, WorkspaceTreeControl, SettingsRailButton, WorkspaceSelectorButton);
+        _windowCoordinator = new MainWindowWindowCoordinator(this, WorkspaceTreeControl, SettingsRailButton, WorkspaceSelectorButton, ReportIssueRailButton);
         WorkspaceTreeControl.AddHandler(PointerPressedEvent, OnWorkspaceTreePointerPressed, RoutingStrategies.Tunnel);
         WorkspaceTreeControl.AddHandler(KeyDownEvent, OnWorkspaceTreeKeyDown, RoutingStrategies.Tunnel);
         DataContextChanged += OnStageToolDataContextChanged;
@@ -66,7 +67,7 @@ public partial class MainWindow : Window
         ArgumentNullException.ThrowIfNull(services);
         InitializeComponent();
         ManualListingVariantsGrid.ItemsSource = _manualListingVariantRows;
-        _windowCoordinator = new MainWindowWindowCoordinator(this, WorkspaceTreeControl, SettingsRailButton, WorkspaceSelectorButton);
+        _windowCoordinator = new MainWindowWindowCoordinator(this, WorkspaceTreeControl, SettingsRailButton, WorkspaceSelectorButton, ReportIssueRailButton);
         WorkspaceTreeControl.AddHandler(PointerPressedEvent, OnWorkspaceTreePointerPressed, RoutingStrategies.Tunnel);
         WorkspaceTreeControl.AddHandler(KeyDownEvent, OnWorkspaceTreeKeyDown, RoutingStrategies.Tunnel);
         DataContextChanged += OnStageToolDataContextChanged;
@@ -1123,6 +1124,14 @@ public partial class MainWindow : Window
         if (DataContext is MainWindowViewModel viewModel)
         {
             _windowCoordinator.SyncSettingsWindow(viewModel.Settings);
+        }
+    }
+
+    private void OnReportIssueClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            _windowCoordinator.SyncIssueReportingWindow(viewModel.Settings.Telemetry);
         }
     }
 

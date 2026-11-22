@@ -62,9 +62,16 @@ body:
     validations:
       required: true
   - type: textarea
-    id: logs-and-screenshots
+    id: additional-context
     attributes:
-      label: Logs or screenshots (optional)
-      description: Attach only redacted material that can be shared publicly.
+      label: Additional context (optional)
+      description: Paste reviewed diagnostic text or add other context that can be shared publicly.
+    validations:
+      required: false
+  - type: upload
+    id: screenshots
+    attributes:
+      label: Screenshot (optional)
+      description: Upload a screenshot that helps explain the issue. Attachments to public issues are publicly accessible. Review the image and remove credentials, personal information, private workspace data, or other sensitive material before uploading.
     validations:
       required: false
