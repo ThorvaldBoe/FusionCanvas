@@ -101,6 +101,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         CancelArtworkCommand = new RelayCommand(_ => _artworkCts?.Cancel(), () => IsArtworkBusy);
         ConfirmListingMigrationCommand = new RelayCommand(_ => _ = ConfirmListingMigrationAsync(), () => IsListingMigrationReviewVisible && !IsBusy);
         CancelListingMigrationCommand = new RelayCommand(_ => _ = CancelListingMigrationAsync(), () => IsListingMigrationReviewVisible && !IsBusy);
+        AddArtworkVariantCommand = new RelayCommand(_ => _ = AddArtworkVariantAsync(), () => HasConfiguration && !IsReadOnly && !IsBusy);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -118,6 +119,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
             OnPropertyChanged(nameof(ShowsConfiguredState));
             OnPropertyChanged(nameof(CanGenerateArtwork));
             GenerateArtworkCommand.NotifyCanExecuteChanged();
+            AddArtworkVariantCommand.NotifyCanExecuteChanged();
         }
     }
 
@@ -303,6 +305,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
             GenerateArtworkCommand.NotifyCanExecuteChanged();
             AdjustExistingArtworkCommand.NotifyCanExecuteChanged();
             ResetArtworkPromptCommand.NotifyCanExecuteChanged();
+            AddArtworkVariantCommand.NotifyCanExecuteChanged();
         }
     }
 
@@ -324,6 +327,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
             OnPropertyChanged(nameof(CanChooseRecoveryOffering));
             ConfirmListingMigrationCommand.NotifyCanExecuteChanged();
             CancelListingMigrationCommand.NotifyCanExecuteChanged();
+            AddArtworkVariantCommand.NotifyCanExecuteChanged();
         }
     }
 
@@ -708,6 +712,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
     public RelayCommand CancelArtworkCommand { get; }
     public RelayCommand ConfirmListingMigrationCommand { get; }
     public RelayCommand CancelListingMigrationCommand { get; }
+    public RelayCommand AddArtworkVariantCommand { get; }
 
     // --- Commands ---
     public async Task SelectConfigurationAsync(Guid offeringId, CancellationToken ct = default)
@@ -1000,6 +1005,28 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         finally
         {
             IsBusy = false;
+        }
+    }
+
+    public async Task AddArtworkVariantAsync(CancellationToken ct = default)
+    {
+        if (!HasConfiguration || IsReadOnly || IsBusy) return;
+        IsBusy = true;
+        try
+        {
+            var result = await _designStageService.AddArtworkVariantAsync(_itemId, cancellationToken: ct).ConfigureAwait(true);
+            if (!result.Succeeded)
+            {
+                ErrorMessage = result.Error;
+                return;
+            }
+
+            await LoadAsync(_itemId, !IsReadOnly, ct).ConfigureAwait(true);
+        }
+        finally
+        {
+            IsBusy = false;
+            AddArtworkVariantCommand.NotifyCanExecuteChanged();
         }
     }
 

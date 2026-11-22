@@ -38,25 +38,32 @@ public static class ListingProjectionBuilder
             issues.Add(new("printify-provider-identity-missing", "The selected Print Provider has no Printify Provider ID. Reimport its Printify catalog data before creating a listing."));
         }
 
-        var selectedColorValues = request.SelectedColors
-            .Where(value => value.ItemId == request.Item.Id)
-            .Select(value => value.ColorValue)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        if (selectedColorValues.Count == 0)
+        var listingSelections = request.ListingColorSelections.Where(value => value.ItemId == request.Item.Id).ToArray();
+        var selectedColorIds = listingSelections.Where(value => value.ColorOptionValueId is not null)
+            .Select(value => value.ColorOptionValueId!.Value).ToHashSet();
+        var selectedColorValues = listingSelections.Where(value => value.ColorOptionValueId is null)
+            .Select(value => value.LegacyColorLabel!).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (listingSelections.Length == 0)
         {
-            issues.Add(new("no-selected-colors", "Design must select at least one color before a product can be created."));
+            selectedColorValues = request.SelectedColors.Where(value => value.ItemId == request.Item.Id)
+                .Select(value => value.ColorValue).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+
+        if (selectedColorValues.Count == 0 && selectedColorIds.Count == 0)
+        {
+            issues.Add(new("no-selected-colors", "Select at least one Color in Listing before creating a product."));
         }
 
         var optionValuesById = request.OptionValues.ToDictionary(value => value.Id);
         var optionsById = request.Options.ToDictionary(value => value.Id);
         var prices = new Dictionary<Guid, decimal?>();
-        var variantProjections = new List<(OfferingVariant Variant, string? Color, IReadOnlyList<KeyValuePair<string, string>> Options, decimal? Cost)>();
+        var variantProjections = new List<(OfferingVariant Variant, string? Color, Guid? ColorOptionValueId, IReadOnlyList<KeyValuePair<string, string>> Options, decimal? Cost)>();
 
         foreach (var variant in request.Variants.Where(value => !value.IsArchived))
         {
             var optionPairs = new List<KeyValuePair<string, string>>();
             string? color = null;
+            Guid? colorOptionValueId = null;
             var invalid = false;
             foreach (var optionValueId in variant.OptionValueIds)
             {
@@ -72,10 +79,14 @@ public static class ListingProjectionBuilder
                 if (option.OptionKind == OptionKind.Color)
                 {
                     color = optionValue.Value;
+                    colorOptionValueId = optionValue.Id;
                 }
             }
 
-            if (invalid || (color is not null && !selectedColorValues.Contains(color)))
+            var colorSelected = colorOptionValueId is Guid stableColorId
+                ? selectedColorIds.Contains(stableColorId) || (selectedColorIds.Count == 0 && selectedColorValues.Contains(color ?? string.Empty))
+                : color is null || selectedColorValues.Contains(color);
+            if (invalid || !colorSelected)
             {
                 continue;
             }
@@ -86,19 +97,31 @@ public static class ListingProjectionBuilder
                 issues.Add(new("production-cost-missing", $"Production cost is required for fixed-profit pricing of variant '{variant.Name}'."));
             }
             prices[variant.Id] = cost;
-            variantProjections.Add((variant, color, optionPairs, cost));
+            variantProjections.Add((variant, color, colorOptionValueId, optionPairs, cost));
         }
 
         if (variantProjections.Count == 0)
         {
-            issues.Add(new("no-compatible-variants", "The fixed provider has no active variants matching Design's selected colors."));
+            issues.Add(new("no-compatible-variants", "The selected Colors have no active configured provider Variants."));
         }
 
         var pricesByVariant = issues.Count == 0
             ? ListingPricingCalculator.Calculate(request.Pricing, prices).ToDictionary(value => value.SourceVariantId)
             : new Dictionary<Guid, ListingPrice>();
 
-        var artwork = BuildArtwork(request, issues);
+        var selectionsForArtwork = listingSelections.Length > 0
+            ? listingSelections.Select(value => (
+                value.ColorOptionValueId,
+                value.ColorOptionValueId is Guid id ? optionValuesById.GetValueOrDefault(id)?.Value ?? value.LegacyColorLabel ?? string.Empty : value.LegacyColorLabel ?? string.Empty,
+                value.ArtworkVariantId)).ToArray()
+            : selectedColorValues.Select(color =>
+            {
+                var rowId = request.VariantRowColors.FirstOrDefault(value => string.Equals(value.ColorValue, color, StringComparison.OrdinalIgnoreCase))?.RowId
+                    ?? request.VariantRows.FirstOrDefault(value => value.ItemId == request.Item.Id && value.IsDefault)?.Id
+                    ?? Guid.Empty;
+                return ((Guid?)null, color, rowId);
+            }).ToArray();
+        var artwork = BuildArtwork(request, issues, variantProjections, selectionsForArtwork);
         if (issues.Count > 0)
         {
             return new ListingProjectionResult(null, issues);
@@ -140,53 +163,79 @@ public static class ListingProjectionBuilder
 
     private static IReadOnlyList<ListingArtworkProjection> BuildArtwork(
         ListingProjectionRequest request,
-        ICollection<ListingReadinessIssue> issues)
+        ICollection<ListingReadinessIssue> issues,
+        IReadOnlyList<(OfferingVariant Variant, string? Color, Guid? ColorOptionValueId, IReadOnlyList<KeyValuePair<string, string>> Options, decimal? Cost)> projectedVariants,
+        IReadOnlyList<(Guid? ColorOptionValueId, string Color, Guid ArtworkVariantId)> selectedColors)
     {
         var assetsById = request.Assets.ToDictionary(value => value.Id);
         var itemRowIds = request.VariantRows
             .Where(value => value.ItemId == request.Item.Id)
             .Select(value => value.Id)
             .ToHashSet();
-        var assignmentsByArea = request.SlotAssignments
-            .Where(value => itemRowIds.Contains(value.RowId) && value.AssetId.HasValue)
-            .GroupBy(value => value.DesignAreaId)
-            .ToDictionary(value => value.Key, value => value.First());
-
         var result = new List<ListingArtworkProjection>();
         var hasAssignment = false;
-        foreach (var area in request.DesignAreas)
+        foreach (var selectedColor in selectedColors)
         {
-            if (!assignmentsByArea.TryGetValue(area.Id, out var assignment) || !assignment.AssetId.HasValue)
+            if (selectedColor.ArtworkVariantId == Guid.Empty || !itemRowIds.Contains(selectedColor.ArtworkVariantId))
             {
-                continue;
-            }
-            hasAssignment = true;
-
-            if (!assetsById.TryGetValue(assignment.AssetId.Value, out var asset) || asset.IsMissing)
-            {
-                issues.Add(new("artwork-asset-missing", $"The artwork assigned to design area '{area.Name}' is unavailable."));
+                issues.Add(new("artwork-variant-assignment-missing", $"No valid artwork variant is assigned to Color '{selectedColor.Color}'."));
                 continue;
             }
 
-            if (!request.ArtworkDimensions.TryGetValue(asset.Id, out var dimensions))
+            var sourceVariantIds = projectedVariants.Where(value =>
+                    selectedColor.ColorOptionValueId is Guid colorId
+                        ? value.ColorOptionValueId == colorId
+                        : string.Equals(value.Color, selectedColor.Color, StringComparison.OrdinalIgnoreCase))
+                .Select(value => value.Variant.Id)
+                .ToArray();
+            if (sourceVariantIds.Length == 0)
             {
-                issues.Add(new("artwork-dimensions-missing", $"Artwork dimensions are unavailable for '{asset.Name}'."));
+                issues.Add(new("no-compatible-color-variants", $"Color '{selectedColor.Color}' has no configured active provider Variants."));
                 continue;
             }
 
-            dimensions.Normalize();
-            var target = new ArtworkDimensions(area.Width, area.Height);
-            result.Add(new ListingArtworkProjection(
-                area.Id,
-                asset.Id,
-                asset.WorkspaceRelativePath,
-                dimensions,
-                target,
-                ListingPlacementCalculator.Calculate(dimensions, target))
+            var colorHasAssignment = false;
+            foreach (var area in request.DesignAreas)
             {
-                Position = area.Position,
-                DecorationMethod = area.DecorationMethod
-            });
+                var assignment = request.SlotAssignments.SingleOrDefault(value =>
+                    value.RowId == selectedColor.ArtworkVariantId && value.DesignAreaId == area.Id);
+                if (assignment?.AssetId is not Guid assetId)
+                    continue;
+                hasAssignment = true;
+                colorHasAssignment = true;
+
+                if (!assetsById.TryGetValue(assetId, out var asset) || asset.IsMissing)
+                {
+                    issues.Add(new("artwork-asset-missing", $"The artwork assigned to design area '{area.Name}' for Color '{selectedColor.Color}' is unavailable."));
+                    continue;
+                }
+
+                if (!request.ArtworkDimensions.TryGetValue(asset.Id, out var dimensions))
+                {
+                    issues.Add(new("artwork-dimensions-missing", $"Artwork dimensions are unavailable for '{asset.Name}'."));
+                    continue;
+                }
+
+                dimensions.Normalize();
+                var target = new ArtworkDimensions(area.Width, area.Height);
+                result.Add(new ListingArtworkProjection(
+                    area.Id,
+                    asset.Id,
+                    asset.WorkspaceRelativePath,
+                    dimensions,
+                    target,
+                    ListingPlacementCalculator.Calculate(dimensions, target))
+                {
+                    Position = area.Position,
+                    DecorationMethod = area.DecorationMethod,
+                    ColorOptionValueId = selectedColor.ColorOptionValueId,
+                    ArtworkVariantId = selectedColor.ArtworkVariantId,
+                    SourceVariantIds = sourceVariantIds
+                });
+            }
+
+            if (!colorHasAssignment)
+                issues.Add(new("artwork-assignment-missing", $"Assign artwork for Color '{selectedColor.Color}' before creating a Printify product."));
         }
 
         if (result.Count == 0 && !hasAssignment)

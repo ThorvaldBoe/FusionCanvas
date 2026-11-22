@@ -1,19 +1,18 @@
 namespace FusionCanvas.Domain.Products;
 
 /// <summary>
-/// A row in the final-design slot grid. One row serves a set of colors;
-/// exactly one <see cref="IsDefault"/> row exists per item at any time.
-/// Rows partition the selected colors: every selected color belongs to
-/// exactly one row, and rows may serve multiple colors.
+/// A color-independent artwork variant in the final-design slot grid.
+/// Exactly one <see cref="IsDefault"/> row exists per item when variants exist.
 /// </summary>
 public sealed record DesignVariantRow
 {
-    public DesignVariantRow(Guid id, Guid itemId, bool isDefault, int sortOrder)
+    public DesignVariantRow(Guid id, Guid itemId, bool isDefault, int sortOrder, ArtworkContrastIntent? contrastIntent = null)
     {
         Id = ProductRecordValidation.RequireId(id, nameof(id));
         ItemId = ProductRecordValidation.RequireId(itemId, nameof(itemId));
         IsDefault = isDefault;
         SortOrder = sortOrder;
+        ContrastIntent = contrastIntent;
     }
 
     public Guid Id { get; init; }
@@ -23,4 +22,6 @@ public sealed record DesignVariantRow
     public bool IsDefault { get; init; }
 
     public int SortOrder { get; init; }
+
+    public ArtworkContrastIntent? ContrastIntent { get; init; }
 }

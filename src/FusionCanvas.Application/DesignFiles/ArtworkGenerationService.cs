@@ -82,8 +82,7 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
             ? null
             : ResolveArea(snapshot, configuration.OfferingId, request.DesignAreaId);
         var row = snapshot.DesignVariantRows.SingleOrDefault(value => value.ItemId == item.Id && value.IsDefault);
-        var hasDefaultRowWithSelectedColor = row is not null
-            && snapshot.DesignVariantRowColors.Any(value => value.RowId == row.Id);
+        var hasDefaultRowWithSelectedColor = row is not null;
 
         var metadata = ItemMetadataCodec.ParseMetadata(item.MetadataJson);
         var designTriangleComplete = DesignTriangleScore.FromValues(
@@ -236,6 +235,15 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         var assetId = _newId();
         var currentItem = currentSnapshot.Items.Single(value => value.Id == request.ItemId);
         var currentRow = currentSnapshot.DesignVariantRows.Single(value => value.Id == readyRow.Id);
+        var updatedRow = currentRow with
+        {
+            ContrastIntent = request.Contrast switch
+            {
+                ArtworkContrast.LightOnDark => ArtworkContrastIntent.LightForDarkProduct,
+                ArtworkContrast.DarkOnLight => ArtworkContrastIntent.DarkForLightProduct,
+                _ => null
+            }
+        };
         var asset = new Asset(assetId, currentItem.StoreId, $"{GeneratedArtworkName} - {readyArea.Name}", null, AssetKind.ExportedImage,
             managed.WorkspaceRelativePath, null, false, false, now, now, _provenanceCodec.Serialize(provenance));
         var relatedAssetId = relatedManaged is null ? (Guid?)null : _newId();
@@ -253,6 +261,7 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
                 ? [.. currentSnapshot.AssetLinks, new AssetLink(assetId, WorkspaceEntityKind.Item, currentItem.Id)]
                 : [.. currentSnapshot.AssetLinks, new AssetLink(assetId, WorkspaceEntityKind.Item, currentItem.Id), new AssetLink(relatedAsset.Id, WorkspaceEntityKind.Item, currentItem.Id)],
             DesignSlotAssignments = [.. currentSnapshot.DesignSlotAssignments.Where(value => value.RowId != currentRow.Id || value.DesignAreaId != request.DesignAreaId), assignment],
+            DesignVariantRows = [.. currentSnapshot.DesignVariantRows.Where(value => value.Id != updatedRow.Id), updatedRow],
             ContentRiskReviews = relatedAsset is null
                 ? [.. currentSnapshot.ContentRiskReviews.Where(existing => existing.Target != reviewTarget), review]
                 : [.. currentSnapshot.ContentRiskReviews.Where(existing => existing.Target.OwnerId != relatedAsset.Id && existing.Target != reviewTarget), review,
@@ -343,13 +352,6 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         var expectedRow = expected.DesignVariantRows.SingleOrDefault(value => value.ItemId == request.ItemId && value.IsDefault);
         var currentRow = current.DesignVariantRows.SingleOrDefault(value => value.ItemId == request.ItemId && value.IsDefault);
         if (!Equals(expectedRow, currentRow) || expectedRow is null || currentRow is null)
-        {
-            return false;
-        }
-
-        var expectedColors = expected.DesignVariantRowColors.Where(value => value.RowId == expectedRow.Id).ToArray();
-        var currentColors = current.DesignVariantRowColors.Where(value => value.RowId == currentRow.Id).ToArray();
-        if (!expectedColors.SequenceEqual(currentColors))
         {
             return false;
         }

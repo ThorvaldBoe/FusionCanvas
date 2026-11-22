@@ -33,7 +33,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         ValidateSnapshot(snapshot);
 
-        foreach (var table in new[] { "item_listing_setup_history", "item_variant_listing_terms", "item_listing_details", "external_listing_mappings", "content_risk_reviews", "mockup_template_revision_source_image_values", "mockup_template_revision_source_images", "mockup_template_source_image_values", "mockup_template_source_images", "mockup_template_revision_colors", "mockup_template_revisions", "mockup_template_colors", "mockup_templates", "placeholder_variants", "offering_placeholders", "offering_variant_values", "offering_variants", "offering_option_values", "offering_options", "blueprint_offerings", "print_providers", "catalog_blueprints", "design_slot_assignments", "design_variant_row_colors", "design_variant_rows", "design_selected_colors", "item_listing_configuration", "asset_links", "design_areas", "product_variants", "item_tags", "fulfillment_offerings", "prompts", "assets", "product_blueprints", "items", "ideation_rejections", "groups", "niches", "tags", "stores", "workspaces" })
+        foreach (var table in new[] { "listing_color_selections", "item_listing_setup_history", "item_variant_listing_terms", "item_listing_details", "external_listing_mappings", "content_risk_reviews", "mockup_template_revision_source_image_values", "mockup_template_revision_source_images", "mockup_template_source_image_values", "mockup_template_source_images", "mockup_template_revision_colors", "mockup_template_revisions", "mockup_template_colors", "mockup_templates", "placeholder_variants", "offering_placeholders", "offering_variant_values", "offering_variants", "offering_option_values", "offering_options", "blueprint_offerings", "print_providers", "catalog_blueprints", "design_slot_assignments", "design_variant_row_colors", "design_variant_rows", "design_selected_colors", "item_listing_configuration", "asset_links", "design_areas", "product_variants", "item_tags", "fulfillment_offerings", "prompts", "assets", "product_blueprints", "items", "ideation_rejections", "groups", "niches", "tags", "stores", "workspaces" })
         {
             await ExecuteAsync(connection, transaction, $"DELETE FROM {QuoteIdentifier(table)};", cancellationToken);
         }
@@ -187,6 +187,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             await InsertDesignSlotAssignmentAsync(connection, transaction, assignment, cancellationToken);
         }
 
+        foreach (var selection in snapshot.ListingColorSelections)
+        {
+            await InsertListingColorSelectionAsync(connection, transaction, selection, cancellationToken);
+        }
+
         await ExecuteAsync(connection, transaction,
             "DELETE FROM telemetry_entries WHERE workspace_id NOT IN (SELECT id FROM workspaces);", cancellationToken);
         await ExecuteAsync(connection, transaction,
@@ -228,6 +233,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             DesignVariantRows = await LoadDesignVariantRowsAsync(connection, cancellationToken),
             DesignVariantRowColors = await LoadDesignVariantRowColorsAsync(connection, cancellationToken),
             DesignSlotAssignments = await LoadDesignSlotAssignmentsAsync(connection, cancellationToken)
+            ,ListingColorSelections = await LoadListingColorSelectionsAsync(connection, cancellationToken)
             ,Blueprints = await LoadBlueprintsAsync(connection, cancellationToken)
             ,PrintProviders = await LoadPrintProvidersAsync(connection, cancellationToken)
             ,BlueprintOfferings = await LoadBlueprintOfferingsAsync(connection, cancellationToken)
@@ -685,6 +691,8 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         await ApplyMigrationAsync(21, () => MigrateToVersion21Async(connection, cancellationToken));
         await ApplyMigrationAsync(22, () => MigrateToVersion22Async(connection, cancellationToken));
         await ApplyMigrationAsync(23, () => MigrateToVersion23Async(connection, cancellationToken));
+        await ApplyMigrationAsync(24, () => MigrateToVersion24Async(connection, cancellationToken));
+        await ApplyMigrationAsync(25, () => MigrateToVersion25Async(connection, cancellationToken));
 
         await SetPragmaUserVersionAsync(connection, currentSchemaVersion, cancellationToken);
     }
@@ -807,6 +815,164 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             );
             CREATE INDEX IF NOT EXISTS ix_item_listing_history_item ON item_listing_setup_history(item_id, archived_at DESC);
             """, cancellationToken);
+
+    private static async Task MigrateToVersion24Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            if (!await ColumnExistsAsync(connection, "design_variant_rows", "contrast_intent", cancellationToken, transaction).ConfigureAwait(false))
+                await ExecuteAsync(connection, transaction, "ALTER TABLE design_variant_rows ADD COLUMN contrast_intent TEXT NULL;", cancellationToken).ConfigureAwait(false);
+            if (!await ColumnExistsAsync(connection, "offering_option_values", "is_favorite", cancellationToken, transaction).ConfigureAwait(false))
+                await ExecuteAsync(connection, transaction, "ALTER TABLE offering_option_values ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0;", cancellationToken).ConfigureAwait(false);
+
+            await ExecuteAsync(connection, transaction, """
+                CREATE TABLE IF NOT EXISTS listing_color_selections (
+                    item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                    color_option_value_id TEXT NULL REFERENCES offering_option_values(id) ON DELETE RESTRICT,
+                    legacy_color_label TEXT NULL,
+                    artwork_variant_id TEXT NOT NULL REFERENCES design_variant_rows(id) ON DELETE RESTRICT,
+                    sort_order INTEGER NOT NULL,
+                    CHECK ((color_option_value_id IS NOT NULL AND legacy_color_label IS NULL)
+                        OR (color_option_value_id IS NULL AND legacy_color_label IS NOT NULL AND length(trim(legacy_color_label)) > 0))
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS ux_listing_color_selection_value
+                    ON listing_color_selections(item_id, color_option_value_id)
+                    WHERE color_option_value_id IS NOT NULL;
+                CREATE UNIQUE INDEX IF NOT EXISTS ux_listing_color_selection_legacy
+                    ON listing_color_selections(item_id, legacy_color_label COLLATE NOCASE)
+                    WHERE color_option_value_id IS NULL;
+                """, cancellationToken).ConfigureAwait(false);
+
+            var legacyColors = new List<(Guid ItemId, string ColorValue, Guid? RowId)>();
+            await foreach (var reader in ReadAsync(connection, """
+                SELECT selected.item_id, selected.color_value,
+                    (SELECT membership.row_id FROM design_variant_row_colors AS membership
+                     INNER JOIN design_variant_rows AS row ON row.id = membership.row_id
+                     WHERE row.item_id = selected.item_id AND membership.color_value = selected.color_value COLLATE NOCASE
+                     ORDER BY row.is_default DESC, row.sort_order, row.id LIMIT 1) AS row_id
+                FROM design_selected_colors AS selected
+                UNION
+                SELECT row.item_id, membership.color_value, membership.row_id
+                FROM design_variant_row_colors AS membership
+                INNER JOIN design_variant_rows AS row ON row.id = membership.row_id
+                ORDER BY item_id, color_value COLLATE NOCASE;
+                """, cancellationToken, transaction))
+            {
+                legacyColors.Add((ReadGuid(reader, "item_id"), ReadString(reader, "color_value"), ReadNullableGuid(reader, "row_id")));
+            }
+
+            var byItem = legacyColors.GroupBy(value => value.ItemId);
+            foreach (var itemGroup in byItem)
+            {
+                var itemId = itemGroup.Key;
+                var defaultRowId = await ReadDefaultArtworkVariantIdAsync(connection, transaction, itemId, cancellationToken).ConfigureAwait(false);
+                if (defaultRowId is null)
+                {
+                    defaultRowId = Guid.NewGuid();
+                    await ExecuteAsync(connection, transaction, "INSERT INTO design_variant_rows (id, item_id, is_default, sort_order, contrast_intent) VALUES ($id, $item_id, 1, 0, NULL);", cancellationToken,
+                        ("$id", defaultRowId.Value.ToString()), ("$item_id", itemId.ToString())).ConfigureAwait(false);
+                }
+
+                var offeringId = await ReadNullableGuidAsync(connection, transaction,
+                    "SELECT offering_id FROM item_listing_configuration WHERE item_id = $item_id;", cancellationToken,
+                    ("$item_id", itemId.ToString())).ConfigureAwait(false);
+                var colorValues = offeringId is Guid configuredOfferingId
+                    ? await LoadMigrationColorValuesAsync(connection, transaction, configuredOfferingId, cancellationToken).ConfigureAwait(false)
+                    : [];
+
+                var order = 0;
+                foreach (var legacy in itemGroup
+                    .GroupBy(value => value.ColorValue, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.First()))
+                {
+                    var matches = colorValues.Where(value => string.Equals(value.Value, legacy.ColorValue, StringComparison.OrdinalIgnoreCase)).ToArray();
+                    var artworkVariantId = legacy.RowId ?? defaultRowId.Value;
+                    if (!await ExistsAsync(connection, transaction, "SELECT 1 FROM design_variant_rows WHERE id = $id AND item_id = $item_id;", cancellationToken,
+                        ("$id", artworkVariantId.ToString()), ("$item_id", itemId.ToString())).ConfigureAwait(false))
+                        artworkVariantId = defaultRowId.Value;
+
+                    await ExecuteAsync(connection, transaction, """
+                        INSERT INTO listing_color_selections (item_id, color_option_value_id, legacy_color_label, artwork_variant_id, sort_order)
+                        VALUES ($item_id, $color_option_value_id, $legacy_color_label, $artwork_variant_id, $sort_order);
+                        """, cancellationToken,
+                        ("$item_id", itemId.ToString()),
+                        ("$color_option_value_id", matches.Length == 1 ? matches[0].Id.ToString() : null),
+                        ("$legacy_color_label", matches.Length == 1 ? null : legacy.ColorValue),
+                        ("$artwork_variant_id", artworkVariantId.ToString()),
+                        ("$sort_order", order++)).ConfigureAwait(false);
+                }
+            }
+
+            await ExecuteAsync(connection, transaction, "DELETE FROM design_selected_colors; DELETE FROM design_variant_row_colors;", cancellationToken).ConfigureAwait(false);
+            await VerifyForeignKeyIntegrityAsync(connection, transaction, cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    private static async Task MigrateToVersion25Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            if (!await ColumnExistsAsync(connection, "offering_variants", "provider_is_available", cancellationToken, transaction).ConfigureAwait(false))
+                await ExecuteAsync(connection, transaction, "ALTER TABLE offering_variants ADD COLUMN provider_is_available INTEGER NULL;", cancellationToken).ConfigureAwait(false);
+            await VerifyForeignKeyIntegrityAsync(connection, transaction, cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    private static async Task<Guid?> ReadDefaultArtworkVariantIdAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, Guid itemId, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = (SqliteTransaction)transaction;
+        command.CommandText = "SELECT id FROM design_variant_rows WHERE item_id = $item_id AND is_default = 1 ORDER BY sort_order, id LIMIT 1;";
+        command.Parameters.AddWithValue("$item_id", itemId.ToString());
+        var value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+        return value is string text && Guid.TryParse(text, out var id) ? id : null;
+    }
+
+    private static async Task<Guid?> ReadNullableGuidAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, string sql, CancellationToken cancellationToken, params (string Name, object? Value)[] parameters)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = (SqliteTransaction)transaction;
+        command.CommandText = sql;
+        foreach (var parameter in parameters) command.Parameters.AddWithValue(parameter.Name, parameter.Value ?? DBNull.Value);
+        var value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+        return value is string text && Guid.TryParse(text, out var id) ? id : null;
+    }
+
+    private static async Task<bool> ExistsAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, string sql, CancellationToken cancellationToken, params (string Name, object? Value)[] parameters)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = (SqliteTransaction)transaction;
+        command.CommandText = sql;
+        foreach (var parameter in parameters) command.Parameters.AddWithValue(parameter.Name, parameter.Value ?? DBNull.Value);
+        return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not null;
+    }
+
+    private static async Task<IReadOnlyList<(Guid Id, string Value)>> LoadMigrationColorValuesAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, Guid offeringId, CancellationToken cancellationToken)
+    {
+        var values = new List<(Guid Id, string Value)>();
+        await foreach (var reader in ReadAsync(connection, """
+            SELECT value.id, value.value FROM offering_option_values AS value
+            INNER JOIN offering_options AS option ON option.id = value.option_id
+            WHERE value.offering_id = $offering_id AND value.is_archived = 0 AND option.is_archived = 0 AND option.option_kind = $color_kind
+            ORDER BY value.sort_order, value.id;
+            """, cancellationToken, transaction, ("$offering_id", offeringId.ToString()), ("$color_kind", (int)OptionKind.Color)))
+            values.Add((ReadGuid(reader, "id"), ReadString(reader, "value")));
+        return values;
+    }
 
     private static async Task MigrateToVersion13Async(SqliteConnection connection, CancellationToken cancellationToken)
     {
@@ -975,7 +1141,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
 
             foreach (var column in columns)
             {
-                if (!await ColumnExistsAsync(connection, column.Table, column.Name, cancellationToken))
+                if (!await ColumnExistsAsync(connection, column.Table, column.Name, cancellationToken, transaction))
                     await ExecuteAsync(connection, transaction, $"ALTER TABLE {QuoteIdentifier(column.Table)} ADD COLUMN {QuoteIdentifier(column.Name)} {column.Definition};", cancellationToken);
             }
 
@@ -1008,7 +1174,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         var transactionCommitted = false;
         try
         {
-            if (!await ColumnExistsAsync(connection, "stores", "fulfillment_strategy", cancellationToken))
+            if (!await ColumnExistsAsync(connection, "stores", "fulfillment_strategy", cancellationToken, transaction))
             {
                 await ExecuteAsync(connection, transaction, "ALTER TABLE stores ADD COLUMN fulfillment_strategy INTEGER NOT NULL DEFAULT 0;", cancellationToken);
             }
@@ -1570,9 +1736,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         SqliteConnection connection,
         string tableName,
         string columnName,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        System.Data.Common.DbTransaction? transaction = null)
     {
         await using var command = connection.CreateCommand();
+        command.Transaction = (SqliteTransaction?)transaction;
         command.CommandText = $"PRAGMA table_info({QuoteIdentifier(tableName)});";
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
@@ -1859,12 +2027,12 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         ExecuteAsync(c, t, "INSERT INTO blueprint_offerings (id, blueprint_id, store_id, name, description, kind, print_provider_id, provider_network_code, default_placeholder_id, primary_artwork_design_area_id, external_offering_id, is_archived, created_at, updated_at, metadata_json) VALUES ($id,$blueprint_id,$store_id,$name,$description,$kind,$print_provider_id,$provider_network_code,$default_placeholder_id,$primary_artwork_design_area_id,$external_offering_id,$is_archived,$created_at,$updated_at,$metadata_json);", ct, ("$id", value.Id.ToString()), ("$blueprint_id", value.BlueprintId.ToString()), ("$store_id", value.StoreId.ToString()), ("$name", value.Name), ("$description", value.Description), ("$kind", (int)value.Kind), ("$print_provider_id", value.PrintProviderId?.ToString()), ("$provider_network_code", value.ProviderNetworkCode), ("$default_placeholder_id", value.DefaultPlaceholderId?.ToString()), ("$primary_artwork_design_area_id", value.PrimaryArtworkDesignAreaId?.ToString()), ("$external_offering_id", value.ExternalOfferingId), ("$is_archived", value.IsArchived ? 1 : 0), ("$created_at", value.CreatedAt.ToString("O")), ("$updated_at", value.UpdatedAt.ToString("O")), ("$metadata_json", value.MetadataJson));
 
     private static Task InsertOfferingOptionAsync(SqliteConnection c, System.Data.Common.DbTransaction t, OfferingOption value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO offering_options (id, offering_id, option_kind, name, sort_order, is_archived, metadata_json) VALUES ($id,$offering_id,$option_kind,$name,$sort_order,$is_archived,$metadata_json);", ct, ("$id", value.Id.ToString()), ("$offering_id", value.OfferingId.ToString()), ("$option_kind", (int)value.OptionKind), ("$name", value.Name), ("$sort_order", value.SortOrder), ("$is_archived", value.IsArchived ? 1 : 0), ("$metadata_json", value.MetadataJson));
-    private static Task InsertOfferingOptionValueAsync(SqliteConnection c, System.Data.Common.DbTransaction t, OfferingOptionValue value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO offering_option_values (id, option_id, offering_id, value, sort_order, is_archived, metadata_json) VALUES ($id,$option_id,$offering_id,$value,$sort_order,$is_archived,$metadata_json);", ct, ("$id", value.Id.ToString()), ("$option_id", value.OptionId.ToString()), ("$offering_id", value.OfferingId.ToString()), ("$value", value.Value), ("$sort_order", value.SortOrder), ("$is_archived", value.IsArchived ? 1 : 0), ("$metadata_json", value.MetadataJson));
+    private static Task InsertOfferingOptionValueAsync(SqliteConnection c, System.Data.Common.DbTransaction t, OfferingOptionValue value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO offering_option_values (id, option_id, offering_id, value, sort_order, is_archived, metadata_json, is_favorite) VALUES ($id,$option_id,$offering_id,$value,$sort_order,$is_archived,$metadata_json,$is_favorite);", ct, ("$id", value.Id.ToString()), ("$option_id", value.OptionId.ToString()), ("$offering_id", value.OfferingId.ToString()), ("$value", value.Value), ("$sort_order", value.SortOrder), ("$is_archived", value.IsArchived ? 1 : 0), ("$metadata_json", value.MetadataJson), ("$is_favorite", value.IsFavorite ? 1 : 0));
 
     private static Task InsertOfferingVariantAsync(SqliteConnection c, System.Data.Common.DbTransaction t, OfferingVariant value, CancellationToken ct) => InsertOfferingVariantCoreAsync(c, t, value, ct);
     private static async Task InsertOfferingVariantCoreAsync(SqliteConnection c, System.Data.Common.DbTransaction t, OfferingVariant value, CancellationToken ct)
     {
-        await ExecuteAsync(c, t, "INSERT INTO offering_variants (id, offering_id, name, is_archived, created_at, updated_at, metadata_json) VALUES ($id,$offering_id,$name,$is_archived,$created_at,$updated_at,$metadata_json);", ct, ("$id", value.Id.ToString()), ("$offering_id", value.OfferingId.ToString()), ("$name", value.Name), ("$is_archived", value.IsArchived ? 1 : 0), ("$created_at", value.CreatedAt.ToString("O")), ("$updated_at", value.UpdatedAt.ToString("O")), ("$metadata_json", value.MetadataJson));
+        await ExecuteAsync(c, t, "INSERT INTO offering_variants (id, offering_id, name, is_archived, created_at, updated_at, metadata_json, provider_is_available) VALUES ($id,$offering_id,$name,$is_archived,$created_at,$updated_at,$metadata_json,$provider_is_available);", ct, ("$id", value.Id.ToString()), ("$offering_id", value.OfferingId.ToString()), ("$name", value.Name), ("$is_archived", value.IsArchived ? 1 : 0), ("$created_at", value.CreatedAt.ToString("O")), ("$updated_at", value.UpdatedAt.ToString("O")), ("$metadata_json", value.MetadataJson), ("$provider_is_available", value.ProviderIsAvailable is bool available ? (available ? 1 : 0) : null));
         foreach (var optionValueId in value.OptionValueIds)
             await ExecuteAsync(c, t, "INSERT INTO offering_variant_values (variant_id, option_value_id) VALUES ($variant_id,$option_value_id);", ct, ("$variant_id", value.Id.ToString()), ("$option_value_id", optionValueId.ToString()));
     }
@@ -1906,7 +2074,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         ExecuteAsync(connection, transaction, "INSERT INTO design_selected_colors (item_id, color_value) VALUES ($item_id, $color_value);", cancellationToken, ("$item_id", color.ItemId.ToString()), ("$color_value", color.ColorValue));
 
     private static Task InsertDesignVariantRowAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, DesignVariantRow row, CancellationToken cancellationToken) =>
-        ExecuteAsync(connection, transaction, "INSERT INTO design_variant_rows (id, item_id, is_default, sort_order) VALUES ($id, $item_id, $is_default, $sort_order);", cancellationToken, ("$id", row.Id.ToString()), ("$item_id", row.ItemId.ToString()), ("$is_default", row.IsDefault ? 1 : 0), ("$sort_order", row.SortOrder));
+        ExecuteAsync(connection, transaction, "INSERT INTO design_variant_rows (id, item_id, is_default, sort_order, contrast_intent) VALUES ($id, $item_id, $is_default, $sort_order, $contrast_intent);", cancellationToken, ("$id", row.Id.ToString()), ("$item_id", row.ItemId.ToString()), ("$is_default", row.IsDefault ? 1 : 0), ("$sort_order", row.SortOrder), ("$contrast_intent", row.ContrastIntent?.ToString()));
+
+    private static Task InsertListingColorSelectionAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, ListingColorSelection selection, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, "INSERT INTO listing_color_selections (item_id, color_option_value_id, legacy_color_label, artwork_variant_id, sort_order) VALUES ($item_id, $color_option_value_id, $legacy_color_label, $artwork_variant_id, $sort_order);", cancellationToken,
+            ("$item_id", selection.ItemId.ToString()), ("$color_option_value_id", selection.ColorOptionValueId?.ToString()), ("$legacy_color_label", selection.LegacyColorLabel), ("$artwork_variant_id", selection.ArtworkVariantId.ToString()), ("$sort_order", selection.SortOrder));
 
     private static Task InsertDesignVariantRowColorAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, DesignVariantRowColor rowColor, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, "INSERT INTO design_variant_row_colors (row_id, color_value) VALUES ($row_id, $color_value);", cancellationToken, ("$row_id", rowColor.RowId.ToString()), ("$color_value", rowColor.ColorValue));
@@ -1983,7 +2155,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
     {
         var result = new List<OfferingOptionValue>();
         await foreach (var r in ReadAsync(c, "SELECT * FROM offering_option_values ORDER BY sort_order, id;", ct))
-            result.Add(new OfferingOptionValue(ReadGuid(r, "id"), ReadGuid(r, "option_id"), ReadGuid(r, "offering_id"), ReadString(r, "value"), ReadInt(r, "sort_order"), ReadBool(r, "is_archived"), ReadString(r, "metadata_json")));
+            result.Add(new OfferingOptionValue(ReadGuid(r, "id"), ReadGuid(r, "option_id"), ReadGuid(r, "offering_id"), ReadString(r, "value"), ReadInt(r, "sort_order"), ReadBool(r, "is_archived"), ReadString(r, "metadata_json"), ReadBool(r, "is_favorite")));
         return result;
     }
 
@@ -2003,7 +2175,8 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
                 ORDER BY option.sort_order, value.sort_order, value.id;
                 """, ct, null, ("$variant_id", variantId.ToString())))
                 ids.Add(ReadGuid(membership, "option_value_id"));
-            result.Add(new OfferingVariant(variantId, ReadGuid(r, "offering_id"), ReadString(r, "name"), ids, ReadBool(r, "is_archived"), ReadDate(r, "created_at"), ReadDate(r, "updated_at"), ReadString(r, "metadata_json")));
+            result.Add(new OfferingVariant(variantId, ReadGuid(r, "offering_id"), ReadString(r, "name"), ids, ReadBool(r, "is_archived"), ReadDate(r, "created_at"), ReadDate(r, "updated_at"), ReadString(r, "metadata_json"))
+            { ProviderIsAvailable = ReadNullableBool(r, "provider_is_available") });
         }
         return result;
     }
@@ -2457,7 +2630,9 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         var rows = new List<DesignVariantRow>();
         await foreach (var reader in ReadAsync(connection, "SELECT * FROM design_variant_rows ORDER BY sort_order;", cancellationToken))
         {
-            rows.Add(new DesignVariantRow(ReadGuid(reader, "id"), ReadGuid(reader, "item_id"), ReadBool(reader, "is_default"), ReadInt(reader, "sort_order")));
+            var intent = ReadNullableString(reader, "contrast_intent");
+            rows.Add(new DesignVariantRow(ReadGuid(reader, "id"), ReadGuid(reader, "item_id"), ReadBool(reader, "is_default"), ReadInt(reader, "sort_order"),
+                intent is not null && Enum.TryParse<ArtworkContrastIntent>(intent, out var parsed) ? parsed : null));
         }
 
         return rows;
@@ -2483,6 +2658,15 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         }
 
         return assignments;
+    }
+
+    private static async Task<IReadOnlyList<ListingColorSelection>> LoadListingColorSelectionsAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var selections = new List<ListingColorSelection>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM listing_color_selections ORDER BY item_id, sort_order;", cancellationToken))
+            selections.Add(new ListingColorSelection(ReadGuid(reader, "item_id"), ReadNullableGuid(reader, "color_option_value_id"),
+                ReadGuid(reader, "artwork_variant_id"), ReadInt(reader, "sort_order"), ReadNullableString(reader, "legacy_color_label")));
+        return selections;
     }
 
     private static async IAsyncEnumerable<SqliteDataReader> ReadAsync(
@@ -2544,6 +2728,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
     }
 
     private static bool ReadBool(SqliteDataReader reader, string name) => ReadInt(reader, name) == 1;
+    private static bool? ReadNullableBool(SqliteDataReader reader, string name) => reader.IsDBNull(reader.GetOrdinal(name)) ? null : ReadBool(reader, name);
 
     private static DateTimeOffset ReadDate(SqliteDataReader reader, string name) => DateTimeOffset.Parse(ReadString(reader, name));
 
@@ -2718,6 +2903,35 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             {
                 throw new InvalidOperationException("Every design slot assignment must reference an existing design area.");
             }
+        }
+
+        var artworkRowsById = snapshot.DesignVariantRows.ToDictionary(value => value.Id);
+        var optionValuesById = snapshot.OfferingOptionValues.ToDictionary(value => value.Id);
+        var optionsById = snapshot.OfferingOptions.ToDictionary(value => value.Id);
+        foreach (var selection in snapshot.ListingColorSelections)
+        {
+            if (!snapshot.Items.Any(item => item.Id == selection.ItemId))
+                throw new InvalidOperationException("Every Listing Color selection must reference an existing Item.");
+            if (!artworkRowsById.TryGetValue(selection.ArtworkVariantId, out var artworkVariant) || artworkVariant.ItemId != selection.ItemId)
+                throw new InvalidOperationException("Every Listing Color selection must reference an artwork variant belonging to the same Item.");
+            if (selection.ColorOptionValueId is Guid colorValueId)
+            {
+                var itemOfferingId = snapshot.ItemListingConfigurations.SingleOrDefault(value => value.ItemId == selection.ItemId)?.OfferingId;
+                if (itemOfferingId is null
+                    || !optionValuesById.TryGetValue(colorValueId, out var colorValue)
+                    || colorValue.OfferingId != itemOfferingId
+                    || colorValue.IsArchived
+                    || !optionsById.TryGetValue(colorValue.OptionId, out var colorOption)
+                    || colorOption.OptionKind != OptionKind.Color
+                    || colorOption.IsArchived)
+                    throw new InvalidOperationException("A resolved Listing Color selection must reference an active Color Value in the Item's selected Offering.");
+            }
+        }
+
+        foreach (var optionValue in snapshot.OfferingOptionValues.Where(value => value.IsFavorite))
+        {
+            if (!optionsById.TryGetValue(optionValue.OptionId, out var option) || option.OptionKind != OptionKind.Color)
+                throw new InvalidOperationException("Only Color Option Values can be marked as favorites.");
         }
 
         var blueprints = snapshot.Blueprints.ToDictionary(value => value.Id);

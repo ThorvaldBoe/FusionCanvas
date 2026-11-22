@@ -48,4 +48,5 @@ public sealed record MainWindowApplicationServices(
     IListingProjectionSource? ListingProjectionSource = null,
     IStoreContextMapper? StoreContextMapper = null,
     FusionCanvas.Application.Listings.ManualListingDetailsService? ManualListingDetails = null,
-    FusionCanvas.Application.Stores.Printify.PrintifyListingImportService? PrintifyListingImport = null);
+    FusionCanvas.Application.Stores.Printify.PrintifyListingImportService? PrintifyListingImport = null,
+    IListingColorSelectionService? ListingColorSelection = null);

@@ -99,13 +99,15 @@ public sealed class PrintifyListingClientTests
         using var http = new HttpClient(handler);
         var client = new PrintifyListingClient(Guid.NewGuid(), http, _ => Task.FromResult<string?>("key"));
         var assetId = Guid.NewGuid();
-        var projection = Projection() with
+        var baseProjection = Projection();
+        var projection = baseProjection with
         {
             Artwork =
             [
                 new ListingArtworkProjection(Guid.NewGuid(), assetId, "artwork/front.png", new ArtworkDimensions(1000, 1000), new ArtworkDimensions(4500, 5400), new ArtworkPlacement(1, 0.5, 0.5, 0))
                 {
-                    Position = "front"
+                    Position = "front",
+                    SourceVariantIds = [baseProjection.Variants[0].SourceVariantId]
                 }
             ]
         };

@@ -166,6 +166,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         CancelOptionValueEditCommand = new RelayCommand(_ => CancelOptionValueEdit());
         MoveOptionValueUpCommand = new RelayCommand(parameter => _ = MoveOptionValueAsync(parameter as OfferingOptionValue, -1), () => CanEdit && IsManagingOptionValues);
         MoveOptionValueDownCommand = new RelayCommand(parameter => _ = MoveOptionValueAsync(parameter as OfferingOptionValue, 1), () => CanEdit && IsManagingOptionValues);
+        ToggleColorFavoriteCommand = new RelayCommand(parameter => _ = ToggleColorFavoriteAsync(parameter as OfferingOptionValue), () => CanEdit && IsManagingOptionValues && SelectedOption?.OptionKind == OptionKind.Color);
         StartAddVariantCommand = new RelayCommand(_ => BeginVariantDraft(false), () => CanEdit && AvailableOptions.Any() && VariantValueChoices.Count > 0);
         StartBulkVariantsCommand = new RelayCommand(_ => BeginVariantDraft(true), () => CanEdit && AvailableColors.Any() && BulkSizeChoices.Count > 0);
         CancelAddVariantCommand = new RelayCommand(_ => { ResetVariantDraft(); VariantActionsFocusRequested?.Invoke(this, EventArgs.Empty); });
@@ -548,12 +549,14 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(AvailableValues));
             OnPropertyChanged(nameof(HasAvailableValues));
             OnPropertyChanged(nameof(ManageOptionValuesDialogTitle));
+            OnPropertyChanged(nameof(IsSelectedOptionColor));
             NotifyCommands();
         }
     }
 
     public Guid? SelectedOptionId => SelectedOption?.Id;
     public string ManageOptionValuesDialogTitle => SelectedOption is { } option ? $"Manage {option.Name} values" : "Manage values";
+    public bool IsSelectedOptionColor => SelectedOption?.OptionKind == OptionKind.Color;
 
     public OfferingPlaceholder? SelectedPlaceholder
     {
@@ -960,6 +963,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public ICommand CancelOptionValueEditCommand { get; }
     public ICommand MoveOptionValueUpCommand { get; }
     public ICommand MoveOptionValueDownCommand { get; }
+    public ICommand ToggleColorFavoriteCommand { get; }
     public ICommand StartAddVariantCommand { get; }
     public ICommand StartBulkVariantsCommand { get; }
     public ICommand CancelAddVariantCommand { get; }
@@ -1144,6 +1148,12 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         if (SelectedOffering is null || SelectedOption is null) return;
         await RunMutationAsync(() => _catalog.CreateOptionValueAsync(new CreateOptionValueRequest(SelectedOffering.Id, SelectedOption.Id, OptionValue))).ConfigureAwait(true);
         if (!HasError) { IsAddingOptionValue = false; OptionValue = string.Empty; }
+    }
+
+    private async Task ToggleColorFavoriteAsync(OfferingOptionValue? value)
+    {
+        if (!CanEdit || SelectedOffering is null || SelectedOption?.OptionKind != OptionKind.Color || value is null) return;
+        await RunMutationAsync(() => _catalog.SetColorFavoriteAsync(SelectedOffering.StoreId, SelectedOffering.Id, value.Id, !value.IsFavorite)).ConfigureAwait(true);
     }
 
     private async Task MoveOptionValueAsync(OfferingOptionValue? value, int offset)
@@ -3087,7 +3097,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         {
             SaveOfferingCommand, StartAddPrintProviderCommand, CreatePrintProviderCommand, StartAddOptionCommand, ManageOptionCommand, CreateOptionCommand, StartAddOptionValueCommand,
             CreateOptionValueCommand, EditOptionValueCommand, SaveOptionValueEditCommand, CancelOptionValueEditCommand,
-            MoveOptionValueUpCommand, MoveOptionValueDownCommand,
+            MoveOptionValueUpCommand, MoveOptionValueDownCommand, ToggleColorFavoriteCommand,
             StartAddVariantCommand, StartBulkVariantsCommand, CreateVariantCommand, StartAddPlaceholderCommand,
             CreatePlaceholderCommand, SetDefaultPlaceholderCommand, StartAddTemplateCommand, CreateTemplateCommand,
             DuplicateTemplateCommand, ArchiveTemplateCommand, ConfirmMockupTemplateArchiveCommand, CancelMockupTemplateArchiveCommand,

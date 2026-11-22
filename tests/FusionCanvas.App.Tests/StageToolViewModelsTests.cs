@@ -1,4 +1,5 @@
 using Avalonia.Headless.XUnit;
+using Avalonia.Controls;
 using FusionCanvas.App.StageTools;
 using FusionCanvas.Application.Mockups;
 using FusionCanvas.Domain.Mockups;
@@ -35,6 +36,65 @@ public class StageToolViewModelsTests
         Assert.Equal("Unavailable", vm.ConnectionStatus);
         Assert.False(vm.CanCreateOrUpdate);
         Assert.False(vm.CanPublish);
+    }
+
+    [AvaloniaFact]
+    public async Task ListingColorOptionsWindow_PreviewDoesNotSelectAndEscapeDiscardsDraft()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var workspace = WorkspaceSnapshot.DefaultWorkspace(now);
+        var storeId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var store = new Store(storeId, workspace.Id, "Store", null, false, now, now, "{}", fulfillmentStrategy: FulfillmentStrategy.Printify);
+        var item = new Item(itemId, storeId, null, null, "Tee", null, ItemStatus.Draft, WorkflowStage.Listing, false, now, now, "{}");
+        var provider = new FusionCanvas.Domain.Catalog.PrintProvider(Guid.NewGuid(), storeId, "Provider", "42", false, now, now);
+        var blueprint = new FusionCanvas.Domain.Catalog.Blueprint(Guid.NewGuid(), storeId, "Tee", null, false, now, now);
+        var offering = new FusionCanvas.Domain.Catalog.BlueprintOffering(Guid.NewGuid(), blueprint.Id, storeId, "Tee", null,
+            FusionCanvas.Domain.Catalog.BlueprintOfferingKind.FixedPrintProvider, provider.Id, null, null, "1:42", false, now, now);
+        var option = new FusionCanvas.Domain.Catalog.OfferingOption(Guid.NewGuid(), offering.Id, FusionCanvas.Domain.Catalog.OptionKind.Color, "Color", 0);
+        var black = new FusionCanvas.Domain.Catalog.OfferingOptionValue(Guid.NewGuid(), option.Id, offering.Id, "Black", 0, isFavorite: true);
+        var teal = new FusionCanvas.Domain.Catalog.OfferingOptionValue(Guid.NewGuid(), option.Id, offering.Id, "Teal", 1, metadataJson: "{\"hex\":\"#008080\"}");
+        var sellable = new FusionCanvas.Domain.Catalog.OfferingVariant(Guid.NewGuid(), offering.Id, "Teal", [teal.Id], false, now, now);
+        var artwork = new DesignVariantRow(Guid.NewGuid(), itemId, true, 0);
+        var snapshot = WorkspaceSnapshot.Empty with
+        {
+            Workspaces = [workspace], Stores = [store], Items = [item], Blueprints = [blueprint], PrintProviders = [provider],
+            BlueprintOfferings = [offering], OfferingOptions = [option], OfferingOptionValues = [black, teal],
+            OfferingVariants = [sellable], ItemListingConfigurations = [new ItemListingConfiguration(itemId, offering.Id)],
+            DesignVariantRows = [artwork]
+        };
+        var repository = new MemoryRepository(snapshot);
+        var lifecycle = new ListingLifecycleService(repository, new Connection(), new Products(), new Publication());
+        var viewModel = new PrintifyListingStageToolViewModel(
+            new Factory(lifecycle), new ProjectionSource(), () => repository.Snapshot,
+            id => id == storeId ? store : null, new ContextMapper(),
+            listingColors: new ListingColorSelectionService(repository));
+
+        await viewModel.LoadAsync(itemId, canEdit: true, TestContext.Current.CancellationToken);
+        Assert.Single(viewModel.ListingOtherColors);
+        Assert.Empty(repository.Snapshot.ListingColorSelections);
+
+        viewModel.ShowMoreOptionsCommand.Execute(null);
+        var choice = Assert.Single(viewModel.ListingOtherColors);
+        choice.IsDraftSelected = true;
+        viewModel.PreviewListingColorCommand.Execute(choice);
+        await HeadlessUiWait.UntilAsync(() => viewModel.PreviewColorName == "Teal", "flat Color preview");
+        Assert.Empty(repository.Snapshot.ListingColorSelections);
+
+        var dialog = new ListingColorOptionsWindow { DataContext = viewModel };
+        dialog.Show();
+        var searchBox = dialog.FindControl<Avalonia.Controls.TextBox>("SearchColorsBox");
+        Assert.NotNull(searchBox);
+        await HeadlessUiWait.UntilAsync(() => searchBox!.IsFocused, "More Options search focus");
+        dialog.RaiseEvent(new Avalonia.Input.KeyEventArgs
+        {
+            RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent,
+            Key = Avalonia.Input.Key.Escape
+        });
+
+        Assert.False(viewModel.IsMoreOptionsVisible);
+        Assert.False(choice.IsDraftSelected);
+        Assert.Empty(repository.Snapshot.ListingColorSelections);
     }
 
     [Fact]
@@ -378,8 +438,20 @@ public class StageToolViewModelsTests
         await vm.LoadAsync(itemId, canEdit: true, TestContext.Current.CancellationToken);
         Assert.True(connection.LastRequest!.RequireShopifyChannel);
         Assert.True(vm.CanPublish);
+        var mappingBeforePublish = repository.Snapshot.ExternalListingMappings.Single();
+        vm.PublishCommand.Execute(null);
+        Assert.True(vm.IsPublishAvailabilityConfirmationVisible);
+        vm.CancelPublishAvailabilityCommand.Execute(null);
+        Assert.False(vm.IsPublishAvailabilityConfirmationVisible);
+        Assert.Equal(0, publication.PublishCalls);
+        Assert.Equal(mappingBeforePublish, repository.Snapshot.ExternalListingMappings.Single());
+
         products.RemoteProduct = new ListingRemoteProduct("product-1", false, ListingPublicationState.Published, ListingSnapshot.Empty);
         vm.PublishCommand.Execute(null);
+        Assert.True(vm.IsPublishAvailabilityConfirmationVisible);
+        Assert.Equal(0, publication.PublishCalls);
+        vm.PublishAvailabilityAcknowledged = true;
+        vm.ConfirmPublishAvailabilityCommand.Execute(null);
         await HeadlessUiWait.UntilAsync(() => !vm.IsBusy, "Printify publish");
         Assert.Equal(1, publication.PublishCalls);
         Assert.True(vm.CanUnpublish);
@@ -390,6 +462,12 @@ public class StageToolViewModelsTests
         Assert.Equal(1, publication.UnpublishCalls);
         Assert.True(vm.CanPublish);
         Assert.True(vm.CanDelete);
+        var mappingBeforeRepublish = repository.Snapshot.ExternalListingMappings.Single();
+        vm.PublishCommand.Execute(null);
+        Assert.True(vm.IsPublishAvailabilityConfirmationVisible);
+        vm.CancelPublishAvailabilityCommand.Execute(null);
+        Assert.Equal(1, publication.PublishCalls);
+        Assert.Equal(mappingBeforeRepublish, repository.Snapshot.ExternalListingMappings.Single());
     }
 
     [Fact]

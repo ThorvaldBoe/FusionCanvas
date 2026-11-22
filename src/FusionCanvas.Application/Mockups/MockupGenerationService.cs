@@ -39,10 +39,10 @@ public sealed class MockupGenerationService : IMockupGenerationService
         var config = snapshot.ItemListingConfigurations.SingleOrDefault(value => value.ItemId == itemId);
         if (config is null) return new(itemId, null, isReadOnly, readOnlyReason, [], null, Outputs(snapshot, itemId), [], "Select an Offering in Design before generating mockups.", null, [], ReadNotice(item.MetadataJson));
         var eligible = await _templates.GetEligibleTemplatesAsync(item.StoreId, config.OfferingId, cancellationToken: cancellationToken).ConfigureAwait(false);
-        var colors = snapshot.DesignSelectedColors.Where(value => value.ItemId == itemId).Select(value => value.ColorValue).OrderBy(value => value).ToArray();
+        var colors = ResolveListingColors(snapshot, itemId).Select(value => value.Name).OrderBy(value => value).ToArray();
         var outputs = Outputs(snapshot, itemId);
         var blocked = colors.Length == 0
-            ? "Select at least one product Color in Design before generating mockups."
+            ? "Select at least one product Color in Listing before generating mockups."
             : eligible.Error is not null
                 ? null
                 : eligible.Templates.Count > 0
@@ -74,18 +74,21 @@ public sealed class MockupGenerationService : IMockupGenerationService
         var conditions = snapshot.MockupTemplateRevisionSourceImageOptionValues
             .Where(value => revisionImages.Any(image => image.Id == value.RevisionSourceImageId))
             .ToLookup(value => value.RevisionSourceImageId, value => value.OptionValueId);
-        var colors = snapshot.DesignSelectedColors.Where(value => value.ItemId == item.Id).Select(value => value.ColorValue).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var colors = ResolveListingColors(snapshot, item.Id).ToArray();
         var results = new List<MockupGenerationOutput>();
         var diagnostics = new List<MockupGenerationDiagnostic>();
         try
         {
-            foreach (var color in colors)
+            foreach (var selectedColor in colors)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var colorOption = snapshot.OfferingOptionValues.FirstOrDefault(value => value.OfferingId == config.OfferingId
-                    && string.Equals(value.Value, color, StringComparison.OrdinalIgnoreCase)
-                    && !value.IsArchived
-                    && snapshot.OfferingOptions.Any(option => option.Id == value.OptionId && option.OptionKind == OptionKind.Color && !option.IsArchived));
+                var color = selectedColor.Name;
+                var colorOption = selectedColor.ColorOptionValueId is Guid selectedColorId
+                    ? snapshot.OfferingOptionValues.SingleOrDefault(value => value.Id == selectedColorId)
+                    : snapshot.OfferingOptionValues.FirstOrDefault(value => value.OfferingId == config.OfferingId
+                        && string.Equals(value.Value, color, StringComparison.OrdinalIgnoreCase)
+                        && !value.IsArchived
+                        && snapshot.OfferingOptions.Any(option => option.Id == value.OptionId && option.OptionKind == OptionKind.Color && !option.IsArchived));
                 var compatibleVariants = colorOption is null
                     ? Array.Empty<OfferingVariant>()
                     : snapshot.OfferingVariants.Where(variant => !variant.IsArchived
@@ -110,7 +113,7 @@ public sealed class MockupGenerationService : IMockupGenerationService
                     continue;
                 }
                 var source = revisionImages.Single(image => image.Id == resolvedSourceIds[0]);
-                var design = FindDesignAsset(snapshot, item.Id, color, template.TargetPlaceholderId);
+                var design = FindDesignAsset(snapshot, item.Id, selectedColor.ArtworkVariantId, template.TargetPlaceholderId);
                 if (source is null) { diagnostics.Add(new(color, "No template source image is configured for this Color.")); continue; }
                 if (design is null) { diagnostics.Add(new(color, "No Design PNG is assigned for this Color and Design Area.")); continue; }
                 if (source.ImageMapping is null) { diagnostics.Add(new(color, "The template source image has no valid placement mapping.")); continue; }
@@ -166,16 +169,37 @@ public sealed class MockupGenerationService : IMockupGenerationService
         return new(results.Count > 0, diagnostics.Count == 0 ? null : "Some mockups could not be generated.", results, diagnostics);
     }
 
-    private static Guid? FindDesignAsset(WorkspaceSnapshot snapshot, Guid itemId, string color, Guid? targetAreaId)
+    private static Guid? FindDesignAsset(WorkspaceSnapshot snapshot, Guid itemId, Guid artworkVariantId, Guid? targetAreaId)
     {
-        var rows = snapshot.DesignVariantRows.Where(value => value.ItemId == itemId).Join(snapshot.DesignVariantRowColors, row => row.Id, colorRow => colorRow.RowId, (row, colorRow) => new { row, colorRow })
-            .Where(value => string.Equals(value.colorRow.ColorValue, color, StringComparison.OrdinalIgnoreCase)).OrderBy(value => value.row.IsDefault ? 0 : 1).ThenBy(value => value.row.SortOrder).ToArray();
-        foreach (var row in rows)
+        var rowExists = snapshot.DesignVariantRows.Any(value => value.Id == artworkVariantId && value.ItemId == itemId);
+        if (!rowExists) return null;
+        var assignment = snapshot.DesignSlotAssignments.FirstOrDefault(value =>
+            value.RowId == artworkVariantId && (targetAreaId is null || value.DesignAreaId == targetAreaId) && value.AssetId is not null);
+        return assignment?.AssetId is Guid assetId && snapshot.Assets.Any(value => value.Id == assetId && value.Kind == AssetKind.ExportedImage)
+            ? assetId
+            : null;
+    }
+
+    private static IReadOnlyList<(string Name, Guid? ColorOptionValueId, Guid ArtworkVariantId)> ResolveListingColors(WorkspaceSnapshot snapshot, Guid itemId)
+    {
+        var selections = snapshot.ListingColorSelections.Where(value => value.ItemId == itemId).ToArray();
+        if (selections.Length > 0)
         {
-            var assignment = snapshot.DesignSlotAssignments.FirstOrDefault(value => value.RowId == row.row.Id && (targetAreaId is null || value.DesignAreaId == targetAreaId) && value.AssetId is not null);
-            if (assignment?.AssetId is not null && snapshot.Assets.Any(value => value.Id == assignment.AssetId && value.Kind == AssetKind.ExportedImage)) return assignment.AssetId;
+            return selections.Select(value => (
+                value.ColorOptionValueId is Guid colorId
+                    ? snapshot.OfferingOptionValues.SingleOrDefault(optionValue => optionValue.Id == colorId)?.Value ?? value.LegacyColorLabel ?? "Unavailable Color"
+                    : value.LegacyColorLabel ?? "Unavailable Color",
+                value.ColorOptionValueId,
+                value.ArtworkVariantId)).ToArray();
         }
-        return null;
+
+        // Compatibility for data opened before the schema migration has completed.
+        return snapshot.DesignSelectedColors.Where(value => value.ItemId == itemId)
+            .Select(value => (value.ColorValue, (Guid?)null,
+                snapshot.DesignVariantRowColors.FirstOrDefault(rowColor =>
+                    string.Equals(rowColor.ColorValue, value.ColorValue, StringComparison.OrdinalIgnoreCase))?.RowId
+                ?? snapshot.DesignVariantRows.First(row => row.ItemId == itemId && row.IsDefault).Id))
+            .ToArray();
     }
 
     private static string SafeFileNamePart(string value)

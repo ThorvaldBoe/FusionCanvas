@@ -10,6 +10,10 @@ internal sealed class UiTestPrintifyCatalogClient : IPrintifyCatalogClient
     public Task<PrintifyCatalogResult> LoadSelectedProductsAsync(string key, int shopId, IReadOnlyCollection<string> productIds, CancellationToken cancellationToken = default) =>
         Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Succeeded, "Fixture catalog loaded.", SelectedProducts:
         [new PrintifyCatalogBlueprint(new(68, "Mocked Tee", "Imported from the UI test fixture.", "Test", "Tee"),
-            [new PrintifyCatalogProvider(9, "Fixture Provider", [new("Color", "color", [new(1, "Black")])],
-                [new(11, "Black / M", true, true, [1], [new("front", "dtg", 100, 200)])])]) { ProductId = "ui-test-product" }]));
+            [new PrintifyCatalogProvider(9, "Fixture Provider", [new("Color", "color", [
+                    new(1, "Black"), new(2, "Heather Gray"), new(3, "Teal"), new(4, "White")])],
+                [new(11, "Black / M", true, true, [1], [new("front", "dtg", 100, 200)]),
+                    new(12, "Heather Gray / M", true, true, [2], [new("front", "dtg", 100, 200)]),
+                    new(13, "Teal / M", true, true, [3], [new("front", "dtg", 100, 200)]),
+                    new(14, "White / M", true, true, [4], [new("front", "dtg", 100, 200)])])]) { ProductId = "ui-test-product" }]));
 }

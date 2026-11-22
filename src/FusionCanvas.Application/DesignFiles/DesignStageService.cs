@@ -101,7 +101,15 @@ public sealed class DesignStageService : IDesignStageService
             }
         }
 
+        if (existingConfiguration is not null
+            && existingConfiguration.OfferingId != offeringId
+            && snapshot.DesignSlotAssignments.Any(value => snapshot.DesignVariantRows.Any(row => row.ItemId == itemId && row.Id == value.RowId) && value.AssetId is not null))
+        {
+            return DesignStageResult.Failure("Download and manually adapt the current artwork before changing the Offering. The current artwork has not been removed.", BuildState(snapshot, itemId));
+        }
+
         var updated = ReplaceConfiguration(snapshot, item, offeringId);
+        updated = EnsureDefaultArtworkVariant(updated, itemId, offeringId);
         if (existingConfiguration is null && snapshot.ItemListingDetails.SingleOrDefault(value => value.ItemId == itemId) is { } firstSetupDetails)
         {
             updated = updated with
@@ -174,7 +182,42 @@ public sealed class DesignStageService : IDesignStageService
             return DesignStageResult.Failure("The replacement listing configuration must be an active Offering from this item's Store.", BuildState(snapshot, itemId));
         }
 
-        var updated = ReplaceConfiguration(snapshot, item, offeringId);
+        if (snapshot.DesignSlotAssignments.Any(value => snapshot.DesignVariantRows.Any(row => row.ItemId == itemId && row.Id == value.RowId) && value.AssetId is not null))
+        {
+            return DesignStageResult.Failure("Download and manually adapt the current artwork before changing the Offering. The current artwork has not been removed.", BuildState(snapshot, itemId));
+        }
+
+        var updated = EnsureDefaultArtworkVariant(ReplaceConfiguration(snapshot, item, offeringId), itemId, offeringId);
+        return await SaveDesignMutationAsync(updated, itemId, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<DesignStageResult> AddArtworkVariantAsync(Guid itemId, ArtworkContrastIntent? contrastIntent = null, CancellationToken cancellationToken = default)
+    {
+        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var item = snapshot.Items.SingleOrDefault(value => value.Id == itemId);
+        if (item is null) return DesignStageResult.Failure("Item was not found.");
+
+        var editDecision = ItemWorkflowPolicy.CanPerformOperation(item, ItemOperationKind.DesignStage);
+        if (!editDecision.IsAllowed) return DesignStageResult.Failure(editDecision.Reason, BuildState(snapshot, itemId));
+
+        var offeringId = snapshot.ItemListingConfigurations.SingleOrDefault(value => value.ItemId == itemId)?.OfferingId;
+        if (offeringId is null || IsStaleConfiguration(snapshot, item, offeringId.Value))
+            return DesignStageResult.Failure("Select an active Offering before adding artwork variants.", BuildState(snapshot, itemId));
+
+        var hadDefaultVariant = snapshot.DesignVariantRows.Any(value => value.ItemId == itemId && value.IsDefault);
+        var updated = EnsureDefaultArtworkVariant(snapshot, itemId, offeringId.Value);
+        if (!hadDefaultVariant)
+            return await SaveDesignMutationAsync(updated, itemId, cancellationToken).ConfigureAwait(false);
+
+        var nextOrder = updated.DesignVariantRows.Where(value => value.ItemId == itemId).Select(value => value.SortOrder).DefaultIfEmpty(-1).Max() + 1;
+        var variant = new DesignVariantRow(_newId(), itemId, false, nextOrder, contrastIntent);
+        var areaIds = PlaceholderIdsForOffering(updated, offeringId.Value);
+        updated = updated with
+        {
+            DesignVariantRows = [.. updated.DesignVariantRows, variant],
+            DesignSlotAssignments = [.. updated.DesignSlotAssignments, .. areaIds.Select(areaId => new DesignSlotAssignment(variant.Id, areaId, null))]
+        };
+        DesignStagePolicy.ValidateArtworkVariants(itemId, updated.DesignVariantRows, updated.DesignSlotAssignments);
         return await SaveDesignMutationAsync(updated, itemId, cancellationToken).ConfigureAwait(false);
     }
 
@@ -526,6 +569,10 @@ public sealed class DesignStageService : IDesignStageService
         {
             DesignVariantRows = [.. snapshot.DesignVariantRows.Where(r => r.Id != rowId)],
             DesignVariantRowColors = updatedRowColors,
+            ListingColorSelections = [.. snapshot.ListingColorSelections.Select(selection =>
+                selection.ItemId == itemId && selection.ArtworkVariantId == rowId
+                    ? selection with { ArtworkVariantId = defaultRow.Id }
+                    : selection)],
             DesignSlotAssignments = [.. snapshot.DesignSlotAssignments.Where(a => a.RowId != rowId)]
         };
 
@@ -1241,8 +1288,7 @@ public sealed class DesignStageService : IDesignStageService
             itemMetadata.GetValueOrDefault(ItemMetadataCodec.PhraseKey),
             itemMetadata.GetValueOrDefault(ItemMetadataCodec.GraphicDirectionKey)) == 100;
         var defaultRow = snapshot.DesignVariantRows.SingleOrDefault(value => value.ItemId == itemId && value.IsDefault);
-        var hasDefaultRowWithSelectedColor = defaultRow is not null
-            && snapshot.DesignVariantRowColors.Any(value => value.RowId == defaultRow.Id);
+        var hasDefaultRowWithSelectedColor = defaultRow is not null;
 
         // The legacy offering projection retains archived rows so existing external
         // references remain valid. The Design selector is for new active choices only,
@@ -1296,21 +1342,11 @@ public sealed class DesignStageService : IDesignStageService
                     : "The selected listing configuration is no longer active; existing Design data is read-only."
             : string.Empty;
 
-        // Available colors: from the selected offering's variants
+        // Product Color belongs to Listing. Design only carries artwork variants and
+        // the Offering context required to define compatible Design Areas.
         var configOfferingId = config?.OfferingId;
-        var availableColors = configOfferingId is not null
-            && snapshot.BlueprintOfferings.Any(o => o.Id == configOfferingId.Value)
-            && !configuredOfferingIsStale
-            ? DesignStagePolicy.AvailableColors(snapshot.OfferingOptions, snapshot.OfferingOptionValues, snapshot.OfferingVariants, configOfferingId.Value)
-            : configOfferingId is not null
-                ? DesignStagePolicy.AvailableColors(snapshot.ProductVariants, configOfferingId.Value)
-            : [];
-
-        // Selected colors
-        var selectedColors = snapshot.DesignSelectedColors
-            .Where(c => c.ItemId == itemId)
-            .Select(c => c.ColorValue)
-            .ToArray();
+        IReadOnlyList<string> availableColors = [];
+        IReadOnlyList<string> selectedColors = [];
 
         // Rows with slots
         var rows = snapshot.DesignVariantRows
@@ -1318,10 +1354,7 @@ public sealed class DesignStageService : IDesignStageService
             .OrderBy(r => r.SortOrder)
             .Select(r =>
             {
-                var colorValues = snapshot.DesignVariantRowColors
-                    .Where(c => c.RowId == r.Id)
-                    .Select(c => c.ColorValue)
-                    .ToArray();
+                IReadOnlyList<string> colorValues = [];
 
                 var areaIds = configOfferingId is not null
                     ? PlaceholderIdsForOffering(snapshot, configOfferingId.Value)
@@ -1359,7 +1392,10 @@ public sealed class DesignStageService : IDesignStageService
                     };
                 }).ToArray();
 
-                return new DesignRowSummary(r.Id, r.IsDefault, r.SortOrder, colorValues, slots);
+                return new DesignRowSummary(r.Id, r.IsDefault, r.SortOrder, colorValues, slots)
+                {
+                    ContrastIntent = r.ContrastIntent
+                };
             }).ToArray();
 
         var supportingImages = ListSupportingImages(snapshot, itemId);
@@ -1507,9 +1543,23 @@ public sealed class DesignStageService : IDesignStageService
             ItemListingConfigurations = [.. snapshot.ItemListingConfigurations.Where(value => value.ItemId != item.Id),
                 new ItemListingConfiguration(item.Id, offeringId)],
             DesignSelectedColors = [.. snapshot.DesignSelectedColors.Where(value => value.ItemId != item.Id)],
+            ListingColorSelections = [.. snapshot.ListingColorSelections.Where(value => value.ItemId != item.Id)],
             DesignVariantRows = [.. snapshot.DesignVariantRows.Where(value => value.ItemId != item.Id)],
             DesignVariantRowColors = [.. snapshot.DesignVariantRowColors.Where(value => !oldRows.Contains(value.RowId))],
             DesignSlotAssignments = [.. snapshot.DesignSlotAssignments.Where(value => !oldRows.Contains(value.RowId))]
+        };
+    }
+
+    private WorkspaceSnapshot EnsureDefaultArtworkVariant(WorkspaceSnapshot snapshot, Guid itemId, Guid offeringId)
+    {
+        if (snapshot.DesignVariantRows.Any(value => value.ItemId == itemId && value.IsDefault)) return snapshot;
+
+        var defaultVariant = new DesignVariantRow(_newId(), itemId, true, 0);
+        var areaIds = PlaceholderIdsForOffering(snapshot, offeringId);
+        return snapshot with
+        {
+            DesignVariantRows = [.. snapshot.DesignVariantRows, defaultVariant],
+            DesignSlotAssignments = [.. snapshot.DesignSlotAssignments, .. areaIds.Select(areaId => new DesignSlotAssignment(defaultVariant.Id, areaId, null))]
         };
     }
 

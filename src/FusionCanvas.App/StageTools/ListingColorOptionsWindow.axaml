@@ -1,0 +1,67 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:stageTools="using:FusionCanvas.App.StageTools"
+        x:Class="FusionCanvas.App.StageTools.ListingColorOptionsWindow"
+        x:DataType="stageTools:PrintifyListingStageToolViewModel"
+        Title="More Listing Colors"
+        Width="720" Height="680" MinWidth="520" MinHeight="420"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ApplicationBackgroundBrush}"
+        CanResize="True">
+  <Grid RowDefinitions="Auto,*,Auto" Margin="{DynamicResource Token.Layout.Margin.Uniform.SectionPlus}"
+        RowSpacing="{DynamicResource Token.Spacing.ControlGap}">
+    <StackPanel Grid.Row="0" Spacing="{DynamicResource Token.Spacing.InlineGap}">
+      <TextBlock Text="More Colors" FontSize="18" FontWeight="SemiBold" />
+      <TextBox x:Name="SearchColorsBox"
+               Text="{Binding ListingColorSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+               PlaceholderText="Search Colors" AutomationProperties.Name="Search Listing Colors" />
+    </StackPanel>
+    <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
+      <ScrollViewer Grid.Column="0" MaxHeight="480">
+        <ItemsControl ItemsSource="{Binding FilteredListingOtherColors}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="stageTools:ListingColorChoiceViewModel">
+              <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto"
+                    ColumnSpacing="{DynamicResource Token.Spacing.InlineGap}" MinHeight="42">
+                <CheckBox Grid.Column="0" IsChecked="{Binding IsDraftSelected, Mode=TwoWay}"
+                          IsEnabled="{Binding CanSelect}" VerticalAlignment="Center"
+                          AutomationProperties.Name="{Binding Name, StringFormat='Add {0} color to this listing'}" />
+                <Button Grid.Column="1" Content="{Binding Name}"
+                        Command="{Binding $parent[ItemsControl].DataContext.PreviewListingColorCommand}"
+                        CommandParameter="{Binding}" HorizontalContentAlignment="Left"
+                        AutomationProperties.Name="{Binding Name, StringFormat='Preview {0} color'}" />
+                <Border Grid.Column="2" Width="24" Height="24" CornerRadius="12"
+                        Background="{Binding SwatchBrush}" VerticalAlignment="Center"
+                        ToolTip.Tip="Approximate flat swatch" />
+                <ComboBox Grid.Column="1" Grid.Row="1" ItemsSource="{Binding ArtworkVariants}"
+                          SelectedItem="{Binding SelectedArtworkVariant, Mode=TwoWay}"
+                          IsEnabled="{Binding IsSelected}" DisplayMemberBinding="{Binding Name}"
+                          AutomationProperties.Name="{Binding Name, StringFormat='Artwork for {0}'}" />
+                <TextBlock Grid.Column="1" Grid.Row="2" Text="{Binding AvailabilityLabel}"
+                           Foreground="{DynamicResource SecondaryTextBrush}" FontSize="11" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+      <StackPanel Grid.Column="1" Width="220" Spacing="{DynamicResource Token.Spacing.InlineGap}">
+        <TextBlock Text="{Binding PreviewColorSummary}" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <Grid Width="210" Height="210">
+          <Border CornerRadius="4" Background="{Binding PreviewSwatchBrush}"
+                  AutomationProperties.Name="Approximate flat Color swatch preview" />
+          <Image Source="{Binding PreviewArtworkBitmap}" Stretch="Uniform" Margin="12"
+                 IsVisible="{Binding HasPreviewArtwork}"
+                 AutomationProperties.Name="Artwork preview over the approximate flat Color swatch" />
+        </Grid>
+        <TextBlock Text="{Binding PreviewSelectionNote}" Foreground="{DynamicResource SecondaryTextBrush}"
+                   TextWrapping="Wrap" />
+      </StackPanel>
+    </Grid>
+    <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.InlineGap}">
+      <Button Content="Apply selected Colors" Command="{Binding ApplyMoreOptionsCommand}"
+              AutomationProperties.AutomationId="Listing.ApplyMoreOptions" />
+      <Button Content="Cancel" Command="{Binding CancelMoreOptionsCommand}"
+              AutomationProperties.AutomationId="Listing.CancelMoreOptions" />
+    </StackPanel>
+  </Grid>
+</Window>

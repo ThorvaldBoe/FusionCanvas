@@ -1,3 +1,3 @@
 namespace FusionCanvas.Application.Stores.Printify;
 
-public sealed record PrintifyCatalogOptionValue(int Id, string Title);
+public sealed record PrintifyCatalogOptionValue(int Id, string Title, string? Hex = null);

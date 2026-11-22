@@ -9,6 +9,9 @@ public sealed record DesignRowSummary(
     bool IsDefault,
     int SortOrder,
     IReadOnlyList<string> ColorValues,
-    IReadOnlyList<DesignSlotSummary> Slots);
+    IReadOnlyList<DesignSlotSummary> Slots)
+{
+    public ArtworkContrastIntent? ContrastIntent { get; init; }
+}
 
 /// <summary>Full state of the Design Stage for an item.</summary>

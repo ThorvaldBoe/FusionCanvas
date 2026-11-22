@@ -1011,6 +1011,59 @@
                                  AutomationProperties.Name="Printify out-of-stock policy" />
                       <TextBlock Text="Fixed retail price" FontWeight="SemiBold" />
                       <TextBox Text="{Binding PrintifyTool.PriceAmount, Mode=TwoWay}" AutomationProperties.Name="Printify fixed retail price" />
+                      <Border IsVisible="{Binding PrintifyTool.HasListingColors}"
+                              Padding="{DynamicResource Token.Layout.PreviewPadding}"
+                              Background="{DynamicResource PanelSurfaceBrush}"
+                              BorderBrush="{DynamicResource SubtleBorderBrush}"
+                              BorderThickness="1" CornerRadius="4">
+                        <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
+                          <TextBlock Text="Listing Colors" FontWeight="SemiBold" />
+                          <ItemsControl ItemsSource="{Binding PrintifyTool.UnresolvedListingColors}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="stageTools:UnresolvedListingColorViewModel">
+                                <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
+                                  <TextBlock Text="{Binding Label, StringFormat='Unresolved imported Color: {0}'}" Foreground="{DynamicResource WarningTextBrush}" />
+                                  <ComboBox ItemsSource="{Binding Candidates}" SelectedItem="{Binding SelectedCandidate, Mode=TwoWay}"
+                                            DisplayMemberBinding="{Binding Name}" PlaceholderText="Choose the matching provider Color"
+                                            AutomationProperties.Name="Resolve imported Listing Color" />
+                                </StackPanel>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <TextBlock Text="Favorites" Foreground="{DynamicResource SecondaryTextBrush}" />
+                          <ItemsControl ItemsSource="{Binding PrintifyTool.ListingFavoriteColors}">
+                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Tight}" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="stageTools:ListingColorChoiceViewModel">
+                                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="{DynamicResource Token.Spacing.InlineGap}">
+                                  <ToggleButton Grid.Column="0" Content="{Binding Name}" IsChecked="{Binding IsSelected, Mode=OneWay}"
+                                                Command="{Binding $parent[ItemsControl].DataContext.PrintifyTool.ToggleFavoriteListingColorCommand}"
+                                                CommandParameter="{Binding}" Classes="compactChip" IsEnabled="{Binding CanSelect}"
+                                                AutomationProperties.Name="{Binding Name, StringFormat='Select {0} color'}" />
+                                  <ComboBox Grid.Column="1" ItemsSource="{Binding ArtworkVariants}"
+                                            SelectedItem="{Binding SelectedArtworkVariant, Mode=TwoWay}"
+                                            IsEnabled="{Binding IsSelected}" DisplayMemberBinding="{Binding Name}"
+                                            AutomationProperties.Name="{Binding Name, StringFormat='Artwork for {0}'}" />
+                                  <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding AvailabilityLabel}"
+                                             Foreground="{DynamicResource SecondaryTextBrush}" FontSize="11" />
+                                </Grid>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <Button x:Name="ListingMoreOptionsButton" Content="More Options" Command="{Binding PrintifyTool.ShowMoreOptionsCommand}"
+                                  IsEnabled="{Binding PrintifyTool.CanShowMoreOptions}"
+                                  HorizontalAlignment="Left" AutomationProperties.AutomationId="Listing.MoreOptions" />
+                          <TextBlock Text="{Binding PrintifyTool.PreviewColorSummary}"
+                                     Foreground="{DynamicResource SecondaryTextBrush}" />
+                          <Grid Width="260" Height="130">
+                            <Border CornerRadius="4" Background="{Binding PrintifyTool.PreviewSwatchBrush}"
+                                    AutomationProperties.Name="Approximate flat Color swatch preview" />
+                            <Image Source="{Binding PrintifyTool.PreviewArtworkBitmap}" Stretch="Uniform" Margin="12"
+                                   IsVisible="{Binding PrintifyTool.HasPreviewArtwork}"
+                                   AutomationProperties.Name="Artwork preview over the approximate flat Color swatch" />
+                          </Grid>
+                        </StackPanel>
+                      </Border>
                       <TextBlock Text="{Binding PrintifyTool.VariantSummary}" Foreground="{DynamicResource SecondaryTextBrush}" />
                       <TextBlock Text="{Binding PrintifyTool.ArtworkSummary}" Foreground="{DynamicResource SecondaryTextBrush}" />
                       <TextBlock Text="{Binding PrintifyTool.ErrorMessage}"
@@ -1076,6 +1129,28 @@
                                  TextWrapping="Wrap"
                                  Foreground="{DynamicResource WarningTextBrush}"
                                  AutomationProperties.Name="Why Printify publishing is unavailable" />
+                      <Border IsVisible="{Binding PrintifyTool.IsPublishAvailabilityConfirmationVisible}"
+                              Padding="{DynamicResource Token.Layout.PreviewPadding}"
+                              Background="{DynamicResource WarningSurfaceBrush}"
+                              BorderBrush="{DynamicResource WarningTextBrush}"
+                              BorderThickness="1"
+                              AutomationProperties.Name="Confirm Printify availability setting">
+                        <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
+                          <TextBlock Text="{Binding PrintifyTool.PublishAvailabilityReminder}" TextWrapping="Wrap" />
+                          <CheckBox Content="I checked the product setting in Printify"
+                                    IsChecked="{Binding PrintifyTool.PublishAvailabilityAcknowledged, Mode=TwoWay}"
+                                    AutomationProperties.AutomationId="Printify.AvailabilityAcknowledged" />
+                          <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.InlineGap}">
+                            <Button Content="Continue to publish"
+                                    Command="{Binding PrintifyTool.ConfirmPublishAvailabilityCommand}"
+                                    IsEnabled="{Binding PrintifyTool.CanConfirmPublishAvailability}"
+                                    AutomationProperties.AutomationId="Printify.ConfirmPublishAvailability" />
+                            <Button Content="Cancel"
+                                    Command="{Binding PrintifyTool.CancelPublishAvailabilityCommand}"
+                                    AutomationProperties.AutomationId="Printify.CancelPublishAvailability" />
+                          </StackPanel>
+                        </StackPanel>
+                      </Border>
                       <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.InlineGap}">
                         <Button Content="Archive locally" Command="{Binding PrintifyTool.ArchiveCommand}" />
                         <Button Content="Delete remote draft"
@@ -1687,54 +1762,20 @@
                         </Border>
                       </StackPanel>
 
-                      <!-- Color Working Set -->
+                      <!-- Artwork Variants -->
                       <StackPanel IsVisible="{Binding DesignTool.ShowsConfiguredState}" Spacing="{DynamicResource Token.Spacing.InlineGap}">
-                         <TextBlock Text="Color Working Set" FontSize="{DynamicResource Token.Typography.SectionHeading}" FontWeight="SemiBold"
-                                   Foreground="{DynamicResource StrongTextBrush}" />
-                         <TextBlock Text="Select the colors this design will use." TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Helper}"
-                                   Foreground="{DynamicResource SecondaryTextBrush}" />
-
-                        <ItemsControl ItemsSource="{Binding DesignTool.AvailableColors}">
-                          <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
-                          </ItemsControl.ItemsPanel>
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="stageTools:DesignColorViewModel">
-                              <ToggleButton Content="{Binding ColorValue}"
-                                            IsChecked="{Binding IsSelected}"
-                                            IsEnabled="{Binding !IsReadOnly}"
-                                            Click="OnColorToggle"
-                                            Classes="compactChip" />
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-
-                         <TextBlock Text="Selected colors" FontSize="{DynamicResource Token.Typography.Label}" FontWeight="SemiBold"
-                                    Foreground="{DynamicResource StrongTextBrush}" />
-                         <ItemsControl ItemsSource="{Binding DesignTool.SelectedColors}">
-                           <ItemsControl.ItemsPanel>
-                             <ItemsPanelTemplate>
-                               <StackPanel Spacing="{DynamicResource Token.Spacing.SelectedColorRowGap}" />
-                             </ItemsPanelTemplate>
-                           </ItemsControl.ItemsPanel>
-                           <ItemsControl.ItemTemplate>
-                             <DataTemplate x:DataType="stageTools:DesignColorViewModel">
-                               <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="{DynamicResource Token.Spacing.InlineGap}">
-                                 <TextBlock Text="{Binding ColorValue}"
-                                            Width="{DynamicResource Token.Control.SelectedColorLabelWidth}"
-                                            Foreground="{DynamicResource PrimaryTextBrush}" />
-                                <Button Grid.Column="1" Content="Make specific"
-                                        IsEnabled="{Binding !IsReadOnly}"
-                                        Click="OnMakeSpecificForColor"
-                                         Tag="{Binding ColorValue}"
-                                         Classes="compactAction"
-                                        AutomationProperties.Name="Make specific design for color" />
-                              </Grid>
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{DynamicResource Token.Spacing.InlineGap}">
+                          <StackPanel Spacing="{DynamicResource Token.Spacing.Gap.Tight}">
+                            <TextBlock Text="Artwork Variants" FontSize="{DynamicResource Token.Typography.SectionHeading}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource StrongTextBrush}" />
+                            <TextBlock Text="Create artwork for light or dark products. Listing colors are selected later."
+                                       TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Helper}"
+                                       Foreground="{DynamicResource SecondaryTextBrush}" />
+                          </StackPanel>
+                          <Button Grid.Column="1" Content="Add variant" Command="{Binding DesignTool.AddArtworkVariantCommand}"
+                                  Classes="compactAction" AutomationProperties.Name="Add artwork variant" />
+                        </Grid>
                       </StackPanel>
-
                       <!-- Row x Area Slot Grid -->
                       <StackPanel IsVisible="{Binding DesignTool.ShowsConfiguredState}" Spacing="{DynamicResource Token.Spacing.InlineGap}">
                          <TextBlock Text="Design Slot Grid" FontSize="{DynamicResource Token.Typography.SectionHeading}" FontWeight="SemiBold"
@@ -1748,7 +1789,7 @@
                                       BorderThickness="1" CornerRadius="6">
                                 <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
                                   <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{DynamicResource Token.Spacing.CompactGap}">
-                                     <TextBlock Text="{Binding ColorChips}" FontSize="{DynamicResource Token.Typography.Label}" FontWeight="SemiBold"
+                                     <TextBlock Text="{Binding DisplayName}" FontSize="{DynamicResource Token.Typography.Label}" FontWeight="SemiBold"
                                                Foreground="{DynamicResource PrimaryTextBrush}" />
                                     <Button Grid.Column="1" Content="Remove row"
                                             IsVisible="{Binding CanRemove}"

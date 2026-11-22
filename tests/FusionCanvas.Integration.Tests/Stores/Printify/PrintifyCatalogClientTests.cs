@@ -57,10 +57,13 @@ public sealed class PrintifyCatalogClientTests
     public async Task GroupsShopProductsByBlueprintAndLoadsFullCatalogVariantsForEveryUsedProvider()
     {
         var requests = new List<string>();
+        var providerVariantQueries = new List<string>();
         using var client = new HttpClient(new Handler((request, _) =>
         {
             var path = request.RequestUri!.AbsolutePath;
             requests.Add(path);
+            if (path.EndsWith("/variants.json", StringComparison.Ordinal))
+                providerVariantQueries.Add(request.RequestUri.Query);
             var body = path.EndsWith("/shops/42/products.json", StringComparison.Ordinal)
                 ? "{\"last_page\":1,\"data\":[{\"id\":\"product-a\",\"title\":\"Listing A\",\"blueprint_id\":68,\"print_provider_id\":9},{\"id\":\"product-b\",\"title\":\"Listing B\",\"blueprint_id\":68,\"print_provider_id\":9},{\"id\":\"product-c\",\"title\":\"Listing C\",\"blueprint_id\":68,\"print_provider_id\":10}]}"
                 : path.EndsWith("/blueprints/68.json", StringComparison.Ordinal)
@@ -102,20 +105,22 @@ public sealed class PrintifyCatalogClientTests
         Assert.Equal(68, blueprint.Summary.Id);
         Assert.Equal([9, 10], blueprint.Providers.Select(provider => provider.Id));
         var swift = blueprint.Providers.Single(provider => provider.Id == 9);
-        Assert.Equal([101, 102], swift.Variants.Select(variant => variant.Id));
+        Assert.Equal([101, 102, 103], swift.Variants.Select(variant => variant.Id));
         Assert.Equal(2, swift.Options.Count);
-        Assert.Equal([1, 2], swift.Options.Single(option => option.Name == "Color").Values.Select(value => value.Id));
+        Assert.Equal([1, 2, 6], swift.Options.Single(option => option.Name == "Color").Values.Select(value => value.Id));
+        Assert.Equal("#111111", swift.Options.Single(option => option.Name == "Color").Values[0].Hex);
         Assert.Equal([3, 4], swift.Options.Single(option => option.Name == "Size").Values.Select(value => value.Id));
         Assert.Equal([1, 3], swift.Variants[0].OptionValueIds);
         Assert.Equal([2, 4], swift.Variants[1].OptionValueIds);
-        Assert.Single(blueprint.Providers.Single(provider => provider.Id == 10).Variants);
+        Assert.Equal([201, 202], blueprint.Providers.Single(provider => provider.Id == 10).Variants.Select(variant => variant.Id));
         Assert.DoesNotContain(11, blueprint.Providers.Select(provider => provider.Id));
         Assert.Contains("/v1/catalog/blueprints/68/print_providers/9/variants.json", requests);
         Assert.Contains("/v1/catalog/blueprints/68/print_providers/10/variants.json", requests);
+        Assert.Equal(["?show-out-of-stock=1", "?show-out-of-stock=1"], providerVariantQueries);
     }
 
     private static string ProductDetail(string id, string title, int providerId, int variantId) =>
-        $"{{\"id\":\"{id}\",\"title\":\"{title}\",\"blueprint_id\":68,\"print_provider_id\":{providerId},\"options\":[{{\"name\":\"Color\",\"type\":\"color\",\"values\":[{{\"id\":1,\"title\":\"Black\"}},{{\"id\":2,\"title\":\"White\"}}]}},{{\"name\":\"Size\",\"type\":\"size\",\"values\":[{{\"id\":3,\"title\":\"S\"}},{{\"id\":4,\"title\":\"M\"}}]}}],\"variants\":[{{\"id\":{variantId},\"title\":\"Configured variant\",\"options\":[1,3],\"is_enabled\":true,\"is_available\":true}}],\"print_areas\":[]}}";
+        $"{{\"id\":\"{id}\",\"title\":\"{title}\",\"blueprint_id\":68,\"print_provider_id\":{providerId},\"options\":[{{\"name\":\"Color\",\"type\":\"color\",\"values\":[{{\"id\":1,\"title\":\"Black\",\"hex\":\"#111111\"}},{{\"id\":2,\"title\":\"White\"}},{{\"id\":6,\"title\":\"Red\"}}]}},{{\"name\":\"Size\",\"type\":\"size\",\"values\":[{{\"id\":3,\"title\":\"S\"}},{{\"id\":4,\"title\":\"M\"}}]}}],\"variants\":[{{\"id\":{variantId},\"title\":\"Configured variant\",\"options\":[1,3],\"is_enabled\":true,\"is_available\":true}}],\"print_areas\":[]}}";
 
     [Fact]
     public async Task SelectedShopProductUsesAuthoritativeCatalogBlueprintIdentity()

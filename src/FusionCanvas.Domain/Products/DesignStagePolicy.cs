@@ -12,6 +12,76 @@ namespace FusionCanvas.Domain.Products;
 /// </summary>
 public static class DesignStagePolicy
 {
+    /// <summary>Validates that Design variants are independent of Listing Color selection.</summary>
+    public static void ValidateArtworkVariants(
+        Guid itemId,
+        IReadOnlyList<DesignVariantRow> variants,
+        IReadOnlyList<DesignSlotAssignment> assignments)
+    {
+        var itemVariants = variants.Where(value => value.ItemId == itemId).ToArray();
+        var variantIds = itemVariants.Select(value => value.Id).ToHashSet();
+        var itemAssignments = assignments.Where(value => variantIds.Contains(value.RowId)).ToArray();
+
+        if (itemVariants.Length == 0)
+        {
+            if (itemAssignments.Length > 0)
+            {
+                throw new InvalidOperationException($"Item {itemId} has artwork assignments without an artwork variant.");
+            }
+
+            return;
+        }
+
+        if (itemVariants.Count(value => value.IsDefault) != 1)
+        {
+            throw new InvalidOperationException($"Item {itemId} must have exactly one default artwork variant.");
+        }
+
+        if (itemVariants.Select(value => value.SortOrder).Distinct().Count() != itemVariants.Length)
+        {
+            throw new InvalidOperationException($"Item {itemId} has duplicate artwork variant order values.");
+        }
+
+        var slotKeys = new HashSet<(Guid VariantId, Guid AreaId)>();
+        foreach (var assignment in itemAssignments)
+        {
+            if (!slotKeys.Add((assignment.RowId, assignment.DesignAreaId)))
+            {
+                throw new InvalidOperationException($"Artwork variant {assignment.RowId} has duplicate assignments for Design Area {assignment.DesignAreaId}.");
+            }
+        }
+    }
+
+    /// <summary>Validates Item-scoped Color-to-artwork assignments against their owner Item.</summary>
+    public static void ValidateListingColorSelections(
+        Guid itemId,
+        IReadOnlyList<ListingColorSelection> selections,
+        IReadOnlyList<DesignVariantRow> artworkVariants)
+    {
+        var itemSelections = selections.Where(value => value.ItemId == itemId).ToArray();
+        var itemVariants = artworkVariants.Where(value => value.ItemId == itemId).Select(value => value.Id).ToHashSet();
+        if (itemSelections.Any(value => !itemVariants.Contains(value.ArtworkVariantId)))
+        {
+            throw new InvalidOperationException($"A Listing Color for Item {itemId} references an artwork variant that does not belong to that Item.");
+        }
+
+        var duplicateResolved = itemSelections.Where(value => value.ColorOptionValueId.HasValue)
+            .GroupBy(value => value.ColorOptionValueId)
+            .FirstOrDefault(group => group.Count() > 1);
+        if (duplicateResolved is not null)
+        {
+            throw new InvalidOperationException($"Color Option Value {duplicateResolved.Key} is selected more than once for Item {itemId}.");
+        }
+
+        var duplicateLegacy = itemSelections.Where(value => value.LegacyColorLabel is not null)
+            .GroupBy(value => value.LegacyColorLabel!, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(group => group.Count() > 1);
+        if (duplicateLegacy is not null)
+        {
+            throw new InvalidOperationException($"Legacy Color '{duplicateLegacy.Key}' is selected more than once for Item {itemId}.");
+        }
+    }
+
     /// <summary>
     /// Validates that an offering can be selected as an item's listing configuration.
     /// </summary>

@@ -26,19 +26,21 @@ public sealed record OfferingVariant
     public string Name { get; init; }
     public IReadOnlyList<Guid> OptionValueIds => _optionValueIds;
     public bool IsArchived { get; init; }
+    /// <summary>Last-known provider stock availability; null means the provider has not reported it.</summary>
+    public bool? ProviderIsAvailable { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
     public DateTimeOffset UpdatedAt { get; init; }
     public string MetadataJson { get; init; }
 
     public bool Equals(OfferingVariant? other) => other is not null
         && Id == other.Id && OfferingId == other.OfferingId && Name == other.Name
-        && IsArchived == other.IsArchived && CreatedAt == other.CreatedAt && UpdatedAt == other.UpdatedAt
+        && IsArchived == other.IsArchived && ProviderIsAvailable == other.ProviderIsAvailable && CreatedAt == other.CreatedAt && UpdatedAt == other.UpdatedAt
         && MetadataJson == other.MetadataJson && _optionValueIds.SequenceEqual(other._optionValueIds);
 
     public override int GetHashCode()
     {
         var hash = new HashCode();
-        hash.Add(Id); hash.Add(OfferingId); hash.Add(Name); hash.Add(IsArchived); hash.Add(CreatedAt); hash.Add(UpdatedAt); hash.Add(MetadataJson);
+        hash.Add(Id); hash.Add(OfferingId); hash.Add(Name); hash.Add(IsArchived); hash.Add(ProviderIsAvailable); hash.Add(CreatedAt); hash.Add(UpdatedAt); hash.Add(MetadataJson);
         foreach (var value in _optionValueIds) hash.Add(value);
         return hash.ToHashCode();
     }

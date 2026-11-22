@@ -22,4 +22,7 @@ public sealed record ListingProjectionRequest(
     IReadOnlyDictionary<Guid, ArtworkDimensions> ArtworkDimensions,
     ListingPricingInput Pricing,
     string? ShippingProfile = null,
-    string? OutOfStockPolicy = null);
+    string? OutOfStockPolicy = null)
+{
+    public IReadOnlyList<ListingColorSelection> ListingColorSelections { get; init; } = [];
+}

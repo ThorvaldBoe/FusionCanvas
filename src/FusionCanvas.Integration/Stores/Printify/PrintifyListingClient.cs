@@ -330,29 +330,34 @@ public sealed class PrintifyListingClient : IListingConnectionPort, IListingImag
         if (variants.Length != projection.Variants.Count)
             throw new InvalidOperationException("One or more selected variants has no Printify identity.");
 
-        var variantIds = variants.Select(value => value.id).ToArray();
-        var areas = projection.Artwork.Select(area => new
+        var remoteIdsByVariant = projection.Variants
+            .Where(value => value.ExternalVariantId is not null)
+            .ToDictionary(value => value.SourceVariantId, value => value.ExternalVariantId!.Value);
+        var areas = projection.Artwork.GroupBy(area => (area.Position, area.AssetId, area.Placement))
+            .Select(group => new
         {
-            variant_ids = variantIds,
+            variant_ids = group.SelectMany(area => area.SourceVariantIds)
+                .Where(remoteIdsByVariant.ContainsKey)
+                .Select(id => remoteIdsByVariant[id]).Distinct().ToArray(),
             placeholders = new[]
             {
                 new
                 {
-                    position = area.Position,
+                    position = group.Key.Position,
                     images = new[]
                     {
                         new
                         {
-                            id = images.TryGetValue(area.AssetId, out var image) ? image.ReferenceId : throw new InvalidOperationException($"No uploaded Printify image exists for artwork asset '{area.AssetId}'."),
-                            x = area.Placement.X,
-                            y = area.Placement.Y,
-                            scale = area.Placement.Scale,
-                            angle = area.Placement.Angle
+                            id = images.TryGetValue(group.Key.AssetId, out var image) ? image.ReferenceId : throw new InvalidOperationException($"No uploaded Printify image exists for artwork asset '{group.Key.AssetId}'."),
+                            x = group.Key.Placement.X,
+                            y = group.Key.Placement.Y,
+                            scale = group.Key.Placement.Scale,
+                            angle = group.Key.Placement.Angle
                         }
                     }
                 }
             }
-        }).ToArray();
+        }).Where(value => value.variant_ids.Length > 0).ToArray();
 
         var shippingTemplate = string.IsNullOrWhiteSpace(projection.ShippingProfile)
             ? null

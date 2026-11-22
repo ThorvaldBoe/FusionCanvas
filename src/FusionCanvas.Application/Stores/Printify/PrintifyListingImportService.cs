@@ -70,6 +70,7 @@ public sealed class PrintifyListingImportService(
             if (existingConfiguration is not null && snapshot.DesignVariantRows.Any(value => value.ItemId == itemId))
                 return new(true, false, "Variant setup is already present; existing local design choices were preserved.");
             if (existingConfiguration is not null && (snapshot.DesignSelectedColors.Any(value => value.ItemId == itemId)
+                || snapshot.ListingColorSelections.Any(value => value.ItemId == itemId)
                 || snapshot.DesignSlotAssignments.Any(value => snapshot.DesignVariantRows.Any(row => row.ItemId == itemId && row.Id == value.RowId))))
                 return new(false, false, "This Item has partial local Design setup. Resolve it before downloading Printify setup to avoid overwriting local choices.");
 
@@ -77,7 +78,7 @@ public sealed class PrintifyListingImportService(
             var configurations = updated.ItemListingConfigurations.Where(value => value.ItemId != itemId).Append(new FusionCanvas.Domain.Products.ItemListingConfiguration(itemId, offering.Id)).ToArray();
             var colorOption = provider.Options.FirstOrDefault(option => option.Name.Equals("Color", StringComparison.OrdinalIgnoreCase) || option.Type.Equals("color", StringComparison.OrdinalIgnoreCase));
             var colorValues = colorOption?.Values.ToDictionary(value => value.Id, value => value.Title) ?? [];
-            var activeVariants = provider.Variants.Where(value => value.IsEnabled && value.IsAvailable).ToArray();
+            var activeVariants = provider.Variants.Where(value => value.IsEnabled).ToArray();
             var colorVariantIds = new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
             foreach (var variant in activeVariants)
             {
@@ -87,7 +88,6 @@ public sealed class PrintifyListingImportService(
             }
             if (colorVariantIds.Count == 0) colorVariantIds["Default"] = activeVariants.Select(value => value.Id).ToHashSet();
             var colors = colorVariantIds.Keys.Order(StringComparer.OrdinalIgnoreCase).ToArray();
-            var selectedColors = updated.DesignSelectedColors.Where(value => value.ItemId != itemId).Concat(colors.Select(color => new FusionCanvas.Domain.Products.DesignSelectedColor(itemId, color))).ToArray();
 
             var imageByVariantArea = detail.PrintAreas.SelectMany(area => area.Images.Select(image => (area, image)))
                 .SelectMany(pair => pair.image.VariantIds.Select(variantId => (variantId, pair.image.Position, pair.image.ImageId, pair.image, pair.area.HasUnsupportedLayers)))
@@ -102,6 +102,7 @@ public sealed class PrintifyListingImportService(
             }).GroupBy(value => value.Signature, StringComparer.Ordinal).ToArray();
             var rows = updated.DesignVariantRows.Where(value => value.ItemId != itemId).ToList();
             var rowColors = updated.DesignVariantRowColors.Where(value => updated.DesignVariantRows.Any(row => row.ItemId != itemId && row.Id == value.RowId)).ToList();
+            var listingSelections = updated.ListingColorSelections.Where(value => value.ItemId != itemId).ToList();
             var assignments = updated.DesignSlotAssignments.Where(value => updated.DesignVariantRows.Any(row => row.ItemId != itemId && row.Id == value.RowId)).ToList();
             var partial = false;
             var unsupportedSlots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -110,7 +111,18 @@ public sealed class PrintifyListingImportService(
             {
                 var rowId = _newId();
                 rows.Add(new(rowId, itemId, index == 0, index));
-                rowColors.AddRange(group.Select(value => new FusionCanvas.Domain.Products.DesignVariantRowColor(rowId, value.Color)));
+                foreach (var color in group)
+                {
+                    var optionValueId = colorValues.Where(pair => string.Equals(pair.Value, color.Color, StringComparison.OrdinalIgnoreCase))
+                        .Select(pair => updated.OfferingOptionValues.FirstOrDefault(optionValue => optionValue.OfferingId == offering.Id
+                            && MetadataHasId(optionValue.MetadataJson, pair.Key)))
+                        .Where(optionValue => optionValue is not null)
+                        .Select(optionValue => optionValue!.Id)
+                        .FirstOrDefault();
+                    listingSelections.Add(optionValueId == Guid.Empty
+                        ? new FusionCanvas.Domain.Products.ListingColorSelection(itemId, null, rowId, listingSelections.Count, color.Color)
+                        : new FusionCanvas.Domain.Products.ListingColorSelection(itemId, optionValueId, rowId, listingSelections.Count));
+                }
                 foreach (var designArea in localAreas)
                 {
                     var candidateImages = group.SelectMany(value => value.VariantIds.SelectMany(variantId => imageByVariantArea.GetValueOrDefault((variantId, designArea.Position)) ?? []))
@@ -126,9 +138,9 @@ public sealed class PrintifyListingImportService(
             await repository.SaveAsync(updated with
             {
                 ItemListingConfigurations = configurations,
-                DesignSelectedColors = selectedColors,
                 DesignVariantRows = rows,
                 DesignVariantRowColors = rowColors,
+                ListingColorSelections = listingSelections,
                 DesignSlotAssignments = assignments
             }, cancellationToken).ConfigureAwait(false);
             return new(true, partial, partial
@@ -306,6 +318,21 @@ public sealed class PrintifyListingImportService(
     private static bool MetadataHasImageId(string json, string imageId)
     {
         try { using var document = JsonDocument.Parse(json); return document.RootElement.TryGetProperty("imageId", out var value) && value.GetString() == imageId; }
+        catch (JsonException) { return false; }
+    }
+
+    private static bool MetadataHasId(string json, int id)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            return document.RootElement.TryGetProperty("source", out var source)
+                && source.ValueKind == JsonValueKind.String && source.GetString() == "printify"
+                && document.RootElement.TryGetProperty("ids", out var ids)
+                && ids.ValueKind == JsonValueKind.Array
+                && ids.EnumerateArray().Any(value => value.ValueKind == JsonValueKind.Number
+                    && value.TryGetInt32(out var actual) && actual == id);
+        }
         catch (JsonException) { return false; }
     }
     private static bool IsPrintifyOwned(string json)

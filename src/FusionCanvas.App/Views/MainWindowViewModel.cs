@@ -221,7 +221,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
             () => _workspaceSnapshot,
             ResolveStore,
             applicationServices.StoreContextMapper ?? new UnavailableStoreContextMapper(),
-            applicationServices.PrintifyListingImport);
+            applicationServices.PrintifyListingImport,
+            applicationServices.ListingColorSelection);
         PrintifyTool.VariantSetupCompleted += async (_, _) => await RefreshWorkspaceAfterImportAsync();
         PrintifyListingImportService = applicationServices.PrintifyListingImport;
         ManualListingDetailsTool = new ManualListingDetailsStageToolViewModel(applicationServices.ManualListingDetails);
