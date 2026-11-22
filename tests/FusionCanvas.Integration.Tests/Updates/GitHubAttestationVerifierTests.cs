@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using FusionCanvas.Application.Updates;
 using FusionCanvas.Integration.Updates;
@@ -32,6 +33,36 @@ public sealed class GitHubAttestationVerifierTests
     public void AcceptsMatchingGitHubProvenanceStatement()
     {
         GitHubAttestationVerifier.ValidateStatement(Statement(), InstallerName, Manifest());
+    }
+
+    [Fact]
+    public async Task VerifiesProductionReleaseBundleWhenConfigured()
+    {
+        var manifestPath = Environment.GetEnvironmentVariable("FUSIONCANVAS_RELEASE_MANIFEST");
+        var installerPath = Environment.GetEnvironmentVariable("FUSIONCANVAS_RELEASE_INSTALLER");
+        var bundlePath = Environment.GetEnvironmentVariable("FUSIONCANVAS_RELEASE_BUNDLE");
+        if (string.IsNullOrWhiteSpace(manifestPath)
+            && string.IsNullOrWhiteSpace(installerPath)
+            && string.IsNullOrWhiteSpace(bundlePath))
+        {
+            return;
+        }
+
+        Assert.False(string.IsNullOrWhiteSpace(manifestPath), "The release manifest path is required.");
+        Assert.False(string.IsNullOrWhiteSpace(installerPath), "The release installer path is required.");
+        Assert.False(string.IsNullOrWhiteSpace(bundlePath), "The release provenance bundle path is required.");
+
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+        var manifestJson = await File.ReadAllTextAsync(manifestPath!, TestContext.Current.CancellationToken);
+        var manifest = JsonSerializer.Deserialize<UpdateManifest>(manifestJson, options);
+        Assert.NotNull(manifest);
+
+        await new GitHubAttestationVerifier().VerifyAsync(
+            installerPath!,
+            bundlePath!,
+            manifest,
+            TestContext.Current.CancellationToken);
     }
 
     [Theory]
