@@ -159,6 +159,7 @@ jobs:
             artifacts/FusionCanvas-*.sha256
             artifacts/FusionCanvas-*.json
             artifacts/verification-results/**
+            tests/FusionCanvas.Integration.Tests/bin/Release/net10.0/TestResults/**
           if-no-files-found: warn
           retention-days: 7
 
