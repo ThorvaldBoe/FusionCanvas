@@ -143,14 +143,14 @@ public sealed class PrintifyCatalogClient : IPrintifyCatalogClient
             var providers = new List<PrintifyCatalogProvider>();
             foreach (var providerGroup in group.GroupBy(product => product.ProviderId).OrderBy(value => value.Key))
             {
-                var catalogProviderResult = await LoadCatalogProviderAsync(key, group.Key, providerGroup.Key, cancellationToken).ConfigureAwait(false);
+                var options = MergeOptionDefinitions(providerGroup.SelectMany(product => product.Options).ToArray());
+                var catalogProviderResult = await LoadCatalogProviderAsync(key, group.Key, providerGroup.Key, options, cancellationToken).ConfigureAwait(false);
                 if (!catalogProviderResult.Succeeded) return catalogProviderResult;
                 var catalogProvider = catalogProviderResult.SelectedCatalog!.Single().Providers.Single();
 
-                var options = MergeOptionDefinitions(providerGroup.SelectMany(product => product.Options).ToArray());
                 var optionValueIds = options.SelectMany(option => option.Values).Select(value => value.Id).ToHashSet();
                 var sellableVariants = catalogProvider.Variants.Where(variant => variant.IsEnabled).ToArray();
-                if (sellableVariants.Any(variant => variant.OptionValueIds.Any(id => !optionValueIds.Contains(id))))
+                if (sellableVariants.Any(variant => variant.OptionValueIds.Count == 0 || variant.OptionValueIds.Any(id => !optionValueIds.Contains(id))))
                     return new(PrintifyCatalogResultKind.UnexpectedResponse, "Printify catalog option data does not cover every sellable Variant.");
                 providers.Add(catalogProvider with { Options = options, Variants = sellableVariants });
                 progress?.Report(new("Loading Provider catalogs", ++providersCompleted, providerTotal));
@@ -231,7 +231,7 @@ public sealed class PrintifyCatalogClient : IPrintifyCatalogClient
             if (productDetail.ProductId != product.ProductId || productDetail.Summary.Id != product.BlueprintId || productDetail.Providers.Count != 1 || productDetail.Providers[0].Id != product.ProviderId)
                 return Unexpected();
             var provider = productDetail.Providers.Single();
-            var catalogProvider = await LoadCatalogProviderAsync(key, product.BlueprintId, provider.Id, cancellationToken).ConfigureAwait(false);
+            var catalogProvider = await LoadCatalogProviderAsync(key, product.BlueprintId, provider.Id, null, cancellationToken).ConfigureAwait(false);
             if (!catalogProvider.Succeeded) return catalogProvider;
             var resolvedProvider = catalogProvider.SelectedCatalog![0].Providers.Single();
             var productVariants = new Dictionary<int, PrintifyCatalogVariant>();
@@ -315,7 +315,12 @@ public sealed class PrintifyCatalogClient : IPrintifyCatalogClient
             [new PrintifyCatalogProvider(providerId, $"Printify provider {providerId}", options, variants)]) { ProductId = productId };
     }
 
-    private async Task<PrintifyCatalogResult> LoadCatalogProviderAsync(string key, int blueprintId, int providerId, CancellationToken cancellationToken)
+    private async Task<PrintifyCatalogResult> LoadCatalogProviderAsync(
+        string key,
+        int blueprintId,
+        int providerId,
+        IReadOnlyList<PrintifyCatalogOption>? optionDefinitions,
+        CancellationToken cancellationToken)
     {
         var providersResponse = await SendJsonAsync($"{CatalogBaseUri}blueprints/{blueprintId}/print_providers.json", key, cancellationToken).ConfigureAwait(false);
         if (providersResponse.Error is not null) return providersResponse.Error;
@@ -329,7 +334,7 @@ public sealed class PrintifyCatalogClient : IPrintifyCatalogClient
             using var variantsDocument = variantsResponse.Json!;
             return new(PrintifyCatalogResultKind.Succeeded, "Printify provider loaded.", SelectedCatalog: [new PrintifyCatalogBlueprint(
                 new PrintifyCatalogBlueprintSummary(blueprintId, $"Blueprint {blueprintId}", null, null, null),
-                [provider with { Variants = ParseVariants(variantsDocument) }])]);
+                [provider with { Variants = ParseVariants(variantsDocument, optionDefinitions) }])]);
         }
         catch (JsonException) { return Unexpected(); }
         catch (InvalidOperationException) { return Unexpected(); }
@@ -579,17 +584,56 @@ public sealed class PrintifyCatalogClient : IPrintifyCatalogClient
             RequiredInt(item, "id"), RequiredString(item, "title"), [], [])).ToList();
     }
 
-    private static List<PrintifyCatalogVariant> ParseVariants(JsonDocument document)
+    private static List<PrintifyCatalogVariant> ParseVariants(
+        JsonDocument document,
+        IReadOnlyList<PrintifyCatalogOption>? optionDefinitions = null)
     {
         var root = document.RootElement;
         var variants = root.ValueKind == JsonValueKind.Object && root.TryGetProperty("variants", out var objectVariants)
             ? objectVariants
             : root;
         if (variants.ValueKind != JsonValueKind.Array) throw new JsonException();
-        return variants.EnumerateArray().Select(item => new PrintifyCatalogVariant(
-            RequiredInt(item, "id"), RequiredString(item, "title"),
-            OptionalBool(item, "is_enabled", true), OptionalBool(item, "is_available", true),
-            ParseOptionIds(item), ParsePlaceholders(item), OptionalProductionCost(item))).ToList();
+        return variants.EnumerateArray().Select(item =>
+        {
+            var enabled = OptionalBool(item, "is_enabled", true);
+            return new PrintifyCatalogVariant(
+                RequiredInt(item, "id"), RequiredString(item, "title"),
+                enabled, OptionalBool(item, "is_available", true),
+                ParseCatalogVariantOptionIds(item, enabled ? optionDefinitions : null),
+                ParsePlaceholders(item), OptionalProductionCost(item));
+        }).ToList();
+    }
+
+    private static IReadOnlyList<int> ParseCatalogVariantOptionIds(
+        JsonElement variant,
+        IReadOnlyList<PrintifyCatalogOption>? optionDefinitions)
+    {
+        if (optionDefinitions is null || !variant.TryGetProperty("options", out var options) || options.ValueKind != JsonValueKind.Object)
+            return ParseOptionIds(variant);
+
+        // Catalog variants give choice labels. The shop's option definitions supply their stable IDs.
+        var optionIds = new HashSet<int>();
+        foreach (var choice in options.EnumerateObject())
+        {
+            var label = choice.Value.ValueKind == JsonValueKind.String ? choice.Value.GetString()?.Trim() : null;
+            if (string.IsNullOrEmpty(label))
+                throw new JsonException();
+
+            var optionName = choice.Name.Trim();
+            var matches = optionDefinitions
+                .Where(option => string.Equals(option.Type, optionName, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(option.Name, optionName, StringComparison.OrdinalIgnoreCase))
+                .SelectMany(option => option.Values)
+                .Where(value => string.Equals(value.Title, label, StringComparison.OrdinalIgnoreCase))
+                .Select(value => value.Id)
+                .Distinct()
+                .Take(2)
+                .ToArray();
+            if (matches.Length != 1 || !optionIds.Add(matches[0]))
+                throw new JsonException();
+        }
+
+        return optionIds.Order().ToArray();
     }
 
     private static decimal? OptionalProductionCost(JsonElement variant)
